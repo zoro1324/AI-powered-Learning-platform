@@ -216,23 +216,54 @@ class VideoGeneratorService:
     # ------------------------------------------------------------------
 
     async def _generate_audio_async(self, text: str, index: int) -> str | None:
-        import edge_tts
+        try:
+            import edge_tts
+        except ImportError as e:
+            logger.error(f"❌ edge_tts not installed: {e}")
+            logger.error("Install with: pip install edge-tts")
+            return None
 
         voice = "en-US-ChristopherNeural"
         output_file = os.path.join(self.audio_dir, f"scene_{index}.mp3")
+        
         try:
+            logger.info(f"Starting Edge-TTS for scene {index}...")
+            logger.info(f"  Voice: {voice}")
+            logger.info(f"  Output: {output_file}")
+            logger.info(f"  Text length: {len(text)} characters")
+            
             communicate = edge_tts.Communicate(text, voice)
             await communicate.save(output_file)
+            
+            # Verify file was created
+            if os.path.exists(output_file):
+                file_size = os.path.getsize(output_file)
+                logger.info(f"✅ Edge-TTS completed: {output_file} ({file_size} bytes)")
+                if file_size == 0:
+                    logger.error(f"❌ Audio file is empty!")
+                    return None
+            else:
+                logger.error(f"❌ Audio file was not created!")
+                return None
+                
             return output_file
-        except Exception:
-            logger.exception("Audio generation failed for scene %d", index)
+        except Exception as e:
+            logger.exception(f"Audio generation failed for scene {index}: {str(e)}")
             return None
 
     def generate_audio(self, text: str, index: int) -> str | None:
         """Synchronous wrapper around the async TTS call."""
+        logger.info(f"Generating audio for scene {index}...")
+        logger.info(f"Narration text: {text[:100]}...")
         loop = asyncio.new_event_loop()
         try:
-            return loop.run_until_complete(self._generate_audio_async(text, index))
+            audio_file = loop.run_until_complete(self._generate_audio_async(text, index))
+            if audio_file and os.path.exists(audio_file):
+                file_size = os.path.getsize(audio_file)
+                logger.info(f"✅ Audio generated: {audio_file} ({file_size} bytes)")
+            else:
+                logger.error(f"❌ Audio file not created for scene {index}")
+            return audio_file
         finally:
             loop.close()
 
@@ -243,13 +274,33 @@ class VideoGeneratorService:
     def create_video_clip(self, image_path: str, audio_path: str, index: int) -> str | None:
         output_path = os.path.join(self.video_dir, f"scene_{index}.mp4")
         try:
+            logger.info(f"Creating video clip {index}...")
+            logger.info(f"  Image: {image_path} (exists: {os.path.exists(image_path)})")
+            logger.info(f"  Audio: {audio_path} (exists: {os.path.exists(audio_path)})")
+            
+            # Check if audio file exists and has content
+            if not os.path.exists(audio_path):
+                logger.error(f"❌ Audio file missing: {audio_path}")
+                return None
+            
+            audio_size = os.path.getsize(audio_path)
+            logger.info(f"  Audio file size: {audio_size} bytes")
+            
+            if audio_size == 0:
+                logger.error(f"❌ Audio file is empty: {audio_path}")
+                return None
+            
             audio_clip = AudioFileClip(audio_path)
+            logger.info(f"  Audio duration: {audio_clip.duration}s")
+            
             video_clip = (
                 ImageClip(image_path)
                 .with_duration(audio_clip.duration)
                 .with_fps(24)
-                .with_audio(audio_clip)
+                .set_audio(audio_clip)  # Changed from with_audio to set_audio
             )
+            
+            logger.info(f"  Writing video file with audio...")
             video_clip.write_videofile(
                 output_path,
                 fps=24,
@@ -260,6 +311,14 @@ class VideoGeneratorService:
                 threads=4,
                 logger=None,
             )
+            
+            # Verify output
+            if os.path.exists(output_path):
+                output_size = os.path.getsize(output_path)
+                logger.info(f"✅ Video clip created: {output_path} ({output_size} bytes)")
+            else:
+                logger.error(f"❌ Video clip not created: {output_path}")
+            
             video_clip.close()
             audio_clip.close()
             time.sleep(0.5)
@@ -275,8 +334,18 @@ class VideoGeneratorService:
     def merge_scenes(self, video_files: list[str]) -> str | None:
         output_path = os.path.join(self.video_dir, "final_video.mp4")
         try:
-            clips = [VideoFileClip(f) for f in video_files]
-            final_clip = concatenate_videoclips(clips)
+            logger.info(f"Merging {len(video_files)} video clips...")
+            clips = []
+            for f in video_files:
+                logger.info(f"  Loading clip: {f}")
+                clip = VideoFileClip(f)
+                has_audio = clip.audio is not None
+                logger.info(f"    Duration: {clip.duration}s, Has audio: {has_audio}")
+                clips.append(clip)
+            
+            final_clip = concatenate_videoclips(clips, method="compose")
+            logger.info(f"Final clip duration: {final_clip.duration}s, Has audio: {final_clip.audio is not None}")
+            
             final_clip.write_videofile(
                 output_path,
                 fps=24,
@@ -287,6 +356,12 @@ class VideoGeneratorService:
                 threads=4,
                 logger=None,
             )
+            
+            # Verify final output
+            if os.path.exists(output_path):
+                final_size = os.path.getsize(output_path)
+                logger.info(f"✅ Final video created: {output_path} ({final_size} bytes)")
+            
             final_clip.close()
             for clip in clips:
                 clip.close()
@@ -324,36 +399,71 @@ class VideoGeneratorService:
 
         # --- Scenes ---
         video_clips: list[str] = []
+        failed_scenes = []
+        
         for i, scene in enumerate(scenes, 1):
+            scene_title = scene.get('title', f'Scene {i}')
+            logger.info(f"\n{'='*60}")
+            logger.info(f"Processing scene {i}/{len(scenes)}: {scene_title}")
+            logger.info(f"{'='*60}")
+            
             self._update_task(
-                progress_message=f"Processing scene {i}/{len(scenes)}: {scene.get('title', '')}",
+                progress_message=f"Processing scene {i}/{len(scenes)}: {scene_title}",
             )
 
             # Image
             generated_img_path = None
             image_prompt = scene.get("image_prompt")
             if image_prompt:
+                logger.info(f"Generating AI image for: {image_prompt[:50]}...")
                 raw_path = os.path.join(self.scene_dir, f"scene_{i}_raw.png")
                 generated_img_path = self.generate_image(image_prompt, raw_path)
+                if generated_img_path:
+                    logger.info(f"✅ Image generated: {generated_img_path}")
+                else:
+                    logger.warning(f"⚠️ Image generation failed, will use text-only slide")
 
             # Slide
+            logger.info(f"Creating slide for scene {i}...")
             slide_path = self.create_slide(scene, i, image_path=generated_img_path)
+            logger.info(f"✅ Slide created: {slide_path}")
 
             # Audio
             narration = scene.get("narration", "")
             if not narration:
+                logger.warning(f"⚠️ Scene {i} has no narration text, skipping...")
+                failed_scenes.append((i, "No narration text"))
                 continue
+            
+            logger.info(f"Narration: {narration[:100]}...")
             audio_path = self.generate_audio(narration, i)
             if not audio_path:
+                logger.error(f"❌ Audio generation failed for scene {i}!")
+                failed_scenes.append((i, "Audio generation failed"))
                 continue
 
             # Clip
+            logger.info(f"Creating video clip for scene {i}...")
             clip_path = self.create_video_clip(slide_path, audio_path, i)
             if clip_path:
                 video_clips.append(clip_path)
+                logger.info(f"✅ Scene {i} completed successfully!")
+            else:
+                logger.error(f"❌ Video clip creation failed for scene {i}!")
+                failed_scenes.append((i, "Video clip creation failed"))
+
+        logger.info(f"\n{'='*60}")
+        logger.info(f"Scene processing complete:")
+        logger.info(f"  Successful: {len(video_clips)}/{len(scenes)}")
+        logger.info(f"  Failed: {len(failed_scenes)}")
+        if failed_scenes:
+            logger.warning(f"  Failed scenes: {failed_scenes}")
+        logger.info(f"{'='*60}\n")
 
         if not video_clips:
-            raise RuntimeError("No video clips were created.")
+            error_msg = f"No video clips were created. Failed scenes: {failed_scenes}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
 
         # --- Merge ---
         self._update_task(progress_message="Merging scenes into final video...")

@@ -132,7 +132,23 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
   }, [dispatch, eId, currentModule, quiz, quizAnswers, mIdx, tIdx]);
 
   const handleGenerateVideo = useCallback(() => {
-    if (!currentTopic) return;
+    console.log('🎬 handleGenerateVideo called');
+    console.log('📍 currentTopic:', currentTopic);
+    console.log('📍 mIdx:', mIdx, 'tIdx:', tIdx);
+    console.log('📍 content:', content);
+    
+    if (!currentTopic) {
+      console.error('❌ currentTopic is undefined, cannot generate video');
+      return;
+    }
+    
+    console.log('✅ Dispatching generateVideo with:', {
+      topicName: currentTopic.topic_name,
+      lessonId: content?.lessonId,
+      moduleIndex: mIdx,
+      topicIndex: tIdx,
+    });
+    
     dispatch(
       generateVideo({
         topicName: currentTopic.topic_name,
@@ -419,6 +435,16 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                 }
                 onGenerate={handleGenerateVideo}
               >
+                {(() => {
+                  console.log('🎬 Video ToolCard render:', {
+                    videoTask,
+                    status: videoTask?.status,
+                    videoUrl: videoTask?.videoUrl,
+                    isCompleted: videoTask?.status === 'completed',
+                    hasUrl: !!videoTask?.videoUrl,
+                  });
+                  return null;
+                })()}
                 {videoTask?.status === 'completed' && videoTask.videoUrl && (
                   <video
                     controls
@@ -427,6 +453,12 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                   >
                     Your browser does not support video playback.
                   </video>
+                )}
+                {videoTask?.status === 'completed' && !videoTask.videoUrl && (
+                  <div className="text-yellow-400 text-sm flex items-center gap-2">
+                    <Clock className="w-4 h-4" />
+                    Video completed but URL not available yet
+                  </div>
                 )}
                 {videoTask?.status === 'failed' && (
                   <div className="text-red-400 text-sm flex items-center gap-2">

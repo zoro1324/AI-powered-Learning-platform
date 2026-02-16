@@ -373,12 +373,17 @@ export const dashboardAPI = {
 
 export const videoAPI = {
   generate: async (data: { topic: string; lesson_id?: number }): Promise<any> => {
+    console.log('📡 videoAPI.generate called with:', data);
+    console.log('📡 Making POST request to: /videos/generate/');
     const response = await api.post('/videos/generate/', data);
+    console.log('📡 Response received:', response.data);
     return response.data;
   },
 
   getStatus: async (taskId: string): Promise<any> => {
+    console.log('📡 Fetching video status for task:', taskId);
     const response = await api.get(`/videos/status/${taskId}/`);
+    console.log('📡 Status response:', response.data);
     return response.data;
   },
 };

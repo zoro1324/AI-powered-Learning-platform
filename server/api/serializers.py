@@ -284,11 +284,13 @@ class VideoTaskCreateSerializer(serializers.Serializer):
 
 class VideoTaskStatusSerializer(serializers.ModelSerializer):
     video_url = serializers.SerializerMethodField()
+    task_id = serializers.CharField(source='id', read_only=True)
 
     class Meta:
         model = VideoTask
         fields = [
             "id",
+            "task_id",
             "topic",
             "status",
             "progress_message",

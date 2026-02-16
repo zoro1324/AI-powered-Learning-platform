@@ -559,13 +559,15 @@ class GenerateVideoView(APIView):
         # Try async with Celery, fall back to sync if unavailable
         try:
             generate_video_task.delay(str(video_task.id))
+            logger.info(f"✅ Video task queued asynchronously: {video_task.id}")
         except Exception as e:
-            logger.warning(f"Celery unavailable ({e}), running synchronously...")
+            # Fallback to synchronous execution (works without Redis)
+            logger.info(f"ℹ️ Running video generation synchronously (Redis not available)")
             try:
                 # Run synchronously using .apply() instead of .delay()
                 generate_video_task.apply(args=[str(video_task.id)])
             except Exception as sync_error:
-                logger.error(f"Synchronous execution also failed: {sync_error}")
+                logger.error(f"❌ Video generation failed: {sync_error}")
                 video_task.status = "failed"
                 video_task.progress_message = f"Failed to start: {str(sync_error)}"
                 video_task.save()

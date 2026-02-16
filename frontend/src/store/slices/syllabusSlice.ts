@@ -204,16 +204,19 @@ export const generateVideo = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
+      console.log('🎥 generateVideo thunk called with:', data);
       const response = await videoAPI.generate({
         topic: data.topicName,
         lesson_id: data.lessonId,
       });
+      console.log('✅ Video API response:', response);
       return {
         taskId: response.task_id,
         moduleIndex: data.moduleIndex,
         topicIndex: data.topicIndex,
       };
     } catch (error: any) {
+      console.error('❌ Video generation failed:', error);
       return rejectWithValue(
         error.response?.data?.error || 'Failed to start video generation'
       );
@@ -233,6 +236,7 @@ export const pollVideoStatus = createAsyncThunk(
   ) => {
     try {
       const response = await videoAPI.getStatus(data.taskId);
+      console.log('📊 Video status poll response:', response);
       return {
         ...response,
         taskId: data.taskId,
@@ -240,6 +244,7 @@ export const pollVideoStatus = createAsyncThunk(
         topicIndex: data.topicIndex,
       };
     } catch (error: any) {
+      console.error('❌ Video status poll failed:', error);
       return rejectWithValue(
         error.response?.data?.error || 'Failed to check video status'
       );
@@ -378,14 +383,24 @@ const syllabusSlice = createSlice({
     builder.addCase(pollVideoStatus.fulfilled, (state, action) => {
       const key = topicId(action.payload.moduleIndex, action.payload.topicIndex);
       const existing = state.videoTasks[key];
+      console.log('🔄 Updating video task for key:', key);
+      console.log('📦 Payload:', action.payload);
+      console.log('🎯 Current task:', existing);
+      
       if (existing) {
         existing.status = action.payload.status;
+        console.log('📝 Updated status to:', action.payload.status);
+        
         if (action.payload.status === 'completed') {
           existing.videoUrl = action.payload.video_url;
+          console.log('✅ Video completed! URL:', action.payload.video_url);
         }
         if (action.payload.status === 'failed') {
-          existing.error = action.payload.error || 'Video generation failed';
+          existing.error = action.payload.error_message || action.payload.error || 'Video generation failed';
+          console.log('❌ Video failed:', existing.error);
         }
+      } else {
+        console.warn('⚠️ No existing video task found for key:', key);
       }
     });
   },

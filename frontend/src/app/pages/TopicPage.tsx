@@ -108,45 +108,63 @@ export default function TopicPage() {
     );
   }, [dispatch, eId, currentModule, currentTopic, mIdx, tIdx]);
 
-  // ─── Auto-generate video on page load if not available ────────────────────
+  // ─── Auto-generate video on page load (DISABLED) ──────────────────────────
+  // Video generation now only happens when user clicks "Generate Video" button
 
-  useEffect(() => {
-    // Don't generate if:
-    // - No topic info available
-    // - Video is already generating
-    // - Video task exists and is not failed
-    if (!currentTopic || isVideoLoading) return;
+  // useEffect(() => {
+  //   console.log('📹 Video auto-generation check:', {
+  //     hasCurrentTopic: !!currentTopic,
+  //     isVideoLoading,
+  //     videoTask,
+  //     hasContent: !!content,
+  //   });
     
-    const shouldGenerateVideo = 
-      !videoTask || // No video task exists yet
-      videoTask.status === 'failed'; // Or previous attempt failed
+  //   // Don't generate if:
+  //   // - No topic info available
+  //   // - Video is already generating
+  //   // - Video task exists and is not failed
+  //   if (!currentTopic || isVideoLoading) {
+  //     console.log('⏭️ Skipping video generation:', {
+  //       noTopic: !currentTopic,
+  //       isLoading: isVideoLoading,
+  //     });
+  //     return;
+  //   }
     
-    if (shouldGenerateVideo) {
-      // Use topic description for video generation
-      // Video can be generated even without content
-      const videoSource = content?.content || currentTopic.description;
+  //   const shouldGenerateVideo = 
+  //     !videoTask || // No video task exists yet
+  //     videoTask.status === 'failed'; // Or previous attempt failed
+    
+  //   console.log('🎬 Should generate video?', shouldGenerateVideo);
+    
+  //   if (shouldGenerateVideo) {
+  //     // Use topic description for video generation
+  //     // Video can be generated even without content
+  //     const videoSource = content?.content || currentTopic.description;
       
-      if (videoSource) {
-        console.log(`🎬 Auto-generating video for: ${currentTopic.topic_name}`);
-        dispatch(
-          generateVideo({
-            topicName: currentTopic.topic_name,
-            lessonId: content?.lessonId,
-            moduleIndex: mIdx,
-            topicIndex: tIdx,
-          })
-        );
-      }
-    }
-  }, [
-    currentTopic,
-    videoTask,
-    isVideoLoading,
-    content,
-    dispatch,
-    mIdx,
-    tIdx,
-  ]);
+  //     if (videoSource) {
+  //       console.log(`🎬 Auto-generating video for: ${currentTopic.topic_name}`);
+  //       dispatch(
+  //         generateVideo({
+  //           topicName: currentTopic.topic_name,
+  //           lessonId: content?.lessonId,
+  //           moduleIndex: mIdx,
+  //           topicIndex: tIdx,
+  //         })
+  //       );
+  //     } else {
+  //       console.log('❌ No video source (content or description)');
+  //     }
+  //   }
+  // }, [
+  //   currentTopic,
+  //   videoTask,
+  //   isVideoLoading,
+  //   content,
+  //   dispatch,
+  //   mIdx,
+  //   tIdx,
+  // ]);
 
   // ─── Toggle completion ─────────────────────────────────────────────────────
 
