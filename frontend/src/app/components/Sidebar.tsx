@@ -1,9 +1,11 @@
-import { Home, BookOpen, TrendingUp, Layers, Settings, LogOut } from 'lucide-react';
+import { Home, BookOpen, TrendingUp, Layers, Settings, LogOut, User } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router';
+import { useAuth } from '../../hooks/useAuth';
 
 export function Sidebar() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, handleLogout } = useAuth();
 
   const menuItems = [
     { icon: Home, label: 'Dashboard', path: '/dashboard' },
@@ -13,8 +15,9 @@ export function Sidebar() {
     { icon: Settings, label: 'Settings', path: '/settings' },
   ];
 
-  const handleLogout = () => {
-    navigate('/');
+  const onLogout = async () => {
+    await handleLogout();
+    navigate('/login');
   };
 
   return (
@@ -28,6 +31,27 @@ export function Sidebar() {
           <span className="font-semibold text-xl text-gray-900">LearnPath</span>
         </div>
       </div>
+
+      {/* User Profile Section */}
+      {user && (
+        <div className="px-6 py-4 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            {user.avatar ? (
+              <img src={user.avatar} alt={user.first_name} className="w-10 h-10 rounded-full" />
+            ) : (
+              <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+                <User className="w-6 h-6 text-gray-600" />
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate">
+                {user.first_name} {user.last_name}
+              </p>
+              <p className="text-xs text-gray-500 truncate">{user.email}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Menu Items */}
       <nav className="flex-1 p-4 space-y-1">
@@ -56,7 +80,7 @@ export function Sidebar() {
       {/* Logout */}
       <div className="p-4 border-t border-gray-200">
         <button
-          onClick={handleLogout}
+          onClick={onLogout}
           className="flex items-center gap-3 px-4 py-3 rounded-xl text-red-600 hover:bg-red-50 transition-all w-full"
         >
           <LogOut className="w-5 h-5" />

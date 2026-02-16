@@ -1,7 +1,35 @@
+import { useEffect } from 'react';
+import { useNavigate } from 'react-router';
 import { Sidebar } from '../components/Sidebar';
-import { BookOpen, TrendingUp, Clock, Award } from 'lucide-react';
+import { BookOpen, TrendingUp, Clock, Award, Loader2 } from 'lucide-react';
+import { useAppDispatch, useAppSelector } from '../../store';
+import { fetchDashboard } from '../../store/slices/courseSlice';
 
 export default function DashboardPage() {
+  const dispatch = useAppDispatch();
+  const navigate = useNavigate();
+  const { dashboard, loading } = useAppSelector((state) => state.course);
+  const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    dispatch(fetchDashboard());
+  }, [dispatch, isAuthenticated, navigate]);
+
+  if (loading && !dashboard) {
+    return (
+      <div className="flex min-h-screen bg-gray-50">
+        <Sidebar />
+        <main className="flex-1 ml-64 flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
@@ -10,8 +38,10 @@ export default function DashboardPage() {
         <div className="p-8">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-4xl font-semibold text-gray-900 mb-2">Dashboard</h1>
-            <p className="text-gray-600 text-lg">Welcome back! Here's your learning overview</p>
+            <h1 className="text-4xl font-semibold text-gray-900 mb-2">
+              Welcome back, {user?.first_name || 'Learner'}!
+            </h1>
+            <p className="text-gray-600 text-lg">Here's your learning overview</p>
           </div>
 
           {/* Stats Grid */}
@@ -23,7 +53,9 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <p className="text-gray-600 text-sm">Active Courses</p>
-                  <p className="text-2xl font-bold text-gray-900">3</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {dashboard?.stats?.active_courses || 0}
+                  </p>
                 </div>
               </div>
             </div>
@@ -35,7 +67,9 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <p className="text-gray-600 text-sm">Overall Progress</p>
-                  <p className="text-2xl font-bold text-gray-900">67%</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {dashboard?.stats?.average_progress || 0}%
+                  </p>
                 </div>
               </div>
             </div>
@@ -47,7 +81,9 @@ export default function DashboardPage() {
                 </div>
                 <div>
                   <p className="text-gray-600 text-sm">Learning Hours</p>
-                  <p className="text-2xl font-bold text-gray-900">24h</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {dashboard?.stats?.study_time_hours || 0}h
+                  </p>
                 </div>
               </div>
             </div>
@@ -58,8 +94,10 @@ export default function DashboardPage() {
                   <Award className="w-6 h-6 text-orange-600" />
                 </div>
                 <div>
-                  <p className="text-gray-600 text-sm">Completed</p>
-                  <p className="text-2xl font-bold text-gray-900">12</p>
+                  <p className="text-gray-600 text-sm">Achievements</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {dashboard?.stats?.achievements_earned || 0}
+                  </p>
                 </div>
               </div>
             </div>
@@ -69,22 +107,21 @@ export default function DashboardPage() {
           <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
             <h2 className="text-2xl font-semibold text-gray-900 mb-6">Recent Activity</h2>
             <div className="space-y-4">
-              {[
-                { title: 'Data Structures - Module 3 Completed', time: '2 hours ago', type: 'success' },
-                { title: 'Started Learning: Machine Learning Basics', time: '1 day ago', type: 'info' },
-                { title: 'Assessment Passed - Score: 85%', time: '2 days ago', type: 'success' },
-                { title: 'New Course Added: Web Development', time: '3 days ago', type: 'info' },
-              ].map((activity, idx) => (
-                <div key={idx} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
-                  <div className={`w-2 h-2 rounded-full ${
-                    activity.type === 'success' ? 'bg-green-500' : 'bg-blue-500'
-                  }`}></div>
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900">{activity.title}</p>
-                    <p className="text-sm text-gray-600">{activity.time}</p>
+              {dashboard?.recent_activities && dashboard.recent_activities.length > 0 ? (
+                dashboard.recent_activities.map((activity) => (
+                  <div key={activity.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
+                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                    <div className="flex-1">
+                      <p className="text-gray-900 font-medium">{activity.description}</p>
+                      <p className="text-sm text-gray-500">
+                        {new Date(activity.timestamp).toLocaleString()}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              ))}
+                ))
+              ) : (
+                <p className="text-gray-500 text-center py-4">No recent activity</p>
+              )}
             </div>
           </div>
 
