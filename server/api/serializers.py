@@ -6,7 +6,8 @@ from django.contrib.auth.password_validation import validate_password
 from .models import (
     VideoTask, LearningProfile, Course, Module, Lesson, Resource,
     Enrollment, Question, QuizAttempt, QuizAnswer, ModuleProgress,
-    LearningRoadmap, Achievement, UserAchievement, ActivityLog
+    LearningRoadmap, Achievement, UserAchievement, ActivityLog,
+    PersonalizedSyllabus
 )
 
 User = get_user_model()
@@ -224,6 +225,18 @@ class LearningRoadmapSerializer(serializers.ModelSerializer):
         model = LearningRoadmap
         fields = '__all__'
         read_only_fields = ('enrollment', 'generated_at')
+
+
+class PersonalizedSyllabusSerializer(serializers.ModelSerializer):
+    """Serializer for personalized syllabi"""
+    total_modules = serializers.ReadOnlyField()
+    total_topics = serializers.ReadOnlyField()
+
+    class Meta:
+        model = PersonalizedSyllabus
+        fields = ('id', 'enrollment', 'syllabus_data', 'generated_by_model',
+                  'total_modules', 'total_topics', 'created_at', 'updated_at')
+        read_only_fields = ('enrollment', 'created_at', 'updated_at')
 
 
 class AchievementSerializer(serializers.ModelSerializer):

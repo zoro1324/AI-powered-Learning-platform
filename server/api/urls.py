@@ -10,8 +10,8 @@ from .views import (
     EnrollmentViewSet, QuestionViewSet, QuizAttemptViewSet, QuizAnswerViewSet,
     ModuleProgressViewSet, LearningRoadmapViewSet, AchievementViewSet,
     UserAchievementViewSet, ActivityLogViewSet, DashboardView,
-    InitialAssessmentView, EvaluateAssessmentView, GenerateTopicContentView,
-    GenerateTopicQuizView, EvaluateTopicQuizView
+    InitialAssessmentView, EvaluateAssessmentView, GetSyllabusView,
+    GenerateTopicContentView, GenerateTopicQuizView, EvaluateTopicQuizView
 )
 
 # Create router for ViewSets
@@ -51,6 +51,7 @@ urlpatterns = [
     # Assessment & Personalized Learning
     path('assessment/initial/', InitialAssessmentView.as_view(), name='assessment-initial'),
     path('assessment/evaluate/', EvaluateAssessmentView.as_view(), name='assessment-evaluate'),
+    path('assessment/syllabus/<int:enrollment_id>/', GetSyllabusView.as_view(), name='assessment-syllabus'),
     path('assessment/topic/content/', GenerateTopicContentView.as_view(), name='topic-content'),
     path('assessment/topic/quiz/', GenerateTopicQuizView.as_view(), name='topic-quiz'),
     path('assessment/topic/evaluate/', EvaluateTopicQuizView.as_view(), name='topic-evaluate'),
