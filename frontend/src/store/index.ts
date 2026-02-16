@@ -4,6 +4,7 @@ import authReducer from './slices/authSlice';
 import courseReducer from './slices/courseSlice';
 import quizReducer from './slices/quizSlice';
 import progressReducer from './slices/progressSlice';
+import syllabusReducer from './slices/syllabusSlice';
 
 export const store = configureStore({
   reducer: {
@@ -11,6 +12,7 @@ export const store = configureStore({
     course: courseReducer,
     quiz: quizReducer,
     progress: progressReducer,
+    syllabus: syllabusReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

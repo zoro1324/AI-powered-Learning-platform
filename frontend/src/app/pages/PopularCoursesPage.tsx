@@ -145,12 +145,8 @@ export default function PopularCoursesPage() {
 
   const handleEnrollmentComplete = (enrollmentId: number) => {
     console.log('Enrollment created:', enrollmentId);
-    // Optionally navigate to the course or show a success message
-    if (selectedCourse) {
-      setTimeout(() => {
-        navigate(`/courses/${selectedCourse.id}`);
-      }, 1000);
-    }
+    // Navigate to the personalized course viewer
+    navigate(`/course/${enrollmentId}`);
   };
 
   const filteredCourses = courses.filter((course) => {

@@ -12,6 +12,9 @@ import AssessmentPage from './pages/AssessmentPage';
 import LearningPathPage from './pages/LearningPathPage';
 import FinalQuizPage from './pages/FinalQuizPage';
 import PopularCoursesPage from './pages/PopularCoursesPage';
+import CoursePage from './pages/CoursePage';
+import TopicPage from './pages/TopicPage';
+import { CourseLayout } from './components/CourseLayout';
 
 // Note: Protected routes are handled by checking localStorage in each component
 // Alternatively, use a layout wrapper with auth checking
@@ -72,5 +75,20 @@ export const router = createBrowserRouter([
   {
     path: '/final-quiz',
     Component: FinalQuizPage,
+  },
+  // ─── Coursera + NotebookLM style course viewer ─────────────────────────────
+  {
+    path: '/course/:enrollmentId',
+    Component: CourseLayout,
+    children: [
+      {
+        index: true,
+        Component: CoursePage,
+      },
+      {
+        path: 'module/:moduleIndex/topic/:topicIndex',
+        Component: TopicPage,
+      },
+    ],
   },
 ]);
