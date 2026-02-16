@@ -13,6 +13,7 @@ import { useAppDispatch, useAppSelector } from '../../store';
 import {
   generateTopicContent,
   toggleTopicCompletion,
+  generateVideo,
 } from '../../store/slices/syllabusSlice';
 import { Button } from '../components/ui/button';
 import {
@@ -41,11 +42,15 @@ export default function TopicPage() {
     generatedContent,
     contentLoading,
     topicCompletion,
+    videoTasks,
+    videoLoading,
   } = useAppSelector((state) => state.syllabus);
 
   const content = generatedContent[topicKey];
   const isLoading = !!contentLoading[topicKey];
   const isComplete = !!topicCompletion[topicKey];
+  const videoTask = videoTasks[topicKey];
+  const isVideoLoading = !!videoLoading[topicKey];
 
   const currentModule = syllabus?.modules[mIdx];
   const currentTopic = currentModule?.topics[tIdx];
@@ -102,6 +107,46 @@ export default function TopicPage() {
       })
     );
   }, [dispatch, eId, currentModule, currentTopic, mIdx, tIdx]);
+
+  // ─── Auto-generate video on page load if not available ────────────────────
+
+  useEffect(() => {
+    // Don't generate if:
+    // - No topic info available
+    // - Video is already generating
+    // - Video task exists and is not failed
+    if (!currentTopic || isVideoLoading) return;
+    
+    const shouldGenerateVideo = 
+      !videoTask || // No video task exists yet
+      videoTask.status === 'failed'; // Or previous attempt failed
+    
+    if (shouldGenerateVideo) {
+      // Use topic description for video generation
+      // Video can be generated even without content
+      const videoSource = content?.content || currentTopic.description;
+      
+      if (videoSource) {
+        console.log(`🎬 Auto-generating video for: ${currentTopic.topic_name}`);
+        dispatch(
+          generateVideo({
+            topicName: currentTopic.topic_name,
+            lessonId: content?.lessonId,
+            moduleIndex: mIdx,
+            topicIndex: tIdx,
+          })
+        );
+      }
+    }
+  }, [
+    currentTopic,
+    videoTask,
+    isVideoLoading,
+    content,
+    dispatch,
+    mIdx,
+    tIdx,
+  ]);
 
   // ─── Toggle completion ─────────────────────────────────────────────────────
 

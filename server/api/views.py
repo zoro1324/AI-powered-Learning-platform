@@ -556,7 +556,19 @@ class GenerateVideoView(APIView):
             lesson_id=serializer.validated_data.get("lesson_id"),
         )
 
-        generate_video_task.delay(str(video_task.id))
+        # Try async with Celery, fall back to sync if unavailable
+        try:
+            generate_video_task.delay(str(video_task.id))
+        except Exception as e:
+            logger.warning(f"Celery unavailable ({e}), running synchronously...")
+            try:
+                # Run synchronously using .apply() instead of .delay()
+                generate_video_task.apply(args=[str(video_task.id)])
+            except Exception as sync_error:
+                logger.error(f"Synchronous execution also failed: {sync_error}")
+                video_task.status = "failed"
+                video_task.progress_message = f"Failed to start: {str(sync_error)}"
+                video_task.save()
 
         return Response(
             VideoTaskStatusSerializer(video_task, context={"request": request}).data,
@@ -889,7 +901,45 @@ class GenerateTopicContentView(APIView):
         
         try:
             enrollment = Enrollment.objects.get(pk=enrollment_id, user=request.user)
-            module = Module.objects.get(pk=module_id, course=enrollment.course)
+            
+            # Get or create the Module using the order field
+            # Modules are stored in PersonalizedSyllabus JSON, not always in DB
+            try:
+                module = Module.objects.get(course=enrollment.course, order=module_id)
+            except Module.DoesNotExist:
+                # Create module dynamically from syllabus data
+                try:
+                    syllabus_obj = PersonalizedSyllabus.objects.get(enrollment=enrollment)
+                    syllabus_data = syllabus_obj.syllabus_data
+                    
+                    # Find the module by order in the syllabus JSON
+                    matching_module = None
+                    for mod in syllabus_data.get('modules', []):
+                        if mod.get('order') == module_id:
+                            matching_module = mod
+                            break
+                    
+                    if not matching_module:
+                        return Response(
+                            {'error': f'Module with order {module_id} not found in syllabus'},
+                            status=status.HTTP_404_NOT_FOUND
+                        )
+                    
+                    # Create the Module record
+                    module = Module.objects.create(
+                        course=enrollment.course,
+                        title=matching_module.get('module_name', f'Module {module_id}'),
+                        description=matching_module.get('description', ''),
+                        order=module_id,
+                        difficulty_level=matching_module.get('difficulty_level', 'beginner'),
+                        estimated_duration_minutes=matching_module.get('estimated_duration_minutes', 60),
+                        is_generated=True
+                    )
+                except PersonalizedSyllabus.DoesNotExist:
+                    return Response(
+                        {'error': 'Syllabus not found for this enrollment'},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
             
             # Get study method from enrollment
             study_method = enrollment.learning_style_override or 'summary'
@@ -929,9 +979,9 @@ class GenerateTopicContentView(APIView):
                 'content': content
             }, status=status.HTTP_200_OK)
             
-        except (Enrollment.DoesNotExist, Module.DoesNotExist):
+        except Enrollment.DoesNotExist:
             return Response(
-                {'error': 'Enrollment or Module not found'},
+                {'error': 'Enrollment not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
@@ -1052,7 +1102,44 @@ class EvaluateTopicQuizView(APIView):
         
         try:
             enrollment = Enrollment.objects.get(pk=enrollment_id, user=request.user)
-            module = Module.objects.get(pk=module_id, course=enrollment.course)
+            
+            # Get or create the Module using the order field
+            try:
+                module = Module.objects.get(course=enrollment.course, order=module_id)
+            except Module.DoesNotExist:
+                # Create module dynamically from syllabus data
+                try:
+                    syllabus_obj = PersonalizedSyllabus.objects.get(enrollment=enrollment)
+                    syllabus_data = syllabus_obj.syllabus_data
+                    
+                    # Find the module by order in the syllabus JSON
+                    matching_module = None
+                    for mod in syllabus_data.get('modules', []):
+                        if mod.get('order') == module_id:
+                            matching_module = mod
+                            break
+                    
+                    if not matching_module:
+                        return Response(
+                            {'error': f'Module with order {module_id} not found in syllabus'},
+                            status=status.HTTP_404_NOT_FOUND
+                        )
+                    
+                    # Create the Module record
+                    module = Module.objects.create(
+                        course=enrollment.course,
+                        title=matching_module.get('module_name', f'Module {module_id}'),
+                        description=matching_module.get('description', ''),
+                        order=module_id,
+                        difficulty_level=matching_module.get('difficulty_level', 'beginner'),
+                        estimated_duration_minutes=matching_module.get('estimated_duration_minutes', 60),
+                        is_generated=True
+                    )
+                except PersonalizedSyllabus.DoesNotExist:
+                    return Response(
+                        {'error': 'Syllabus not found for this enrollment'},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
             
             print("\n**************************************************")
             print("*** EvaluateTopicQuizView: Calling assessment service ***")
@@ -1158,9 +1245,9 @@ class EvaluateTopicQuizView(APIView):
             
             return Response(response_data, status=status.HTTP_200_OK)
             
-        except (Enrollment.DoesNotExist, Module.DoesNotExist):
+        except Enrollment.DoesNotExist:
             return Response(
-                {'error': 'Enrollment or Module not found'},
+                {'error': 'Enrollment not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
