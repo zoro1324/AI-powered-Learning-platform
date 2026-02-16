@@ -26,12 +26,14 @@ export interface LearningProfile {
 
 export interface Course {
   id: number;
+  name: string;  // Backward compatibility
   title: string;
   description: string;
-  category: string;
+  category: 'web_dev' | 'data_science' | 'ai_ml' | 'mobile_dev' | 'cloud' | 'design' | 'devops' | 'cybersecurity' | 'blockchain' | 'other';
   difficulty_level: 'beginner' | 'intermediate' | 'advanced';
   estimated_duration: number;
   thumbnail?: string;
+  is_popular?: boolean;
   created_at: string;
   updated_at: string;
   modules?: Module[];

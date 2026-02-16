@@ -116,15 +116,48 @@ class LearningProfile(models.Model):
 # ===========================================================================
 
 class Course(models.Model):
-    name = models.CharField(max_length=255, db_index=True)
+    CATEGORY_CHOICES = [
+        ('web_dev', 'Web Development'),
+        ('data_science', 'Data Science'),
+        ('ai_ml', 'AI & Machine Learning'),
+        ('mobile_dev', 'Mobile Development'),
+        ('cloud', 'Cloud Computing'),
+        ('design', 'Design'),
+        ('devops', 'DevOps'),
+        ('cybersecurity', 'Cybersecurity'),
+        ('blockchain', 'Blockchain'),
+        ('other', 'Other'),
+    ]
+    
+    DIFFICULTY_CHOICES = [
+        ('beginner', 'Beginner'),
+        ('intermediate', 'Intermediate'),
+        ('advanced', 'Advanced'),
+    ]
+    
+    name = models.CharField(max_length=255, db_index=True)  # Keep for backward compatibility
+    title = models.CharField(max_length=255, db_index=True, default='')
     description = models.TextField(blank=True, default='')
+    category = models.CharField(max_length=50, choices=CATEGORY_CHOICES, default='other', db_index=True)
+    difficulty_level = models.CharField(max_length=20, choices=DIFFICULTY_CHOICES, default='beginner')
+    estimated_duration = models.PositiveIntegerField(
+        default=60, help_text='Estimated duration in minutes'
+    )
+    thumbnail = models.URLField(blank=True, default='', help_text='URL to course thumbnail image')
+    is_popular = models.BooleanField(default=False, db_index=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = 'courses'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['category', 'is_popular']),
+            models.Index(fields=['-created_at']),
+        ]
 
     def __str__(self):
-        return self.name
+        return self.title or self.name
 
 
 # ===========================================================================

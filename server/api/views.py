@@ -148,8 +148,16 @@ class CourseViewSet(viewsets.ModelViewSet):
     serializer_class = CourseSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ['title', 'description', 'category']
-    ordering_fields = ['created_at', 'title']
+    search_fields = ['title', 'name', 'description', 'category']
+    filterset_fields = ['category', 'difficulty_level', 'is_popular']
+    ordering_fields = ['created_at', 'title', 'category']
+    
+    @action(detail=False, methods=['get'])
+    def popular(self, request):
+        """Get all popular courses"""
+        popular_courses = self.queryset.filter(is_popular=True)
+        serializer = self.get_serializer(popular_courses, many=True)
+        return Response(serializer.data)
     
     @action(detail=True, methods=['get'])
     def modules(self, request, pk=None):
