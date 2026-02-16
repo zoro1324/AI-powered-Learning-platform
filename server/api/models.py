@@ -1,3 +1,523 @@
+from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 
-# Create your models here.
+
+# ---------------------------------------------------------------------------
+# Custom User Manager
+# ---------------------------------------------------------------------------
+
+class UserManager(BaseUserManager):
+    """Manager for email-based User model (no username field)."""
+
+    def create_user(self, email, full_name, password=None, **extra_fields):
+        if not email:
+            raise ValueError('Email is required')
+        email = self.normalize_email(email)
+        user = self.model(email=email, full_name=full_name, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, full_name, password=None, **extra_fields):
+        extra_fields.setdefault('is_staff', True)
+        extra_fields.setdefault('is_superuser', True)
+        return self.create_user(email, full_name, password, **extra_fields)
+
+
+# ===========================================================================
+# 1. User
+# ===========================================================================
+class User(AbstractUser):
+    """Custom user model – email-based login, no username."""
+
+    username = None
+    email = models.EmailField(unique=True)
+    full_name = models.CharField(max_length=255)
+    bio = models.TextField(blank=True, default='')
+    avatar = models.ImageField(upload_to='avatars/', blank=True, null=True)
+
+    # Notification preferences
+    notify_email = models.BooleanField(default=True)
+    notify_push = models.BooleanField(default=True)
+    notify_course_updates = models.BooleanField(default=False)
+
+    # Display preferences
+    language = models.CharField(max_length=20, default='en')
+    theme = models.CharField(max_length=20, default='light')
+
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['full_name']
+
+    objects = UserManager()
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'users'
+
+    def __str__(self):
+        return self.email
+
+
+# ===========================================================================
+# 2. LearningProfile
+# ===========================================================================
+
+class LearningProfile(models.Model):
+    class LearningStyle(models.TextChoices):
+        MINDMAP = 'mindmap', 'Mind Map'
+        VIDEOS = 'videos', 'Videos'
+        SUMMARY = 'summary', 'Summary Notes'
+        BOOKS = 'books', 'Books'
+        REELS = 'reels', 'Short Reels'
+
+    class DepthPreference(models.TextChoices):
+        SURFACE = 'surface', 'Surface'
+        DEEP = 'deep', 'Deep'
+
+    class PacePreference(models.TextChoices):
+        SLOW = 'slow', 'Slow'
+        MODERATE = 'moderate', 'Moderate'
+        FAST = 'fast', 'Fast'
+
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name='learning_profile',
+    )
+    preferred_style = models.CharField(
+        max_length=20, choices=LearningStyle.choices, default=LearningStyle.SUMMARY,
+    )
+    depth_preference = models.CharField(
+        max_length=10, choices=DepthPreference.choices, default=DepthPreference.DEEP,
+    )
+    pace_preference = models.CharField(
+        max_length=10, choices=PacePreference.choices, default=PacePreference.MODERATE,
+    )
+    quiz_preference = models.BooleanField(
+        default=True, help_text='Whether user prefers frequent quizzes',
+    )
+    attention_span_minutes = models.PositiveIntegerField(
+        default=25, help_text='Estimated attention span in minutes',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'learning_profiles'
+
+    def __str__(self):
+        return f'{self.user.email} – {self.preferred_style}'
+
+
+# ===========================================================================
+# 3. Course
+# ===========================================================================
+
+class Course(models.Model):
+    name = models.CharField(max_length=255, db_index=True)
+    description = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'courses'
+
+    def __str__(self):
+        return self.name
+
+
+# ===========================================================================
+# 4. Achievement
+# ===========================================================================
+
+class Achievement(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField()
+    icon = models.CharField(
+        max_length=50, help_text='Emoji or icon identifier e.g. lightning, target, fire',
+    )
+    criteria = models.JSONField(
+        help_text='JSON criteria for auto-awarding, e.g. {"type":"modules_per_day","threshold":3}',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'achievements'
+
+    def __str__(self):
+        return self.name
+
+
+# ===========================================================================
+# 5. Enrollment
+# ===========================================================================
+
+class Enrollment(models.Model):
+    class KnowledgeLevel(models.TextChoices):
+        BEGINNER = 'beginner', 'Beginner'
+        INTERMEDIATE = 'intermediate', 'Intermediate'
+        ADVANCED = 'advanced', 'Advanced'
+
+    class Status(models.TextChoices):
+        ACTIVE = 'active', 'Active'
+        COMPLETED = 'completed', 'Completed'
+        PAUSED = 'paused', 'Paused'
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='enrollments')
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='enrollments')
+    learning_style_override = models.CharField(
+        max_length=20,
+        choices=LearningProfile.LearningStyle.choices,
+        blank=True,
+        default='',
+        help_text='Per-course learning style override',
+    )
+    diagnosed_level = models.CharField(
+        max_length=15,
+        choices=KnowledgeLevel.choices,
+        default=KnowledgeLevel.BEGINNER,
+        help_text='Level determined by diagnostic assessment',
+    )
+    status = models.CharField(max_length=10, choices=Status.choices, default=Status.ACTIVE)
+    overall_progress = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0.00,
+        help_text='Percentage 0.00–100.00',
+    )
+    total_study_time_minutes = models.PositiveIntegerField(default=0)
+    enrolled_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'enrollments'
+        unique_together = ['user', 'course']
+        indexes = [
+            models.Index(fields=['user', 'status']),
+        ]
+
+    def __str__(self):
+        return f'{self.user.email} → {self.course.name}'
+
+
+# ===========================================================================
+# 6. Module
+# ===========================================================================
+
+class Module(models.Model):
+    class DifficultyLevel(models.TextChoices):
+        BEGINNER = 'beginner', 'Beginner'
+        INTERMEDIATE = 'intermediate', 'Intermediate'
+        ADVANCED = 'advanced', 'Advanced'
+
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='modules')
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, default='')
+    order = models.PositiveIntegerField(help_text='Position in the course sequence')
+    difficulty_level = models.CharField(
+        max_length=15, choices=DifficultyLevel.choices, default=DifficultyLevel.BEGINNER,
+    )
+    estimated_duration_minutes = models.PositiveIntegerField(default=60)
+    is_generated = models.BooleanField(default=False, help_text='True if AI-generated from roadmap')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'modules'
+        ordering = ['order']
+        unique_together = ['course', 'order']
+
+    def __str__(self):
+        return f'{self.course.name} – {self.title}'
+
+
+# ===========================================================================
+# 7. Lesson
+# ===========================================================================
+
+class Lesson(models.Model):
+    module = models.ForeignKey(Module, on_delete=models.CASCADE, related_name='lessons')
+    title = models.CharField(max_length=255)
+    content = models.TextField(
+        blank=True, default='', help_text='AI-generated lesson content (Markdown/HTML)',
+    )
+    order = models.PositiveIntegerField()
+    estimated_duration_minutes = models.PositiveIntegerField(default=15)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'lessons'
+        ordering = ['order']
+        unique_together = ['module', 'order']
+
+    def __str__(self):
+        return f'{self.module.title} – {self.title}'
+
+
+# ===========================================================================
+# 8. Resource
+# ===========================================================================
+
+class Resource(models.Model):
+    class ResourceType(models.TextChoices):
+        NOTES = 'notes', 'Summary Notes'
+        PDF = 'pdf', 'PDF Document'
+        PPT = 'ppt', 'Presentation'
+        MINDMAP = 'mindmap', 'Mind Map'
+        VIDEO_SCRIPT = 'video_script', 'Video Script (JSON)'
+        VIDEO = 'video', 'Video (MP4)'
+        AUDIO = 'audio', 'Audio/Podcast (MP3)'
+        IMAGE = 'image', 'Image (PNG)'
+        REEL = 'reel', 'Short Reel'
+
+    lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='resources')
+    resource_type = models.CharField(max_length=15, choices=ResourceType.choices)
+    title = models.CharField(max_length=255)
+    content_text = models.TextField(
+        blank=True, default='',
+        help_text='Text content (for notes, scripts, mindmap data)',
+    )
+    content_json = models.JSONField(
+        null=True, blank=True,
+        help_text='Structured content (video scripts with scenes, mindmap nodes)',
+    )
+    file = models.FileField(
+        upload_to='resources/%Y/%m/', blank=True, null=True,
+        help_text='For binary files: PDFs, PPTs, videos, audio, images',
+    )
+    file_size_bytes = models.PositiveIntegerField(null=True, blank=True)
+    duration_seconds = models.PositiveIntegerField(
+        null=True, blank=True, help_text='For audio/video resources',
+    )
+    is_generated = models.BooleanField(default=False)
+    generation_model = models.CharField(
+        max_length=100, blank=True, default='',
+        help_text='e.g. llama3:8b-instruct-q4_K_M, stable-diffusion-v1-5',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'resources'
+        indexes = [
+            models.Index(fields=['lesson', 'resource_type']),
+        ]
+
+    def __str__(self):
+        return f'{self.title} ({self.resource_type})'
+
+
+# ===========================================================================
+# 9. Question
+# ===========================================================================
+
+class Question(models.Model):
+    class Difficulty(models.TextChoices):
+        EASY = 'easy', 'Easy'
+        INTERMEDIATE = 'intermediate', 'Intermediate'
+        DIFFICULT = 'difficult', 'Difficult'
+
+    class QuestionType(models.TextChoices):
+        DIAGNOSTIC = 'diagnostic', 'Diagnostic Assessment'
+        TOPIC_QUIZ = 'topic_quiz', 'Topic Quiz'
+        FINAL_QUIZ = 'final_quiz', 'Final Quiz'
+
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='questions')
+    module = models.ForeignKey(
+        Module, on_delete=models.CASCADE, related_name='questions',
+        null=True, blank=True,
+        help_text='Null for diagnostic questions, set for topic/final quizzes',
+    )
+    question_type = models.CharField(max_length=15, choices=QuestionType.choices)
+    difficulty = models.CharField(max_length=15, choices=Difficulty.choices)
+    question_text = models.TextField()
+    options = models.JSONField(help_text='List of option strings, e.g. ["A","B","C","D"]')
+    correct_answer_index = models.PositiveSmallIntegerField(
+        help_text='0-based index into options list',
+    )
+    explanation = models.TextField(blank=True, default='', help_text='Explanation of correct answer')
+    is_generated = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'questions'
+        indexes = [
+            models.Index(fields=['course', 'question_type']),
+            models.Index(fields=['module', 'question_type']),
+        ]
+
+    def __str__(self):
+        return f'[{self.question_type}] {self.question_text[:60]}'
+
+
+# ===========================================================================
+# 10. QuizAttempt
+# ===========================================================================
+
+class QuizAttempt(models.Model):
+    class AttemptType(models.TextChoices):
+        DIAGNOSTIC = 'diagnostic', 'Diagnostic Assessment'
+        TOPIC_QUIZ = 'topic_quiz', 'Topic Quiz'
+        FINAL_QUIZ = 'final_quiz', 'Final Quiz'
+
+    enrollment = models.ForeignKey(
+        Enrollment, on_delete=models.CASCADE, related_name='quiz_attempts',
+    )
+    module = models.ForeignKey(
+        Module, on_delete=models.CASCADE, related_name='quiz_attempts',
+        null=True, blank=True, help_text='Set for topic quizzes, null for diagnostic',
+    )
+    attempt_type = models.CharField(max_length=15, choices=AttemptType.choices)
+    score_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    total_questions = models.PositiveSmallIntegerField(default=0)
+    correct_answers = models.PositiveSmallIntegerField(default=0)
+    time_taken_seconds = models.PositiveIntegerField(null=True, blank=True)
+    weak_areas = models.JSONField(
+        default=list, blank=True,
+        help_text='List of weak area strings from AI evaluation',
+    )
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'quiz_attempts'
+        indexes = [
+            models.Index(fields=['enrollment', 'attempt_type']),
+        ]
+
+    def __str__(self):
+        return f'{self.enrollment} – {self.attempt_type} ({self.score_percent}%)'
+
+
+# ===========================================================================
+# 11. QuizAnswer
+# ===========================================================================
+
+class QuizAnswer(models.Model):
+    attempt = models.ForeignKey(
+        QuizAttempt, on_delete=models.CASCADE, related_name='answers',
+    )
+    question = models.ForeignKey(
+        Question, on_delete=models.CASCADE, related_name='user_answers',
+    )
+    selected_option_index = models.SmallIntegerField(
+        null=True, blank=True, help_text='Null if user skipped',
+    )
+    is_correct = models.BooleanField(default=False)
+    response_time_seconds = models.PositiveIntegerField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'quiz_answers'
+        unique_together = ['attempt', 'question']
+
+    def __str__(self):
+        return f'Q{self.question_id} → {"✓" if self.is_correct else "✗"}'
+
+
+# ===========================================================================
+# 12. ModuleProgress
+# ===========================================================================
+
+class ModuleProgress(models.Model):
+    class Status(models.TextChoices):
+        LOCKED = 'locked', 'Locked'
+        IN_PROGRESS = 'in_progress', 'In Progress'
+        COMPLETED = 'completed', 'Completed'
+
+    enrollment = models.ForeignKey(
+        Enrollment, on_delete=models.CASCADE, related_name='module_progresses',
+    )
+    module = models.ForeignKey(
+        Module, on_delete=models.CASCADE, related_name='user_progresses',
+    )
+    status = models.CharField(
+        max_length=15, choices=Status.choices, default=Status.LOCKED,
+    )
+    progress_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    time_spent_minutes = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = 'module_progress'
+        unique_together = ['enrollment', 'module']
+
+    def __str__(self):
+        return f'{self.enrollment} – {self.module.title} ({self.status})'
+
+
+# ===========================================================================
+# 13. LearningRoadmap
+# ===========================================================================
+
+class LearningRoadmap(models.Model):
+    enrollment = models.ForeignKey(
+        Enrollment, on_delete=models.CASCADE, related_name='roadmaps',
+    )
+    version = models.PositiveIntegerField(
+        default=1, help_text='Increments when roadmap is refined after quiz',
+    )
+    roadmap_data = models.JSONField(
+        help_text='Full roadmap JSON: {"topics": [{"topic_name": "", "level": ""}]}',
+    )
+    generated_by_model = models.CharField(max_length=100, default='llama3:8b-instruct-q4_K_M')
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'learning_roadmaps'
+        indexes = [
+            models.Index(fields=['enrollment', 'is_active']),
+        ]
+        ordering = ['-version']
+
+    def __str__(self):
+        return f'{self.enrollment} – v{self.version}'
+
+
+# ===========================================================================
+# 14. UserAchievement
+# ===========================================================================
+
+class UserAchievement(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='achievements')
+    achievement = models.ForeignKey(
+        Achievement, on_delete=models.CASCADE, related_name='user_achievements',
+    )
+    earned_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'user_achievements'
+        unique_together = ['user', 'achievement']
+
+    def __str__(self):
+        return f'{self.user.email} – {self.achievement.name}'
+
+
+# ===========================================================================
+# 15. ActivityLog
+# ===========================================================================
+
+class ActivityLog(models.Model):
+    class ActivityType(models.TextChoices):
+        MODULE_COMPLETED = 'module_completed', 'Module Completed'
+        COURSE_STARTED = 'course_started', 'Course Started'
+        ASSESSMENT_PASSED = 'assessment_passed', 'Assessment Passed'
+        QUIZ_COMPLETED = 'quiz_completed', 'Quiz Completed'
+        ACHIEVEMENT_EARNED = 'achievement_earned', 'Achievement Earned'
+        COURSE_COMPLETED = 'course_completed', 'Course Completed'
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='activity_logs')
+    activity_type = models.CharField(max_length=25, choices=ActivityType.choices)
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True, default='')
+    metadata = models.JSONField(
+        null=True, blank=True,
+        help_text='Extra context e.g. {"score": 85, "course_id": 1}',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'activity_logs'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['user', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.user.email} – {self.title}'
