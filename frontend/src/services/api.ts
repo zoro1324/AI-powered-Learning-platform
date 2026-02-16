@@ -24,7 +24,7 @@ import {
 
 // Create axios instance
 const api: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
+  baseURL: (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -448,11 +448,21 @@ export const assessmentAPI = {
     course_id: number;
     course_name: string;
   }): Promise<InitialAssessmentResponse> => {
-    const response = await api.post<InitialAssessmentResponse>(
-      '/assessment/initial/',
-      data
-    );
-    return response.data;
+    console.log('📡 assessmentAPI.generateInitialAssessment called with:', data);
+    console.log('📡 API baseURL:', api.defaults.baseURL);
+    console.log('📡 Full URL will be:', api.defaults.baseURL + '/assessment/initial/');
+    try {
+      const response = await api.post<InitialAssessmentResponse>(
+        '/assessment/initial/',
+        data
+      );
+      console.log('📡 API Response received:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('📡 API Error:', error);
+      console.error('📡 Error response:', error.response);
+      throw error;
+    }
   },
 
   evaluateAssessment: async (data: {

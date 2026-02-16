@@ -9,6 +9,9 @@ from django.db.models import Q, Avg, Count, Sum
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
+import logging
+
+logger = logging.getLogger(__name__)
 
 from .models import (
     VideoTask, LearningProfile, Course, Module, Lesson, Resource,
@@ -233,9 +236,10 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
         # Log activity
         ActivityLog.objects.create(
             user=self.request.user,
-            activity_type='course_enrolled',
+            activity_type='course_started',
+            title=f'Enrolled in {enrollment.course.title}',
             description=f'Enrolled in course: {enrollment.course.title}',
-            related_course=enrollment.course
+            metadata={'course_id': enrollment.course.id}
         )
     
     @action(detail=True, methods=['get'])
@@ -353,8 +357,12 @@ class QuizAttemptViewSet(viewsets.ModelViewSet):
         ActivityLog.objects.create(
             user=request.user,
             activity_type='quiz_completed',
+            title=f'Completed {quiz_attempt.quiz_type} quiz',
             description=f'Completed {quiz_attempt.quiz_type} quiz with score {score:.1f}%',
-            related_course=quiz_attempt.enrollment.course if quiz_attempt.enrollment else None
+            metadata={
+                'course_id': quiz_attempt.enrollment.course.id if quiz_attempt.enrollment else None,
+                'score': score
+            }
         )
         
         return Response({
@@ -444,9 +452,10 @@ class LearningRoadmapViewSet(viewsets.ModelViewSet):
         # Log activity
         ActivityLog.objects.create(
             user=request.user,
-            activity_type='roadmap_generated',
+            activity_type='course_started',
+            title=f'Roadmap generated for {enrollment.course.title}',
             description=f'Learning roadmap generated for {enrollment.course.title}',
-            related_course=enrollment.course
+            metadata={'course_id': enrollment.course.id}
         )
         
         serializer = LearningRoadmapSerializer(roadmap)
@@ -600,6 +609,13 @@ class InitialAssessmentView(APIView):
             ]
         }
         """
+        print("\n" + "="*60)
+        print("!!! InitialAssessmentView.post() ENTERED !!!")
+        print(f"!!! Request method: {request.method}")
+        print(f"!!! Request user: {request.user}")
+        print(f"!!! Request data: {request.data}")
+        print("="*60 + "\n")
+        
         from .services.assessment_service import get_assessment_service
         
         course_id = request.data.get('course_id')
@@ -615,9 +631,15 @@ class InitialAssessmentView(APIView):
             # Verify course exists
             course = Course.objects.get(pk=course_id)
             
+            print("\n**************************************************")
+            print("*** GenerateInitialAssessmentView: Calling assessment service ***")
+            print(f"*** Course ID: {course_id}, Course Name: {course_name} ***")
+            print("**************************************************")
             # Generate MCQ
             assessment_service = get_assessment_service()
             mcq_data = assessment_service.generate_initial_mcq(course_name)
+            print("*** GenerateInitialAssessmentView: SUCCESS ***")
+            print("**************************************************\n")
             
             # Store the MCQ temporarily in session or return directly
             # For simplicity, we'll return directly
@@ -696,12 +718,21 @@ class EvaluateAssessmentView(APIView):
                 )
             
             # Evaluate assessment
+            print("\n**************************************************")
+            print("*** EvaluateAssessmentView: Calling assessment service ***")
+            print(f"*** Course ID: {course_id}, Course Name: {course_name} ***")
+            print(f"*** Number of questions: {len(questions)}, Number of answers: {len(answers)} ***")
+            print("**************************************************")
             assessment_service = get_assessment_service()
             mcq_data = {'questions': questions}
             evaluation = assessment_service.evaluate_initial_assessment(mcq_data, answers)
+            print(f"*** Evaluation result: {evaluation} ***")
             
             # Generate personalized roadmap
+            print("*** Generating personalized roadmap ***")
             roadmap_data = assessment_service.generate_personalized_roadmap(course_name, evaluation)
+            print(f"*** Roadmap generated with {len(roadmap_data.get('topics', []))} topics ***")
+            print("**************************************************\n")
             
             # Map knowledge level to KnowledgeLevel enum
             knowledge_level_map = {
@@ -714,17 +745,15 @@ class EvaluateAssessmentView(APIView):
                 'beginner'
             )
             
-            # Map study method to LearningStyle enum
-            study_method_map = {
-                'reading': 'summary',
-                'watching video': 'videos',
-                'voice conversation': 'reels',
-                'interactive practice': 'mindmap',
+            # Determine learning style based on knowledge level (since we no longer ask directly)
+            # Beginners often prefer videos, Intermediate prefer summaries, Advanced prefer mindmaps
+            level_to_style = {
+                'beginner': 'videos',
+                'intermediate': 'summary',
+                'advanced': 'mindmap',
+                'expert': 'mindmap',
             }
-            learning_style = study_method_map.get(
-                evaluation.get('study_method', '').lower(),
-                'summary'
-            )
+            learning_style = level_to_style.get(diagnosed_level, 'summary')
             
             # Create enrollment
             enrollment = Enrollment.objects.create(
@@ -738,7 +767,7 @@ class EvaluateAssessmentView(APIView):
             # Create learning roadmap
             roadmap = LearningRoadmap.objects.create(
                 enrollment=enrollment,
-                roadmap_json=roadmap_data,
+                roadmap_data=roadmap_data,
                 is_active=True,
                 version=1
             )
@@ -757,9 +786,10 @@ class EvaluateAssessmentView(APIView):
             # Log activity
             ActivityLog.objects.create(
                 user=user,
-                activity_type='quiz_completed',
+                activity_type='course_started',
+                title=f'Started {course.title}',
                 description=f'Completed diagnostic assessment for {course.title}',
-                related_course=course
+                metadata={'course_id': course.id, 'evaluation': evaluation}
             )
             
             return Response({
@@ -821,6 +851,12 @@ class GenerateTopicContentView(APIView):
             # Get study method from enrollment
             study_method = enrollment.learning_style_override or 'summary'
             
+            print("\n**************************************************")
+            print("*** GenerateTopicContentView: Calling assessment service ***")
+            print(f"*** Course: {enrollment.course.title} ***")
+            print(f"*** Topic: {topic_name} ***")
+            print(f"*** Study method: {study_method} ***")
+            print("**************************************************")
             # Generate content
             assessment_service = get_assessment_service()
             content = assessment_service.generate_topic_content(
@@ -828,6 +864,8 @@ class GenerateTopicContentView(APIView):
                 topic_name,
                 study_method
             )
+            print(f"*** Content generated: {len(content)} chars ***")
+            print("**************************************************\n")
             
             # Create or update lesson
             lesson, created = Lesson.objects.get_or_create(
@@ -901,9 +939,17 @@ class GenerateTopicQuizView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
+            print("\n**************************************************")
+            print("*** GenerateTopicQuizView: Calling assessment service ***")
+            print(f"*** Lesson ID: {lesson_id} ***")
+            print(f"*** Topic: {topic_name} ***")
+            print(f"*** Content length: {len(content)} chars ***")
+            print("**************************************************")
             # Generate quiz
             assessment_service = get_assessment_service()
             quiz_data = assessment_service.generate_topic_quiz(topic_name, content)
+            print(f"*** Quiz generated with {len(quiz_data.get('questions', []))} questions ***")
+            print("**************************************************\n")
             
             return Response(quiz_data, status=status.HTTP_200_OK)
             
@@ -965,10 +1011,16 @@ class EvaluateTopicQuizView(APIView):
             enrollment = Enrollment.objects.get(pk=enrollment_id, user=request.user)
             module = Module.objects.get(pk=module_id, course=enrollment.course)
             
+            print("\n**************************************************")
+            print("*** EvaluateTopicQuizView: Calling assessment service ***")
+            print(f"*** Enrollment ID: {enrollment_id}, Module ID: {module_id} ***")
+            print(f"*** Number of questions: {len(questions)}, Number of answers: {len(answers)} ***")
+            print("**************************************************")
             # Evaluate quiz
             assessment_service = get_assessment_service()
             quiz_data = {'questions': questions}
             evaluation = assessment_service.evaluate_topic_quiz(quiz_data, answers)
+            print(f"*** Quiz evaluation: {evaluation} ***")
             
             # Create QuizAttempt record
             quiz_attempt = QuizAttempt.objects.create(
@@ -1028,7 +1080,7 @@ class EvaluateTopicQuizView(APIView):
                     # Create new version
                     LearningRoadmap.objects.create(
                         enrollment=enrollment,
-                        roadmap_json=refined_roadmap,
+                        roadmap_data=refined_roadmap,
                         is_active=True,
                         version=roadmap.version + 1
                     )
@@ -1048,8 +1100,9 @@ class EvaluateTopicQuizView(APIView):
             ActivityLog.objects.create(
                 user=request.user,
                 activity_type='quiz_completed',
+                title=f'Completed quiz for {module.title}',
                 description=f'Completed quiz for {module.title}',
-                related_course=enrollment.course
+                metadata={'course_id': enrollment.course.id, 'module_id': module.id}
             )
             
             response_data = {

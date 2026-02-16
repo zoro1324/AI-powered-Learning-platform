@@ -31,10 +31,16 @@ class AssessmentService:
             ollama_url: Ollama API URL (defaults to settings.OLLAMA_API_URL)
             ollama_model: Ollama model name (defaults to settings.OLLAMA_MODEL)
         """
+        print("\n=== AssessmentService.__init__ CALLED ===")
+        print(f"  ollama_url parameter: {ollama_url}")
+        print(f"  ollama_model parameter: {ollama_model}")
         # Use chat endpoint instead of generate
         base_url = ollama_url or settings.OLLAMA_API_URL
         self.ollama_url = base_url.replace('/api/generate', '/api/chat')
         self.ollama_model = ollama_model or settings.OLLAMA_MODEL
+        print(f"  Final ollama_url: {self.ollama_url}")
+        print(f"  Final ollama_model: {self.ollama_model}")
+        print("=== AssessmentService initialized ===")
     
     def _call_ollama(self, prompt: str, system_prompt: str = None) -> str:
         """
@@ -50,6 +56,11 @@ class AssessmentService:
         Raises:
             RuntimeError: If the API call fails
         """
+        print("\n=== _call_ollama CALLED ===")
+        print(f"  URL: {self.ollama_url}")
+        print(f"  Model: {self.ollama_model}")
+        print(f"  Prompt length: {len(prompt)} chars")
+        print(f"  Has system prompt: {system_prompt is not None}")
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
@@ -58,21 +69,33 @@ class AssessmentService:
         payload = {
             "model": self.ollama_model,
             "messages": messages,
-            "stream": False
+            "stream": False,
+            "options": {
+                "num_predict": 2048,  # Increase token limit for complete responses
+                "temperature": 0.7,
+                "top_p": 0.9
+            }
         }
         
         try:
+            print("  Sending request to Ollama...")
             response = requests.post(
                 self.ollama_url,
                 json=payload,
                 headers={"Content-Type": "application/json"},
                 timeout=60
             )
+            print(f"  Response status code: {response.status_code}")
             response.raise_for_status()
             data = response.json()
-            return data.get('message', {}).get('content', '')
+            content = data.get('message', {}).get('content', '')
+            print(f"  Response content length: {len(content)} chars")
+            print("=== _call_ollama SUCCESS ===")
+            return content
         except requests.exceptions.RequestException as e:
+            print(f"  ERROR in _call_ollama: {e}")
             logger.error(f"Ollama API error: {e}")
+            print("=== _call_ollama FAILED ===")
             raise RuntimeError(f"Failed to get response from Ollama: {e}")
     
     def _extract_json(self, text: str) -> Dict[str, Any]:
@@ -88,61 +111,217 @@ class AssessmentService:
         Raises:
             ValueError: If no valid JSON found
         """
-        # Try to find JSON in the response
+        print(f"  Attempting to extract JSON from {len(text)} chars of text")
+        print(f"  First 200 chars: {text[:200]}")
+        print(f"  Last 200 chars: {text[-200:]}")
+        
+        # Try to find JSON in the response - look for both {...} and [...]
         json_match = re.search(r'\{.*\}', text, re.DOTALL)
         if json_match:
+            json_str = json_match.group()
+            print(f"  Found JSON block of {len(json_str)} chars")
+            
             try:
-                return json.loads(json_match.group())
+                result = json.loads(json_str)
+                print(f"  ✓ Successfully parsed JSON")
+                return result
             except json.JSONDecodeError as e:
+                print(f"  ✗ JSON decode error: {e}")
                 logger.error(f"JSON decode error: {e}")
+                logger.error(f"Problematic JSON string: {json_str[:500]}")
+                
+                # Try to repair incomplete JSON
+                print("  Attempting to repair JSON...")
+                repaired_json = self._repair_json(json_str)
+                if repaired_json:
+                    try:
+                        result = json.loads(repaired_json)
+                        print(f"  ✓ Successfully repaired and parsed JSON")
+                        return result
+                    except json.JSONDecodeError:
+                        print(f"  ✗ Repair failed")
+                        pass
+                
+                # Try to fix common JSON issues
+                try:
+                    # Replace single quotes with double quotes
+                    fixed_json = json_str.replace("'", '"')
+                    result = json.loads(fixed_json)
+                    print(f"  ✓ Fixed with quote replacement")
+                    return result
+                except json.JSONDecodeError:
+                    pass
+                
                 raise ValueError(f"Invalid JSON in response: {e}")
         else:
+            # If no JSON found, try to extract just the text and structure it
+            print("  ✗ No JSON block found in response")
+            logger.warning("No JSON found in response, attempting to parse raw text")
             raise ValueError("No valid JSON found in model response")
+    
+    def _repair_json(self, json_str: str) -> str:
+        """
+        Attempt to repair incomplete/malformed JSON.
+        
+        Args:
+            json_str: The malformed JSON string
+            
+        Returns:
+            Repaired JSON string or empty string if repair failed
+        """
+        try:
+            # Count opening and closing braces/brackets
+            open_braces = json_str.count('{')
+            close_braces = json_str.count('}')
+            open_brackets = json_str.count('[')
+            close_brackets = json_str.count(']')
+            
+            print(f"    Braces: {open_braces} open, {close_braces} close")
+            print(f"    Brackets: {open_brackets} open, {close_brackets} close")
+            
+            # Add missing closing braces/brackets
+            repaired = json_str
+            if close_braces < open_braces:
+                repaired += '}' * (open_braces - close_braces)
+                print(f"    Added {open_braces - close_braces} closing braces")
+            if close_brackets < open_brackets:
+                repaired += ']' * (open_brackets - close_brackets)
+                print(f"    Added {open_brackets - close_brackets} closing brackets")
+            
+            # Try to fix incomplete last field by removing it
+            # Look for patterns like: "field_nam or "field":
+            incomplete_field = re.search(r',\s*"[^"]*$', repaired)
+            if incomplete_field:
+                print(f"    Removing incomplete field at end")
+                repaired = repaired[:incomplete_field.start()] + repaired[incomplete_field.end():]
+            
+            return repaired
+        except Exception as e:
+            print(f"    Repair error: {e}")
+            return ""
     
     def generate_initial_mcq(self, course_name: str) -> Dict[str, Any]:
         """
         Generate initial diagnostic MCQ questions for a course.
         
+        Generates 10 questions total:
+        - Question 1: Knowledge level assessment
+        - Questions 2-10: Topic-related conceptual questions
+        
         Args:
             course_name: Name of the course
             
         Returns:
-            Dictionary with 'questions' list containing MCQ questions
+            Dictionary with 'questions' list containing 10 MCQ questions
         """
-        prompt = f"""
-Generate 5 MCQ questions for the course: {course_name}
+        print("\n========================================")
+        print("=== generate_initial_mcq CALLED ===")
+        print(f"  Course name: {course_name}")
+        print("========================================")
+        system_prompt = "You are a helpful assistant that generates educational content. Always respond with valid JSON only, no additional text."
+        
+        prompt = f"""Generate exactly 10 multiple choice questions for the course: {course_name}
+
+IMPORTANT: Respond with ONLY valid JSON, no other text before or after.
 
 Rules:
-Q1: Study method preference (options: Reading / Watching Video / Voice Conversation)
-Q2: Self knowledge level (options: Beginner / Intermediate / Advanced)
-Q3-5: Basic conceptual questions from the course
-Q3-5 must include correct_answer field.
+- Question 1: Ask about current knowledge level with options: ["Beginner", "Intermediate", "Advanced", "Expert"]
+- Questions 2-10: Create conceptual and practical questions about {course_name} with 4 options each
+- Questions 2-10 MUST include the "correct_answer" field with the exact text of the correct option
+- Question 1 should have "correct_answer": null
+- Cover various aspects: fundamentals, key concepts, applications, best practices
+- Make questions progressively more challenging (easier to harder)
 
-Return strictly in JSON format:
+Use this EXACT JSON structure (use double quotes, not single quotes):
 
 {{
   "questions": [
     {{
-      "question": "What is your preferred study method?",
-      "options": ["Reading", "Watching Video", "Voice Conversation", "Interactive Practice"],
-      "correct_answer": null
-    }},
-    {{
-      "question": "How would you rate your current knowledge?",
+      "question": "How would you rate your current knowledge of {course_name}?",
       "options": ["Beginner", "Intermediate", "Advanced", "Expert"],
       "correct_answer": null
     }},
     {{
-      "question": "Actual course question here",
+      "question": "Your conceptual question about fundamentals here?",
       "options": ["Option A", "Option B", "Option C", "Option D"],
       "correct_answer": "Option A"
+    }},
+    {{
+      "question": "Your question about key concepts here?",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correct_answer": "Option B"
     }}
   ]
 }}
-"""
+
+Generate JSON with exactly 10 questions now:"""
         
-        response = self._call_ollama(prompt)
-        return self._extract_json(response)
+        try:
+            response = self._call_ollama(prompt, system_prompt)
+            result = self._extract_json(response)
+            print(f"  Generated {len(result.get('questions', []))} questions")
+            print("=== generate_initial_mcq SUCCESS ===")
+            return result
+        except (ValueError, KeyError) as e:
+            print(f"  ⚠️ JSON parsing failed, using fallback questions: {e}")
+            # Fallback: Create basic assessment questions
+            fallback_questions = {
+                "questions": [
+                    {
+                        "question": f"How would you rate your current knowledge of {course_name}?",
+                        "options": ["Beginner", "Intermediate", "Advanced", "Expert"],
+                        "correct_answer": None
+                    },
+                    {
+                        "question": f"What best describes the fundamentals of {course_name}?",
+                        "options": ["A programming language", "A methodology or framework", "A set of tools and practices", "All of the above"],
+                        "correct_answer": "All of the above"
+                    },
+                    {
+                        "question": f"Which is a key concept in {course_name}?",
+                        "options": ["Understanding core principles", "Ignoring best practices", "Copying code without understanding", "Avoiding documentation"],
+                        "correct_answer": "Understanding core principles"
+                    },
+                    {
+                        "question": f"What is the primary goal when learning {course_name}?",
+                        "options": ["Memorizing syntax", "Building practical skills", "Just passing tests", "Avoiding challenges"],
+                        "correct_answer": "Building practical skills"
+                    },
+                    {
+                        "question": f"Which approach is most effective for mastering {course_name}?",
+                        "options": ["Theory only", "Practice only", "Combining theory and practice", "Neither theory nor practice"],
+                        "correct_answer": "Combining theory and practice"
+                    },
+                    {
+                        "question": f"What interests you most about {course_name}?",
+                        "options": ["Theory and Concepts", "Practical Applications", "Problem Solving", "All of the above"],
+                        "correct_answer": "All of the above"
+                    },
+                    {
+                        "question": f"What is a common challenge when learning {course_name}?",
+                        "options": ["Understanding basic concepts", "Finding resources", "Staying motivated", "All of the above"],
+                        "correct_answer": "All of the above"
+                    },
+                    {
+                        "question": f"Which skill is most valuable in {course_name}?",
+                        "options": ["Critical thinking", "Memorization", "Speed reading", "Guessing"],
+                        "correct_answer": "Critical thinking"
+                    },
+                    {
+                        "question": f"What is your main goal for learning {course_name}?",
+                        "options": ["Career Development", "Personal Interest", "Academic Requirement", "Skill Enhancement"],
+                        "correct_answer": "Skill Enhancement"
+                    },
+                    {
+                        "question": f"How important is hands-on practice in {course_name}?",
+                        "options": ["Not important", "Somewhat important", "Very important", "Essential"],
+                        "correct_answer": "Essential"
+                    }
+                ]
+            }
+            print(f"  Using fallback with {len(fallback_questions['questions'])} questions")
+            print("=== generate_initial_mcq SUCCESS (fallback) ===")
+            return fallback_questions
     
     def evaluate_initial_assessment(
         self,
@@ -158,13 +337,19 @@ Return strictly in JSON format:
             
         Returns:
             Dictionary with evaluation results including:
-            - study_method: Preferred study method
             - knowledge_level: Self-assessed knowledge level
-            - score: Score on conceptual questions
+            - score: Score on conceptual questions (e.g., "7/9")
             - weak_areas: List of weak areas identified
         """
-        prompt = f"""
-Evaluate the user answers to the diagnostic assessment.
+        print("\n========================================")
+        print("=== evaluate_initial_assessment CALLED ===")
+        print(f"  Number of questions: {len(mcq_data.get('questions', []))}")
+        print(f"  Number of answers: {len(user_answers)}")
+        print(f"  User answers: {user_answers}")
+        print("========================================")
+        system_prompt = "You are a helpful assistant that evaluates assessments. Always respond with valid JSON only, no additional text."
+        
+        prompt = f"""Evaluate these diagnostic assessment answers.
 
 Questions:
 {json.dumps(mcq_data, indent=2)}
@@ -173,24 +358,26 @@ User Answers:
 {json.dumps(user_answers, indent=2)}
 
 Instructions:
-- Extract selected study method from Q1 (answer index 0)
-- Extract knowledge level from Q2 (answer index 1)
-- Score only Q3-5 (questions with correct_answer field)
-- Ignore any skipped answers
-- Identify weak areas from wrong answers (extract topic names, not full questions)
+- Extract the knowledge level from answer 0 (index 0) - first question
+- Score questions 1-9 (indices 1-9) which have correct_answer field
+- Identify weak topic areas from incorrect answers
+- Return ONLY valid JSON, no other text
 
-Return strictly JSON:
+Use this EXACT format:
 
 {{
-  "study_method": "Reading",
   "knowledge_level": "Beginner",
-  "score": "2/3",
-  "weak_areas": ["Topic 1", "Topic 2"]
+  "score": "7/9",
+  "weak_areas": ["Topic name 1", "Topic name 2"]
 }}
-"""
+
+Generate the JSON now:"""
         
-        response = self._call_ollama(prompt)
-        return self._extract_json(response)
+        response = self._call_ollama(prompt, system_prompt)
+        result = self._extract_json(response)
+        print(f"  Evaluation results: {result}")
+        print("=== evaluate_initial_assessment SUCCESS ===")
+        return result
     
     def generate_personalized_roadmap(
         self,
@@ -207,39 +394,53 @@ Return strictly JSON:
         Returns:
             Dictionary with 'topics' list containing roadmap topics
         """
-        prompt = f"""
-Create a personalized learning roadmap for the course: {course_name}
+        print("\n========================================")
+        print("=== generate_personalized_roadmap CALLED ===")
+        print(f"  Course name: {course_name}")
+        print(f"  Evaluation: {evaluation}")
+        print("========================================")
+        system_prompt = "You are a helpful assistant that creates learning roadmaps. Always respond with valid JSON only, no additional text."
+        
+        knowledge_level = evaluation.get('knowledge_level', 'Beginner')
+        weak_areas = evaluation.get('weak_areas', [])
+        
+        prompt = f"""Create a learning roadmap for: {course_name}
 
-Based on this evaluation:
-{json.dumps(evaluation, indent=2)}
+Knowledge Level: {knowledge_level}
+Weak Areas: {', '.join(weak_areas[:2]) if weak_areas else 'None'}
 
-Rules:
-- Topic 1 must be a common introduction for all learners
-- Remaining topics must adapt to the knowledge level ({evaluation.get('knowledge_level', 'Beginner')})
-- If weak_areas exist, add reinforcement topics for those areas
-- Provide 5-8 topics total
-- Each topic should have a clear name and difficulty level
-- NO static roadmap - adapt to user's level
-- NO placeholders
+IMPORTANT: Generate ONLY 3-5 topics. Return ONLY valid JSON.
 
-Return strictly JSON:
+Required format (copy this structure exactly):
 
 {{
   "topics": [
-    {{
-      "topic_name": "Introduction to {course_name}",
-      "level": "beginner"
-    }},
-    {{
-      "topic_name": "Topic 2 name",
-      "level": "intermediate"
-    }}
+    {{"topic_name": "Introduction to {course_name}", "level": "beginner"}},
+    {{"topic_name": "Core Concepts", "level": "intermediate"}},
+    {{"topic_name": "Advanced Applications", "level": "advanced"}}
   ]
 }}
-"""
+
+Generate JSON now with 3-5 topics:"""
         
-        response = self._call_ollama(prompt)
-        return self._extract_json(response)
+        try:
+            response = self._call_ollama(prompt, system_prompt)
+            result = self._extract_json(response)
+            print(f"  Generated {len(result.get('topics', []))} topics")
+            print("=== generate_personalized_roadmap SUCCESS ===")
+            return result
+        except (ValueError, KeyError) as e:
+            print(f"  ⚠️ JSON parsing failed, using fallback roadmap: {e}")
+            # Fallback: Create a basic roadmap
+            fallback_topics = [
+                {"topic_name": f"Introduction to {course_name}", "level": "beginner"},
+                {"topic_name": "Fundamental Concepts", "level": "beginner"},
+                {"topic_name": "Core Principles", "level": "intermediate"},
+                {"topic_name": "Practical Applications", "level": "intermediate"},
+            ]
+            print(f"  Using fallback with {len(fallback_topics)} topics")
+            print("=== generate_personalized_roadmap SUCCESS (fallback) ===")
+            return {"topics": fallback_topics}
     
     def generate_topic_content(
         self,
@@ -258,6 +459,12 @@ Return strictly JSON:
         Returns:
             Generated content as markdown text
         """
+        print("\n========================================")
+        print("=== generate_topic_content CALLED ===")
+        print(f"  Course: {course_name}")
+        print(f"  Topic: {topic_name}")
+        print(f"  Study method: {study_method}")
+        print("========================================")
         prompt = f"""
 Generate detailed educational content for:
 
@@ -279,6 +486,8 @@ Generate the content:
 """
         
         response = self._call_ollama(prompt)
+        print(f"  Generated content length: {len(response)} chars")
+        print("=== generate_topic_content SUCCESS ===")
         return response
     
     def generate_topic_quiz(
@@ -296,6 +505,11 @@ Generate the content:
         Returns:
             Dictionary with 'questions' list containing quiz questions
         """
+        print("\n========================================")
+        print("=== generate_topic_quiz CALLED ===")
+        print(f"  Topic: {topic_name}")
+        print(f"  Content length: {len(topic_content)} chars")
+        print("========================================")
         # Truncate content if too long to fit in context
         max_content_length = 2000
         if len(topic_content) > max_content_length:
@@ -327,7 +541,10 @@ Return strictly JSON:
 """
         
         response = self._call_ollama(prompt)
-        return self._extract_json(response)
+        result = self._extract_json(response)
+        print(f"  Generated {len(result.get('questions', []))} quiz questions")
+        print("=== generate_topic_quiz SUCCESS ===")
+        return result
     
     def evaluate_topic_quiz(
         self,
@@ -346,6 +563,11 @@ Return strictly JSON:
             - score: Score as "correct/total"
             - weak_areas: List of concepts where user struggled
         """
+        print("\n========================================")
+        print("=== evaluate_topic_quiz CALLED ===")
+        print(f"  Number of questions: {len(quiz_data.get('questions', []))}")
+        print(f"  Number of answers: {len(user_answers)}")
+        print("========================================")
         questions = quiz_data.get('questions', [])
         correct = 0
         weak = []
@@ -363,13 +585,16 @@ Return strictly JSON:
         
         score = f"{correct}/{len(questions)}"
         
-        return {
+        result = {
             "score": score,
             "correct_count": correct,
             "total_questions": len(questions),
             "score_percent": (correct / len(questions) * 100) if questions else 0,
             "weak_areas": weak
         }
+        print(f"  Quiz evaluation result: {result}")
+        print("=== evaluate_topic_quiz SUCCESS ===")
+        return result
     
     def refine_roadmap(
         self,
@@ -430,7 +655,11 @@ _assessment_service = None
 
 def get_assessment_service() -> AssessmentService:
     """Get or create the singleton assessment service instance."""
+    print("\n### get_assessment_service() CALLED ###")
     global _assessment_service
     if _assessment_service is None:
+        print("  Creating NEW AssessmentService instance")
         _assessment_service = AssessmentService()
+    else:
+        print("  Returning EXISTING AssessmentService instance")
     return _assessment_service

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -39,29 +39,36 @@ export default function AssessmentDialog({
 
   // Load initial assessment when dialog opens
   const loadAssessment = async () => {
+    console.log('🔵 loadAssessment() called');
+    console.log('🔵 courseId:', courseId, 'courseName:', courseName);
     try {
       setStep('loading');
       setError(null);
+      console.log('🔵 About to call assessmentAPI.generateInitialAssessment...');
       const response = await assessmentAPI.generateInitialAssessment({
         course_id: courseId,
         course_name: courseName,
       });
+      console.log('🔵 Assessment API response:', response);
       setQuestions(response.questions);
       setStep('questions');
     } catch (err: any) {
-      console.error('Error loading assessment:', err);
+      console.error('🔴 Error loading assessment:', err);
+      console.error('🔴 Error details:', err.response?.data);
       setError(err.response?.data?.error || 'Failed to load assessment');
       setStep('questions'); // Allow retry
     }
   };
 
-  // Handle dialog open state
-  const handleOpenChange = (newOpen: boolean) => {
-    if (newOpen && !open) {
-      // Dialog is opening
+  // Automatically load assessment when dialog opens
+  useEffect(() => {
+    console.log('🟡 useEffect triggered - open prop changed to:', open);
+    if (open) {
+      console.log('🟡 Dialog is open, loading assessment...');
       loadAssessment();
-    } else if (!newOpen) {
+    } else {
       // Dialog is closing - reset state
+      console.log('🟡 Dialog is closing, resetting state...');
       setStep('loading');
       setQuestions([]);
       setAnswers({});
@@ -69,6 +76,11 @@ export default function AssessmentDialog({
       setRoadmap(null);
       setError(null);
     }
+  }, [open]);
+
+  // Handle dialog open state
+  const handleOpenChange = (newOpen: boolean) => {
+    console.log('🟢 handleOpenChange called with:', newOpen);
     onOpenChange(newOpen);
   };
 
