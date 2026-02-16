@@ -398,7 +398,6 @@ export interface InitialAssessmentResponse {
 }
 
 export interface EvaluationResult {
-  study_method: string;
   knowledge_level: string;
   score: string;
   weak_areas: string[];
@@ -407,16 +406,40 @@ export interface EvaluationResult {
 export interface RoadmapTopic {
   topic_name: string;
   level: string;
+  description?: string;
 }
 
 export interface Roadmap {
   topics: RoadmapTopic[];
 }
 
+export interface SyllabusTopic {
+  topic_name: string;
+  description: string;
+  order: number;
+}
+
+export interface SyllabusModule {
+  module_name: string;
+  description: string;
+  order: number;
+  difficulty_level: string;
+  estimated_duration_minutes: number;
+  topics: SyllabusTopic[];
+}
+
+export interface Syllabus {
+  course_name: string;
+  knowledge_level: string;
+  total_modules: number;
+  modules: SyllabusModule[];
+}
+
 export interface EnrollmentResponse {
   enrollment_id: number;
   evaluation: EvaluationResult;
   roadmap: Roadmap;
+  syllabus: Syllabus;
   message: string;
 }
 
@@ -511,6 +534,19 @@ export const assessmentAPI = {
       '/assessment/topic/evaluate/',
       data
     );
+    return response.data;
+  },
+
+  getSyllabus: async (enrollmentId: number): Promise<{
+    enrollment_id: number;
+    course_name: string;
+    syllabus: Syllabus;
+    generated_by_model: string;
+    total_modules: number;
+    total_topics: number;
+    created_at: string;
+  }> => {
+    const response = await api.get(`/assessment/syllabus/${enrollmentId}/`);
     return response.data;
   },
 };

@@ -16,7 +16,8 @@ logger = logging.getLogger(__name__)
 from .models import (
     VideoTask, LearningProfile, Course, Module, Lesson, Resource,
     Enrollment, Question, QuizAttempt, QuizAnswer, ModuleProgress,
-    LearningRoadmap, Achievement, UserAchievement, ActivityLog
+    LearningRoadmap, Achievement, UserAchievement, ActivityLog,
+    PersonalizedSyllabus
 )
 from .serializers import (
     VideoTaskCreateSerializer, VideoTaskStatusSerializer,
@@ -728,10 +729,22 @@ class EvaluateAssessmentView(APIView):
             evaluation = assessment_service.evaluate_initial_assessment(mcq_data, answers)
             print(f"*** Evaluation result: {evaluation} ***")
             
-            # Generate personalized roadmap
-            print("*** Generating personalized roadmap ***")
-            roadmap_data = assessment_service.generate_personalized_roadmap(course_name, evaluation)
-            print(f"*** Roadmap generated with {len(roadmap_data.get('topics', []))} topics ***")
+            # Generate personalized syllabus
+            print("*** Generating personalized syllabus ***")
+            syllabus_data = assessment_service.generate_personalized_syllabus(course_name, evaluation)
+            print(f"*** Syllabus generated with {syllabus_data.get('total_modules', 0)} modules ***")
+            
+            # Also generate a flat roadmap for backward compatibility
+            roadmap_data = {
+                "topics": [
+                    {
+                        "topic_name": mod.get("module_name", ""),
+                        "level": mod.get("difficulty_level", "beginner"),
+                        "description": mod.get("description", ""),
+                    }
+                    for mod in syllabus_data.get("modules", [])
+                ]
+            }
             print("**************************************************\n")
             
             # Map knowledge level to KnowledgeLevel enum
@@ -764,7 +777,7 @@ class EvaluateAssessmentView(APIView):
                 status='active'
             )
             
-            # Create learning roadmap
+            # Create learning roadmap (backward compatibility)
             roadmap = LearningRoadmap.objects.create(
                 enrollment=enrollment,
                 roadmap_data=roadmap_data,
@@ -772,16 +785,13 @@ class EvaluateAssessmentView(APIView):
                 version=1
             )
             
-            # Create modules from roadmap
-            for idx, topic in enumerate(roadmap_data.get('topics', []), start=1):
-                Module.objects.create(
-                    course=course,
-                    title=topic.get('topic_name', f'Topic {idx}'),
-                    description=f"Generated module for {topic.get('topic_name')}",
-                    order=idx,
-                    difficulty_level=topic.get('level', 'beginner'),
-                    is_generated=True
-                )
+            # Create personalized syllabus (new: per-user structured course)
+            personalized_syllabus = PersonalizedSyllabus.objects.create(
+                enrollment=enrollment,
+                syllabus_data=syllabus_data,
+                generated_by_model='phi3:mini'
+            )
+            print(f"*** PersonalizedSyllabus #{personalized_syllabus.id} created ***")
             
             # Log activity
             ActivityLog.objects.create(
@@ -796,7 +806,8 @@ class EvaluateAssessmentView(APIView):
                 'enrollment_id': enrollment.id,
                 'evaluation': evaluation,
                 'roadmap': roadmap_data,
-                'message': 'Enrollment created successfully with personalized roadmap'
+                'syllabus': syllabus_data,
+                'message': 'Enrollment created successfully with personalized syllabus'
             }, status=status.HTTP_201_CREATED)
             
         except Course.DoesNotExist:
@@ -810,6 +821,38 @@ class EvaluateAssessmentView(APIView):
                 {'error': f'Failed to evaluate assessment: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class GetSyllabusView(APIView):
+    """Retrieve the personalized syllabus for an enrollment"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request, enrollment_id):
+        try:
+            enrollment = Enrollment.objects.get(pk=enrollment_id, user=request.user)
+        except Enrollment.DoesNotExist:
+            return Response(
+                {'error': 'Enrollment not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        try:
+            syllabus = PersonalizedSyllabus.objects.get(enrollment=enrollment)
+        except PersonalizedSyllabus.DoesNotExist:
+            return Response(
+                {'error': 'No syllabus found for this enrollment'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        return Response({
+            'enrollment_id': enrollment.id,
+            'course_name': enrollment.course.title,
+            'syllabus': syllabus.syllabus_data,
+            'generated_by_model': syllabus.generated_by_model,
+            'total_modules': syllabus.total_modules,
+            'total_topics': syllabus.total_topics,
+            'created_at': syllabus.created_at,
+        })
 
 
 class GenerateTopicContentView(APIView):

@@ -11,7 +11,7 @@ import { Card, CardContent } from './ui/card';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Label } from './ui/label';
 import { Loader2, CheckCircle, Brain, Sparkles } from 'lucide-react';
-import { assessmentAPI, AssessmentQuestion } from '../../services/api';
+import { assessmentAPI, AssessmentQuestion, Syllabus } from '../../services/api';
 
 interface AssessmentDialogProps {
   open: boolean;
@@ -34,7 +34,7 @@ export default function AssessmentDialog({
   const [questions, setQuestions] = useState<AssessmentQuestion[]>([]);
   const [answers, setAnswers] = useState<{ [key: number]: string }>({});
   const [evaluation, setEvaluation] = useState<any>(null);
-  const [roadmap, setRoadmap] = useState<any>(null);
+  const [syllabus, setSyllabus] = useState<Syllabus | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Load initial assessment when dialog opens
@@ -73,7 +73,7 @@ export default function AssessmentDialog({
       setQuestions([]);
       setAnswers({});
       setEvaluation(null);
-      setRoadmap(null);
+      setSyllabus(null);
       setError(null);
     }
   }, [open]);
@@ -104,7 +104,7 @@ export default function AssessmentDialog({
       });
 
       setEvaluation(response.evaluation);
-      setRoadmap(response.roadmap);
+      setSyllabus(response.syllabus);
       setStep('complete');
 
       // Notify parent component
@@ -226,7 +226,7 @@ export default function AssessmentDialog({
           </div>
         )}
 
-        {step === 'complete' && evaluation && roadmap && (
+        {step === 'complete' && evaluation && syllabus && (
           <>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2 text-2xl text-green-600">
@@ -234,7 +234,7 @@ export default function AssessmentDialog({
                 Assessment Complete!
               </DialogTitle>
               <DialogDescription>
-                Your personalized learning path has been created
+                Your personalized syllabus has been created
               </DialogDescription>
             </DialogHeader>
 
@@ -248,12 +248,6 @@ export default function AssessmentDialog({
                   </h3>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-gray-600">Study Method</p>
-                      <p className="font-semibold text-gray-900 capitalize">
-                        {evaluation.study_method}
-                      </p>
-                    </div>
-                    <div>
                       <p className="text-sm text-gray-600">Knowledge Level</p>
                       <p className="font-semibold text-gray-900 capitalize">
                         {evaluation.knowledge_level}
@@ -263,11 +257,11 @@ export default function AssessmentDialog({
                       <p className="text-sm text-gray-600">Assessment Score</p>
                       <p className="font-semibold text-gray-900">{evaluation.score}</p>
                     </div>
-                    {evaluation.weak_areas.length > 0 && (
-                      <div>
+                    {evaluation.weak_areas && evaluation.weak_areas.length > 0 && (
+                      <div className="col-span-2">
                         <p className="text-sm text-gray-600">Focus Areas</p>
                         <p className="font-semibold text-gray-900">
-                          {evaluation.weak_areas.length} topic(s)
+                          {evaluation.weak_areas.join(', ')}
                         </p>
                       </div>
                     )}
@@ -275,22 +269,44 @@ export default function AssessmentDialog({
                 </CardContent>
               </Card>
 
-              {/* Personalized Roadmap */}
+              {/* Personalized Syllabus */}
               <Card>
                 <CardContent className="pt-6">
-                  <h3 className="font-semibold text-lg mb-4">Your Personalized Roadmap</h3>
-                  <div className="space-y-2">
-                    {roadmap.topics.map((topic: any, index: number) => (
-                      <div
-                        key={index}
-                        className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
-                      >
-                        <div className="flex-shrink-0 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-semibold">
-                          {index + 1}
+                  <h3 className="font-semibold text-lg mb-1">Your Personalized Syllabus</h3>
+                  <p className="text-sm text-gray-500 mb-4">
+                    {syllabus.total_modules} modules tailored to your level
+                  </p>
+                  <div className="space-y-4">
+                    {syllabus.modules.map((mod, modIndex) => (
+                      <div key={modIndex} className="border rounded-lg overflow-hidden">
+                        {/* Module header */}
+                        <div className="flex items-center gap-3 p-3 bg-gray-50">
+                          <div className="flex-shrink-0 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-semibold text-sm">
+                            {mod.order}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-gray-900 truncate">{mod.module_name}</p>
+                            <div className="flex items-center gap-2 text-xs text-gray-500">
+                              <span className="capitalize">{mod.difficulty_level}</span>
+                              {mod.estimated_duration_minutes && (
+                                <>
+                                  <span>&middot;</span>
+                                  <span>{mod.estimated_duration_minutes} min</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex-1">
-                          <p className="font-medium text-gray-900">{topic.topic_name}</p>
-                          <p className="text-xs text-gray-500 capitalize">{topic.level}</p>
+                        {/* Topics */}
+                        <div className="divide-y">
+                          {mod.topics.map((topic, topicIndex) => (
+                            <div key={topicIndex} className="px-4 py-2 pl-14 text-sm">
+                              <p className="font-medium text-gray-800">{topic.topic_name}</p>
+                              {topic.description && (
+                                <p className="text-gray-500 text-xs">{topic.description}</p>
+                              )}
+                            </div>
+                          ))}
                         </div>
                       </div>
                     ))}

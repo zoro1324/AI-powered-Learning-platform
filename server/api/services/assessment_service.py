@@ -441,7 +441,217 @@ Generate JSON now with 3-5 topics:"""
             print(f"  Using fallback with {len(fallback_topics)} topics")
             print("=== generate_personalized_roadmap SUCCESS (fallback) ===")
             return {"topics": fallback_topics}
+
+    def generate_personalized_syllabus(
+        self,
+        course_name: str,
+        evaluation: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Generate a full personalized syllabus with modules and topics.
+        
+        After the initial assessment, this creates a structured course
+        tailored to the user's knowledge level and weak areas.
+        Each module contains multiple topics with descriptions.
+        """
+        print("\n========================================")
+        print("=== generate_personalized_syllabus CALLED ===")
+        print(f"  Course name: {course_name}")
+        print(f"  Evaluation: {evaluation}")
+        print("========================================")
+        
+        system_prompt = (
+            "You are an expert curriculum designer. "
+            "Generate a structured course syllabus as valid JSON only, "
+            "no additional text before or after the JSON."
+        )
+        
+        knowledge_level = evaluation.get('knowledge_level', 'Beginner')
+        score = evaluation.get('score', '0/0')
+        weak_areas = evaluation.get('weak_areas', [])
+        
+        prompt = f"""Design a personalized course syllabus for: {course_name}
+
+Student Profile:
+- Knowledge Level: {knowledge_level}
+- Assessment Score: {score}
+- Weak Areas: {', '.join(weak_areas[:3]) if weak_areas else 'None identified'}
+
+Requirements:
+- Decide the number of modules based on course complexity (3-8 modules)
+- Each module must have 2-5 topics with short descriptions
+- Start with fundamentals if student is a beginner
+- Add extra modules for weak areas
+- Progress from easier to harder
+- Keep module names concise (3-8 words)
+- Keep topic descriptions to ONE short sentence (under 15 words)
+- Use difficulty_level: "beginner", "intermediate", or "advanced"
+
+Return ONLY this JSON structure:
+
+{{
+  "course_name": "{course_name}",
+  "knowledge_level": "{knowledge_level}",
+  "total_modules": 5,
+  "modules": [
+    {{
+      "module_name": "Getting Started with {course_name}",
+      "description": "Foundation concepts and setup",
+      "order": 1,
+      "difficulty_level": "beginner",
+      "estimated_duration_minutes": 30,
+      "topics": [
+        {{"topic_name": "What is {course_name}", "description": "Overview and importance", "order": 1}},
+        {{"topic_name": "Core Terminology", "description": "Key terms and definitions", "order": 2}}
+      ]
+    }},
+    {{
+      "module_name": "Core Concepts",
+      "description": "Essential principles and techniques",
+      "order": 2,
+      "difficulty_level": "intermediate",
+      "estimated_duration_minutes": 45,
+      "topics": [
+        {{"topic_name": "Fundamental Principles", "description": "Core ideas explained", "order": 1}},
+        {{"topic_name": "Practical Examples", "description": "Hands-on demonstrations", "order": 2}}
+      ]
+    }}
+  ]
+}}
+
+Generate the full syllabus JSON now:"""
+        
+        try:
+            response = self._call_ollama(prompt, system_prompt)
+            result = self._extract_json(response)
+            
+            # Validate and normalize the structure
+            result = self._normalize_syllabus(result, course_name, knowledge_level)
+            
+            print(f"  Generated syllabus: {result.get('total_modules')} modules, "
+                  f"{sum(len(m.get('topics', [])) for m in result.get('modules', []))} total topics")
+            print("=== generate_personalized_syllabus SUCCESS ===")
+            return result
+            
+        except (ValueError, KeyError) as e:
+            print(f"  ⚠️ JSON parsing failed, using fallback syllabus: {e}")
+            fallback = self._build_fallback_syllabus(course_name, knowledge_level, weak_areas)
+            print(f"  Using fallback with {fallback['total_modules']} modules")
+            print("=== generate_personalized_syllabus SUCCESS (fallback) ===")
+            return fallback
     
+    def _normalize_syllabus(
+        self, data: Dict[str, Any], course_name: str, knowledge_level: str
+    ) -> Dict[str, Any]:
+        """Ensure the syllabus JSON has all required fields."""
+        modules = data.get('modules', [])
+        
+        data.setdefault('course_name', course_name)
+        data.setdefault('knowledge_level', knowledge_level)
+        data['total_modules'] = len(modules)
+        
+        for idx, mod in enumerate(modules, start=1):
+            mod.setdefault('module_name', f'Module {idx}')
+            mod.setdefault('description', '')
+            mod['order'] = idx
+            mod.setdefault('difficulty_level', 'beginner')
+            mod.setdefault('estimated_duration_minutes', 30)
+            
+            topics = mod.get('topics', [])
+            if not topics:
+                topics = [{"topic_name": mod['module_name'], "description": "Main content", "order": 1}]
+                mod['topics'] = topics
+            
+            for tidx, topic in enumerate(topics, start=1):
+                topic.setdefault('topic_name', f'Topic {tidx}')
+                topic.setdefault('description', '')
+                topic['order'] = tidx
+        
+        return data
+    
+    def _build_fallback_syllabus(
+        self, course_name: str, knowledge_level: str, weak_areas: List[str]
+    ) -> Dict[str, Any]:
+        """Build a reasonable fallback syllabus when Ollama fails."""
+        modules = [
+            {
+                "module_name": f"Introduction to {course_name}",
+                "description": "Foundation concepts and overview of the subject",
+                "order": 1,
+                "difficulty_level": "beginner",
+                "estimated_duration_minutes": 30,
+                "topics": [
+                    {"topic_name": f"What is {course_name}", "description": "Overview and importance of the subject", "order": 1},
+                    {"topic_name": "History and Background", "description": "How the field evolved over time", "order": 2},
+                    {"topic_name": "Key Terminology", "description": "Essential terms and definitions", "order": 3},
+                ]
+            },
+            {
+                "module_name": "Core Concepts and Principles",
+                "description": "Fundamental ideas that underpin the subject",
+                "order": 2,
+                "difficulty_level": "beginner",
+                "estimated_duration_minutes": 45,
+                "topics": [
+                    {"topic_name": "Fundamental Principles", "description": "The building blocks of knowledge", "order": 1},
+                    {"topic_name": "Key Techniques", "description": "Common methods and approaches", "order": 2},
+                    {"topic_name": "Worked Examples", "description": "Step-by-step problem walkthroughs", "order": 3},
+                ]
+            },
+            {
+                "module_name": "Intermediate Applications",
+                "description": "Applying concepts to real scenarios",
+                "order": 3,
+                "difficulty_level": "intermediate",
+                "estimated_duration_minutes": 45,
+                "topics": [
+                    {"topic_name": "Real-World Use Cases", "description": "How concepts apply in practice", "order": 1},
+                    {"topic_name": "Problem-Solving Strategies", "description": "Approaches to common challenges", "order": 2},
+                    {"topic_name": "Tools and Resources", "description": "Essential tools for practitioners", "order": 3},
+                ]
+            },
+            {
+                "module_name": "Advanced Topics",
+                "description": "Deeper exploration of complex areas",
+                "order": 4,
+                "difficulty_level": "advanced",
+                "estimated_duration_minutes": 60,
+                "topics": [
+                    {"topic_name": "Advanced Techniques", "description": "Sophisticated methods and strategies", "order": 1},
+                    {"topic_name": "Best Practices", "description": "Industry standards and recommendations", "order": 2},
+                    {"topic_name": "Current Trends", "description": "Latest developments in the field", "order": 3},
+                ]
+            },
+        ]
+        
+        # Add weak-area reinforcement module if applicable
+        if weak_areas:
+            reinforcement_topics = []
+            for i, area in enumerate(weak_areas[:3], start=1):
+                topic_name = area[:50].rstrip('?').strip()
+                if len(topic_name) > 40:
+                    topic_name = topic_name[:40].rsplit(' ', 1)[0]
+                reinforcement_topics.append({
+                    "topic_name": f"Review: {topic_name}",
+                    "description": "Reinforcement of identified weak area",
+                    "order": i,
+                })
+            modules.append({
+                "module_name": "Reinforcement and Review",
+                "description": "Extra practice on topics needing improvement",
+                "order": 5,
+                "difficulty_level": "intermediate",
+                "estimated_duration_minutes": 40,
+                "topics": reinforcement_topics,
+            })
+        
+        return {
+            "course_name": course_name,
+            "knowledge_level": knowledge_level,
+            "total_modules": len(modules),
+            "modules": modules,
+        }
+
     def generate_topic_content(
         self,
         course_name: str,
