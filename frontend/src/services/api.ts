@@ -24,7 +24,7 @@ import {
 
 // Create axios instance
 const api: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000/api',
+  baseURL: (import.meta as any).env?.VITE_API_URL || 'http://localhost:8000/api',
   headers: {
     'Content-Type': 'application/json',
   },
@@ -379,6 +379,138 @@ export const videoAPI = {
 
   getStatus: async (taskId: string): Promise<any> => {
     const response = await api.get(`/videos/status/${taskId}/`);
+    return response.data;
+  },
+};
+
+// ============================================================================
+// ASSESSMENT & PERSONALIZED LEARNING API
+// ============================================================================
+
+export interface AssessmentQuestion {
+  question: string;
+  options: string[];
+  correct_answer?: string | null;
+}
+
+export interface InitialAssessmentResponse {
+  questions: AssessmentQuestion[];
+}
+
+export interface EvaluationResult {
+  study_method: string;
+  knowledge_level: string;
+  score: string;
+  weak_areas: string[];
+}
+
+export interface RoadmapTopic {
+  topic_name: string;
+  level: string;
+}
+
+export interface Roadmap {
+  topics: RoadmapTopic[];
+}
+
+export interface EnrollmentResponse {
+  enrollment_id: number;
+  evaluation: EvaluationResult;
+  roadmap: Roadmap;
+  message: string;
+}
+
+export interface TopicContentResponse {
+  lesson_id: number;
+  content: string;
+}
+
+export interface TopicQuizResponse {
+  questions: AssessmentQuestion[];
+}
+
+export interface QuizEvaluationResult {
+  score: string;
+  score_percent: number;
+  correct_count: number;
+  total_questions: number;
+  weak_areas: string[];
+}
+
+export interface TopicEvaluationResponse {
+  evaluation: QuizEvaluationResult;
+  progress_updated: boolean;
+  refined_roadmap?: Roadmap;
+}
+
+export const assessmentAPI = {
+  generateInitialAssessment: async (data: {
+    course_id: number;
+    course_name: string;
+  }): Promise<InitialAssessmentResponse> => {
+    console.log('📡 assessmentAPI.generateInitialAssessment called with:', data);
+    console.log('📡 API baseURL:', api.defaults.baseURL);
+    console.log('📡 Full URL will be:', api.defaults.baseURL + '/assessment/initial/');
+    try {
+      const response = await api.post<InitialAssessmentResponse>(
+        '/assessment/initial/',
+        data
+      );
+      console.log('📡 API Response received:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('📡 API Error:', error);
+      console.error('📡 Error response:', error.response);
+      throw error;
+    }
+  },
+
+  evaluateAssessment: async (data: {
+    course_id: number;
+    course_name: string;
+    questions: AssessmentQuestion[];
+    answers: string[];
+  }): Promise<EnrollmentResponse> => {
+    const response = await api.post<EnrollmentResponse>(
+      '/assessment/evaluate/',
+      data
+    );
+    return response.data;
+  },
+
+  generateTopicContent: async (data: {
+    enrollment_id: number;
+    module_id: number;
+    topic_name: string;
+  }): Promise<TopicContentResponse> => {
+    const response = await api.post<TopicContentResponse>(
+      '/assessment/topic/content/',
+      data
+    );
+    return response.data;
+  },
+
+  generateTopicQuiz: async (data: {
+    lesson_id: number;
+    topic_name: string;
+  }): Promise<TopicQuizResponse> => {
+    const response = await api.post<TopicQuizResponse>(
+      '/assessment/topic/quiz/',
+      data
+    );
+    return response.data;
+  },
+
+  evaluateTopicQuiz: async (data: {
+    enrollment_id: number;
+    module_id: number;
+    questions: AssessmentQuestion[];
+    answers: string[];
+  }): Promise<TopicEvaluationResponse> => {
+    const response = await api.post<TopicEvaluationResponse>(
+      '/assessment/topic/evaluate/',
+      data
+    );
     return response.data;
   },
 };

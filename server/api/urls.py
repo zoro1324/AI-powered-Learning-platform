@@ -9,7 +9,9 @@ from .views import (
     CourseViewSet, ModuleViewSet, LessonViewSet, ResourceViewSet,
     EnrollmentViewSet, QuestionViewSet, QuizAttemptViewSet, QuizAnswerViewSet,
     ModuleProgressViewSet, LearningRoadmapViewSet, AchievementViewSet,
-    UserAchievementViewSet, ActivityLogViewSet, DashboardView
+    UserAchievementViewSet, ActivityLogViewSet, DashboardView,
+    InitialAssessmentView, EvaluateAssessmentView, GenerateTopicContentView,
+    GenerateTopicQuizView, EvaluateTopicQuizView
 )
 
 # Create router for ViewSets
@@ -45,6 +47,13 @@ urlpatterns = [
     # Video Generation
     path('videos/generate/', GenerateVideoView.as_view(), name='video-generate'),
     path('videos/status/<uuid:task_id>/', VideoTaskStatusView.as_view(), name='video-status'),
+    
+    # Assessment & Personalized Learning
+    path('assessment/initial/', InitialAssessmentView.as_view(), name='assessment-initial'),
+    path('assessment/evaluate/', EvaluateAssessmentView.as_view(), name='assessment-evaluate'),
+    path('assessment/topic/content/', GenerateTopicContentView.as_view(), name='topic-content'),
+    path('assessment/topic/quiz/', GenerateTopicQuizView.as_view(), name='topic-quiz'),
+    path('assessment/topic/evaluate/', EvaluateTopicQuizView.as_view(), name='topic-evaluate'),
     
     # Router URLs (all ViewSets)
     path('', include(router.urls)),
