@@ -26,6 +26,7 @@ from .serializers import (
     UserAchievementSerializer, ActivityLogSerializer
 )
 from .tasks import generate_video_task
+from .services.assessment_service import get_assessment_service
 
 User = get_user_model()
 
@@ -568,3 +569,507 @@ class VideoTaskStatusView(APIView):
         return Response(
             VideoTaskStatusSerializer(video_task, context={"request": request}).data,
         )
+
+
+# ============================================================================
+# ASSESSMENT & PERSONALIZED LEARNING VIEWS
+# ============================================================================
+
+class InitialAssessmentView(APIView):
+    """Generate initial diagnostic MCQ questions for course enrollment"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        """
+        Generate initial assessment questions for a course.
+        
+        Expected payload:
+        {
+            "course_id": 1,
+            "course_name": "Web Development"
+        }
+        
+        Returns:
+        {
+            "questions": [
+                {
+                    "question": "...",
+                    "options": [...],
+                    "correct_answer": "..." or null
+                }
+            ]
+        }
+        """
+        from .services.assessment_service import get_assessment_service
+        
+        course_id = request.data.get('course_id')
+        course_name = request.data.get('course_name')
+        
+        if not course_id or not course_name:
+            return Response(
+                {'error': 'course_id and course_name are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Verify course exists
+            course = Course.objects.get(pk=course_id)
+            
+            # Generate MCQ
+            assessment_service = get_assessment_service()
+            mcq_data = assessment_service.generate_initial_mcq(course_name)
+            
+            # Store the MCQ temporarily in session or return directly
+            # For simplicity, we'll return directly
+            return Response(mcq_data, status=status.HTTP_200_OK)
+            
+        except Course.DoesNotExist:
+            return Response(
+                {'error': 'Course not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error generating initial assessment: {e}", exc_info=True)
+            return Response(
+                {'error': f'Failed to generate assessment: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class EvaluateAssessmentView(APIView):
+    """Evaluate initial assessment and generate personalized roadmap"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        """
+        Evaluate assessment answers and create enrollment with personalized roadmap.
+        
+        Expected payload:
+        {
+            "course_id": 1,
+            "course_name": "Web Development",
+            "questions": [...],
+            "answers": ["Reading", "Beginner", "Option A", "Option B", "Option C"]
+        }
+        
+        Returns:
+        {
+            "enrollment_id": 1,
+            "evaluation": {
+                "study_method": "Reading",
+                "knowledge_level": "Beginner",
+                "score": "2/3",
+                "weak_areas": [...]
+            },
+            "roadmap": {
+                "topics": [...]
+            }
+        }
+        """
+        from .services.assessment_service import get_assessment_service
+        
+        course_id = request.data.get('course_id')
+        course_name = request.data.get('course_name')
+        questions = request.data.get('questions')
+        answers = request.data.get('answers')
+        
+        if not all([course_id, course_name, questions, answers]):
+            return Response(
+                {'error': 'course_id, course_name, questions, and answers are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            course = Course.objects.get(pk=course_id)
+            user = request.user
+            
+            # Check if already enrolled
+            existing_enrollment = Enrollment.objects.filter(
+                user=user,
+                course=course
+            ).first()
+            
+            if existing_enrollment:
+                return Response(
+                    {'error': 'Already enrolled in this course'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Evaluate assessment
+            assessment_service = get_assessment_service()
+            mcq_data = {'questions': questions}
+            evaluation = assessment_service.evaluate_initial_assessment(mcq_data, answers)
+            
+            # Generate personalized roadmap
+            roadmap_data = assessment_service.generate_personalized_roadmap(course_name, evaluation)
+            
+            # Map knowledge level to KnowledgeLevel enum
+            knowledge_level_map = {
+                'beginner': 'beginner',
+                'intermediate': 'intermediate',
+                'advanced': 'advanced',
+            }
+            diagnosed_level = knowledge_level_map.get(
+                evaluation.get('knowledge_level', '').lower(),
+                'beginner'
+            )
+            
+            # Map study method to LearningStyle enum
+            study_method_map = {
+                'reading': 'summary',
+                'watching video': 'videos',
+                'voice conversation': 'reels',
+                'interactive practice': 'mindmap',
+            }
+            learning_style = study_method_map.get(
+                evaluation.get('study_method', '').lower(),
+                'summary'
+            )
+            
+            # Create enrollment
+            enrollment = Enrollment.objects.create(
+                user=user,
+                course=course,
+                diagnosed_level=diagnosed_level,
+                learning_style_override=learning_style,
+                status='active'
+            )
+            
+            # Create learning roadmap
+            roadmap = LearningRoadmap.objects.create(
+                enrollment=enrollment,
+                roadmap_json=roadmap_data,
+                is_active=True,
+                version=1
+            )
+            
+            # Create modules from roadmap
+            for idx, topic in enumerate(roadmap_data.get('topics', []), start=1):
+                Module.objects.create(
+                    course=course,
+                    title=topic.get('topic_name', f'Topic {idx}'),
+                    description=f"Generated module for {topic.get('topic_name')}",
+                    order=idx,
+                    difficulty_level=topic.get('level', 'beginner'),
+                    is_generated=True
+                )
+            
+            # Log activity
+            ActivityLog.objects.create(
+                user=user,
+                activity_type='quiz_completed',
+                description=f'Completed diagnostic assessment for {course.title}',
+                related_course=course
+            )
+            
+            return Response({
+                'enrollment_id': enrollment.id,
+                'evaluation': evaluation,
+                'roadmap': roadmap_data,
+                'message': 'Enrollment created successfully with personalized roadmap'
+            }, status=status.HTTP_201_CREATED)
+            
+        except Course.DoesNotExist:
+            return Response(
+                {'error': 'Course not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error evaluating assessment: {e}", exc_info=True)
+            return Response(
+                {'error': f'Failed to evaluate assessment: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class GenerateTopicContentView(APIView):
+    """Generate educational content for a specific topic"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        """
+        Generate content for a topic.
+        
+        Expected payload:
+        {
+            "enrollment_id": 1,
+            "module_id": 5,
+            "topic_name": "Introduction to HTML"
+        }
+        
+        Returns:
+        {
+            "content": "Markdown formatted content..."
+        }
+        """
+        from .services.assessment_service import get_assessment_service
+        
+        enrollment_id = request.data.get('enrollment_id')
+        module_id = request.data.get('module_id')
+        topic_name = request.data.get('topic_name')
+        
+        if not all([enrollment_id, module_id, topic_name]):
+            return Response(
+                {'error': 'enrollment_id, module_id, and topic_name are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            enrollment = Enrollment.objects.get(pk=enrollment_id, user=request.user)
+            module = Module.objects.get(pk=module_id, course=enrollment.course)
+            
+            # Get study method from enrollment
+            study_method = enrollment.learning_style_override or 'summary'
+            
+            # Generate content
+            assessment_service = get_assessment_service()
+            content = assessment_service.generate_topic_content(
+                enrollment.course.title,
+                topic_name,
+                study_method
+            )
+            
+            # Create or update lesson
+            lesson, created = Lesson.objects.get_or_create(
+                module=module,
+                order=1,
+                defaults={
+                    'title': topic_name,
+                    'content': content
+                }
+            )
+            
+            if not created:
+                lesson.content = content
+                lesson.save()
+            
+            return Response({
+                'lesson_id': lesson.id,
+                'content': content
+            }, status=status.HTTP_200_OK)
+            
+        except (Enrollment.DoesNotExist, Module.DoesNotExist):
+            return Response(
+                {'error': 'Enrollment or Module not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error generating topic content: {e}", exc_info=True)
+            return Response(
+                {'error': f'Failed to generate content: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class GenerateTopicQuizView(APIView):
+    """Generate quiz for a specific topic"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        """
+        Generate quiz for a topic based on its content.
+        
+        Expected payload:
+        {
+            "lesson_id": 10,
+            "topic_name": "Introduction to HTML"
+        }
+        
+        Returns:
+        {
+            "questions": [...]
+        }
+        """
+        from .services.assessment_service import get_assessment_service
+        
+        lesson_id = request.data.get('lesson_id')
+        topic_name = request.data.get('topic_name')
+        
+        if not all([lesson_id, topic_name]):
+            return Response(
+                {'error': 'lesson_id and topic_name are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            lesson = Lesson.objects.get(pk=lesson_id)
+            content = lesson.content
+            
+            if not content:
+                return Response(
+                    {'error': 'Lesson content not found. Generate content first.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Generate quiz
+            assessment_service = get_assessment_service()
+            quiz_data = assessment_service.generate_topic_quiz(topic_name, content)
+            
+            return Response(quiz_data, status=status.HTTP_200_OK)
+            
+        except Lesson.DoesNotExist:
+            return Response(
+                {'error': 'Lesson not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error generating topic quiz: {e}", exc_info=True)
+            return Response(
+                {'error': f'Failed to generate quiz: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class EvaluateTopicQuizView(APIView):
+    """Evaluate topic quiz and refine roadmap if needed"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        """
+        Evaluate topic quiz answers and refine remaining roadmap.
+        
+        Expected payload:
+        {
+            "enrollment_id": 1,
+            "module_id": 5,
+            "questions": [...],
+            "answers": ["Option A", "Option B", ...]
+        }
+        
+        Returns:
+        {
+            "evaluation": {
+                "score": "4/5",
+                "score_percent": 80,
+                "weak_areas": [...]
+            },
+            "refined_roadmap": {
+                "topics": [...]
+            }
+        }
+        """
+        from .services.assessment_service import get_assessment_service
+        
+        enrollment_id = request.data.get('enrollment_id')
+        module_id = request.data.get('module_id')
+        questions = request.data.get('questions')
+        answers = request.data.get('answers')
+        
+        if not all([enrollment_id, module_id, questions, answers]):
+            return Response(
+                {'error': 'enrollment_id, module_id, questions, and answers are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            enrollment = Enrollment.objects.get(pk=enrollment_id, user=request.user)
+            module = Module.objects.get(pk=module_id, course=enrollment.course)
+            
+            # Evaluate quiz
+            assessment_service = get_assessment_service()
+            quiz_data = {'questions': questions}
+            evaluation = assessment_service.evaluate_topic_quiz(quiz_data, answers)
+            
+            # Create QuizAttempt record
+            quiz_attempt = QuizAttempt.objects.create(
+                enrollment=enrollment,
+                module=module,
+                attempt_type='topic_quiz',
+                score_percent=evaluation['score_percent'],
+                total_questions=evaluation['total_questions'],
+                correct_answers=evaluation['correct_count'],
+                weak_areas=evaluation['weak_areas']
+            )
+            quiz_attempt.completed_at = timezone.now()
+            quiz_attempt.save()
+            
+            # Update module progress
+            module_progress, created = ModuleProgress.objects.get_or_create(
+                enrollment=enrollment,
+                module=module,
+                defaults={'status': 'completed'}
+            )
+            
+            if not created:
+                module_progress.status = 'completed'
+                module_progress.save()
+            
+            # Get remaining modules (topics)
+            remaining_modules = Module.objects.filter(
+                course=enrollment.course,
+                order__gt=module.order
+            ).order_by('order')
+            
+            refined_roadmap = None
+            if remaining_modules.exists() and evaluation['weak_areas']:
+                # Convert modules to topic format
+                remaining_topics = [
+                    {
+                        'topic_name': m.title,
+                        'level': m.difficulty_level
+                    }
+                    for m in remaining_modules
+                ]
+                
+                # Refine roadmap
+                refined_roadmap = assessment_service.refine_roadmap(
+                    enrollment.course.title,
+                    remaining_topics,
+                    evaluation['weak_areas']
+                )
+                
+                # Update roadmap
+                roadmap = enrollment.roadmaps.filter(is_active=True).first()
+                if roadmap:
+                    # Deactivate old roadmap
+                    roadmap.is_active = False
+                    roadmap.save()
+                    
+                    # Create new version
+                    LearningRoadmap.objects.create(
+                        enrollment=enrollment,
+                        roadmap_json=refined_roadmap,
+                        is_active=True,
+                        version=roadmap.version + 1
+                    )
+            
+            # Update overall progress
+            total_modules = enrollment.course.modules.count()
+            completed_modules = enrollment.module_progresses.filter(
+                status='completed'
+            ).count()
+            
+            if total_modules > 0:
+                progress = (completed_modules / total_modules) * 100
+                enrollment.overall_progress = progress
+                enrollment.save()
+            
+            # Log activity
+            ActivityLog.objects.create(
+                user=request.user,
+                activity_type='quiz_completed',
+                description=f'Completed quiz for {module.title}',
+                related_course=enrollment.course
+            )
+            
+            response_data = {
+                'evaluation': evaluation,
+                'progress_updated': True
+            }
+            
+            if refined_roadmap:
+                response_data['refined_roadmap'] = refined_roadmap
+            
+            return Response(response_data, status=status.HTTP_200_OK)
+            
+        except (Enrollment.DoesNotExist, Module.DoesNotExist):
+            return Response(
+                {'error': 'Enrollment or Module not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error evaluating topic quiz: {e}", exc_info=True)
+            return Response(
+                {'error': f'Failed to evaluate quiz: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

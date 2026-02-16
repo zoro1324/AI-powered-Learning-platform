@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Sidebar } from '../components/Sidebar';
+import AssessmentDialog from '../components/AssessmentDialog';
 import { 
   BookOpen, 
   Clock, 
@@ -8,7 +9,8 @@ import {
   Plus, 
   Loader2,
   Filter,
-  Search
+  Search,
+  GraduationCap
 } from 'lucide-react';
 import { useAppSelector } from '../../store';
 import { courseAPI } from '../../services/api';
@@ -64,6 +66,10 @@ export default function PopularCoursesPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  
+  // Assessment dialog state
+  const [assessmentDialogOpen, setAssessmentDialogOpen] = useState(false);
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   
   // Form state
   const [formData, setFormData] = useState<{
@@ -124,6 +130,26 @@ export default function PopularCoursesPage() {
       alert('Failed to create course: ' + (err.message || 'Unknown error'));
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleEnrollClick = (e: React.MouseEvent, course: Course) => {
+    e.stopPropagation();
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    setSelectedCourse(course);
+    setAssessmentDialogOpen(true);
+  };
+
+  const handleEnrollmentComplete = (enrollmentId: number) => {
+    console.log('Enrollment created:', enrollmentId);
+    // Optionally navigate to the course or show a success message
+    if (selectedCourse) {
+      setTimeout(() => {
+        navigate(`/courses/${selectedCourse.id}`);
+      }, 1000);
     }
   };
 
@@ -405,16 +431,38 @@ export default function PopularCoursesPage() {
                     </div>
                   </CardContent>
                   
-                  <CardFooter>
-                    <Button 
-                      className="w-full"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/courses/${course.id}`);
-                      }}
-                    >
-                      View Course
-                    </Button>
+                  <CardFooter className="flex gap-2">
+                    {isAuthenticated ? (
+                      <>
+                        <Button 
+                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                          onClick={(e) => handleEnrollClick(e, course)}
+                        >
+                          <GraduationCap className="w-4 h-4 mr-2" />
+                          Enroll Now
+                        </Button>
+                        <Button 
+                          variant="outline"
+                          className="flex-1"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/courses/${course.id}`);
+                          }}
+                        >
+                          View Details
+                        </Button>
+                      </>
+                    ) : (
+                      <Button 
+                        className="w-full"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate('/login');
+                        }}
+                      >
+                        Login to Enroll
+                      </Button>
+                    )}
                   </CardFooter>
                 </Card>
               ))}
@@ -422,6 +470,17 @@ export default function PopularCoursesPage() {
           )}
         </div>
       </main>
+
+      {/* Assessment Dialog */}
+      {selectedCourse && (
+        <AssessmentDialog
+          open={assessmentDialogOpen}
+          onOpenChange={setAssessmentDialogOpen}
+          courseId={selectedCourse.id}
+          courseName={selectedCourse.title}
+          onEnrollmentComplete={handleEnrollmentComplete}
+        />
+      )}
     </div>
   );
 }
