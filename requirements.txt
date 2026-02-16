@@ -15,3 +15,9 @@ pillow
 edge-tts
 requests
 mysqlclient
+
+# Django ecosystem
+djangorestframework
+django-cors-headers
+djangorestframework-simplejwt
+django-filter
