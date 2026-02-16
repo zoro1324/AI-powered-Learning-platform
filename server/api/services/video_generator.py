@@ -90,15 +90,19 @@ class VideoGeneratorService:
 
     def generate_script(self, topic: str) -> dict | None:
         prompt = (
-            "Convert this topic into a structured video plan.\n"
-            f"Topic: {topic}\n"
-            "Return JSON only:\n"
+            f"Create an educational video script about: {topic}\n\n"
+            "Requirements:\n"
+            "- Create 3-5 scenes (slides)\n"
+            "- Each scene MUST have a 'narration' field with spoken text (2-3 sentences)\n"
+            "- Each scene should have 'title', 'bullets' (key points), and 'image_prompt'\n"
+            "- Keep narration concise and educational\n\n"
+            "Return ONLY valid JSON in this exact format:\n"
             '{\n'
             '  "scenes": [\n'
             '    {\n'
-            '      "title": "",\n'
-            '      "bullets": [],\n'
-            '      "narration": "",\n'
+            '      "title": "Scene Title",\n'
+            '      "bullets": ["Point 1", "Point 2", "Point 3"],\n'
+            '      "narration": "This is the spoken narration for this scene. It should be 2-3 sentences explaining the concept clearly.",\n'
             '      "image_prompt": "visual description for illustration"\n'
             '    }\n'
             '  ]\n'
@@ -293,12 +297,9 @@ class VideoGeneratorService:
             audio_clip = AudioFileClip(audio_path)
             logger.info(f"  Audio duration: {audio_clip.duration}s")
             
-            video_clip = (
-                ImageClip(image_path)
-                .with_duration(audio_clip.duration)
-                .with_fps(24)
-                .set_audio(audio_clip)  # Changed from with_audio to set_audio
-            )
+            # Create image clip with audio
+            image_clip = ImageClip(image_path).with_duration(audio_clip.duration).with_fps(24)
+            video_clip = image_clip.with_audio(audio_clip)
             
             logger.info(f"  Writing video file with audio...")
             video_clip.write_videofile(
