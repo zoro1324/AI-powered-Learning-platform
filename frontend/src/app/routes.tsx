@@ -12,6 +12,7 @@ import AssessmentPage from './pages/AssessmentPage';
 import LearningPathPage from './pages/LearningPathPage';
 import FinalQuizPage from './pages/FinalQuizPage';
 import PopularCoursesPage from './pages/PopularCoursesPage';
+import MyCoursesPage from './pages/MyCoursesPage';
 import CoursePage from './pages/CoursePage';
 import TopicPage from './pages/TopicPage';
 import { CourseLayout } from './components/CourseLayout';
@@ -43,6 +44,10 @@ export const router = createBrowserRouter([
   {
     path: '/courses/popular',
     Component: PopularCoursesPage,
+  },
+  {
+    path: '/my-courses',
+    Component: MyCoursesPage,
   },
   {
     path: '/course-entry',

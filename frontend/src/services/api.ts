@@ -556,4 +556,21 @@ export const assessmentAPI = {
   },
 };
 
+// Re-export types for convenience
+export type { 
+  User, 
+  LearningProfile, 
+  Course, 
+  Module, 
+  Lesson, 
+  Resource, 
+  Enrollment,
+  Question,
+  QuizAttempt,
+  ModuleProgress,
+  LearningRoadmap,
+  DashboardData,
+  PaginatedResponse,
+};
+
 export default api;
