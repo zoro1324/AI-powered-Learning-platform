@@ -12,6 +12,8 @@ import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Label } from './ui/label';
 import { Loader2, CheckCircle, Brain, Sparkles } from 'lucide-react';
 import { assessmentAPI, AssessmentQuestion, Syllabus } from '../../services/api';
+import { useAppDispatch } from '../../store';
+import { setSyllabusFromEvaluation } from '../../store/slices/syllabusSlice';
 
 interface AssessmentDialogProps {
   open: boolean;
@@ -30,6 +32,7 @@ export default function AssessmentDialog({
   courseName,
   onEnrollmentComplete,
 }: AssessmentDialogProps) {
+  const dispatch = useAppDispatch();
   const [step, setStep] = useState<AssessmentStep>('loading');
   const [questions, setQuestions] = useState<AssessmentQuestion[]>([]);
   const [answers, setAnswers] = useState<{ [key: number]: string }>({});
@@ -50,7 +53,18 @@ export default function AssessmentDialog({
         course_name: courseName,
       });
       console.log('🔵 Assessment API response:', response);
-      setQuestions(response.questions);
+      
+      // Validate questions have options
+      const validatedQuestions = (response.questions || []).map(q => ({
+        ...q,
+        options: Array.isArray(q.options) ? q.options : []
+      }));
+      
+      if (validatedQuestions.length === 0) {
+        throw new Error('No valid questions received from API');
+      }
+      
+      setQuestions(validatedQuestions);
       setStep('questions');
     } catch (err: any) {
       console.error('🔴 Error loading assessment:', err);
@@ -106,6 +120,15 @@ export default function AssessmentDialog({
       setEvaluation(response.evaluation);
       setSyllabus(response.syllabus);
       setStep('complete');
+
+      // Store syllabus in Redux for immediate use in CourseLayout
+      if (response.syllabus) {
+        dispatch(setSyllabusFromEvaluation({
+          enrollmentId: response.enrollment_id,
+          courseName: courseName,
+          syllabus: response.syllabus,
+        }));
+      }
 
       // Notify parent component
       setTimeout(() => {
@@ -180,7 +203,7 @@ export default function AssessmentDialog({
                       onValueChange={(value) => handleAnswerChange(index, value)}
                     >
                       <div className="space-y-3">
-                        {question.options.map((option, optionIndex) => (
+                        {(question.options || []).map((option, optionIndex) => (
                           <div 
                             key={optionIndex} 
                             className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
