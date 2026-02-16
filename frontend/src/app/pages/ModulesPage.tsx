@@ -27,7 +27,7 @@ export default function ModulesPage() {
               </div>
             </div>
             <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-blue-500 to-purple-600" style={{ width: '75%' }}></div>
+              <div className="h-full bg-gradient-to-r from-blue-500 to-purple-600 w-[75%]"></div>
             </div>
           </div>
 
@@ -102,7 +102,7 @@ export default function ModulesPage() {
                         <span className="text-sm font-medium text-gray-900">60%</span>
                       </div>
                       <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                        <div className="h-full bg-blue-500" style={{ width: '60%' }}></div>
+                        <div className="h-full bg-blue-500 w-[60%]"></div>
                       </div>
                     </div>
                   )}

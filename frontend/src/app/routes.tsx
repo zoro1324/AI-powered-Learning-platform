@@ -11,6 +11,7 @@ import LearningPreferencePage from './pages/LearningPreferencePage';
 import AssessmentPage from './pages/AssessmentPage';
 import LearningPathPage from './pages/LearningPathPage';
 import FinalQuizPage from './pages/FinalQuizPage';
+import PopularCoursesPage from './pages/PopularCoursesPage';
 
 // Note: Protected routes are handled by checking localStorage in each component
 // Alternatively, use a layout wrapper with auth checking
@@ -35,6 +36,10 @@ export const router = createBrowserRouter([
   {
     path: '/dashboard',
     Component: DashboardPage,
+  },
+  {
+    path: '/courses/popular',
+    Component: PopularCoursesPage,
   },
   {
     path: '/course-entry',

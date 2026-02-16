@@ -1,4 +1,4 @@
-import { Home, BookOpen, TrendingUp, Layers, Settings, LogOut, User } from 'lucide-react';
+import { Home, BookOpen, TrendingUp, Layers, Settings, LogOut, User, Star } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -9,6 +9,7 @@ export function Sidebar() {
 
   const menuItems = [
     { icon: Home, label: 'Dashboard', path: '/dashboard' },
+    { icon: Star, label: 'Popular Courses', path: '/courses/popular' },
     { icon: BookOpen, label: 'My Course', path: '/course-entry' },
     { icon: TrendingUp, label: 'Progress', path: '/progress' },
     { icon: Layers, label: 'Modules', path: '/modules' },

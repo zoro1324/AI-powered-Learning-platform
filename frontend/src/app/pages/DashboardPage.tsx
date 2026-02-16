@@ -142,6 +142,7 @@ export default function DashboardPage() {
                       <span className="text-sm font-medium text-gray-900">{course.progress}%</span>
                     </div>
                     <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                      {/* eslint-disable-next-line react/forbid-dom-props */}
                       <div
                         className={`h-full bg-gradient-to-r from-${course.color}-500 to-${course.color}-600 transition-all`}
                         style={{ width: `${course.progress}%` }}
