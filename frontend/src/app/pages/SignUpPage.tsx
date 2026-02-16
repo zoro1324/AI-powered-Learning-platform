@@ -1,30 +1,62 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router';
-import { Eye, EyeOff, BookOpen, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, BookOpen, ArrowLeft, AlertCircle, CheckCircle } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function SignUpPage() {
   const navigate = useNavigate();
+  const { handleRegister, isAuthenticated, loading, error, clearAuthError } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [formData, setFormData] = useState({
-    name: '',
+    firstName: '',
+    lastName: '',
     email: '',
     password: '',
     confirmPassword: '',
   });
+  const [validationError, setValidationError] = useState('');
+
+  useEffect(() => {
+    // Redirect if already authenticated
+    if (isAuthenticated) {
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, navigate]);
+
+  useEffect(() => {
+    // Clear error when component unmounts
+    return () => {
+      clearAuthError();
+    };
+  }, [clearAuthError]);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    setValidationError('');
+    clearAuthError();
     
     if (formData.password !== formData.confirmPassword) {
-      alert('Passwords do not match!');
+      setValidationError('Passwords do not match!');
+      return;
+    }
+    
+    if (formData.password.length < 8) {
+      setValidationError('Password must be at least 8 characters long!');
       return;
     }
 
-    // TODO: Implement actual Supabase signup
-    // For now, just navigate to login
-    alert('Account created successfully! Please login.');
-    navigate('/');
+    const result = await handleRegister({
+      first_name: formData.firstName,
+      last_name: formData.lastName,
+      email: formData.email,
+      password: formData.password,
+      password2: formData.confirmPassword,
+    });
+
+    if (result.meta.requestStatus === 'fulfilled') {
+      navigate('/dashboard');
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -58,19 +90,46 @@ export default function SignUpPage() {
             <p className="text-gray-600">Start your personalized learning journey today</p>
           </div>
 
+          {/* Error Message */}
+          {(error || validationError) && (
+            <div className="mb-5 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-red-800">
+                {validationError || (typeof error === 'string' ? error : error.detail || 'Registration failed. Please try again.')}
+              </div>
+            </div>
+          )}
+
           <form onSubmit={handleSignUp} className="space-y-5">
-            {/* Name Input */}
+            {/* First Name Input */}
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                Full Name
+              <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-2">
+                First Name
               </label>
               <input
-                id="name"
-                name="name"
+                id="firstName"
+                name="firstName"
                 type="text"
-                value={formData.name}
+                value={formData.firstName}
                 onChange={handleChange}
-                placeholder="Enter your full name"
+                placeholder="Enter your first name"
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                required
+              />
+            </div>
+
+            {/* Last Name Input */}
+            <div>
+              <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-2">
+                Last Name
+              </label>
+              <input
+                id="lastName"
+                name="lastName"
+                type="text"
+                value={formData.lastName}
+                onChange={handleChange}
+                placeholder="Enter your last name"
                 className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 required
               />
@@ -108,7 +167,7 @@ export default function SignUpPage() {
                   placeholder="Create a password"
                   className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   required
-                  minLength={6}
+                  minLength={8}
                 />
                 <button
                   type="button"
@@ -135,7 +194,7 @@ export default function SignUpPage() {
                   placeholder="Confirm your password"
                   className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                   required
-                  minLength={6}
+                  minLength={8}
                 />
                 <button
                   type="button"
@@ -150,9 +209,10 @@ export default function SignUpPage() {
             {/* Sign Up Button */}
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-xl font-medium hover:from-blue-600 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-xl font-medium hover:from-blue-600 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Create Account
+              {loading ? 'Creating Account...' : 'Create Account'}
             </button>
           </form>
 

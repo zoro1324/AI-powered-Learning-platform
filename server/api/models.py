@@ -1,3 +1,5 @@
+import uuid
+
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 
@@ -521,3 +523,44 @@ class ActivityLog(models.Model):
 
     def __str__(self):
         return f'{self.user.email} – {self.title}'
+
+
+# ===========================================================================
+# 16. VideoTask
+# ===========================================================================
+
+class VideoTask(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        PROCESSING = 'processing', 'Processing'
+        COMPLETED = 'completed', 'Completed'
+        FAILED = 'failed', 'Failed'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    lesson = models.ForeignKey(
+        Lesson, on_delete=models.SET_NULL, related_name='video_tasks',
+        null=True, blank=True, help_text='Optional link to a lesson',
+    )
+    topic = models.CharField(max_length=255)
+    status = models.CharField(
+        max_length=15, choices=Status.choices, default=Status.PENDING,
+    )
+    progress_message = models.TextField(blank=True, default='')
+    script_data = models.JSONField(
+        null=True, blank=True, help_text='Generated script JSON from Ollama',
+    )
+    video_file = models.FileField(
+        upload_to='videos/', blank=True, null=True,
+        help_text='Final generated video file',
+    )
+    duration_seconds = models.PositiveIntegerField(null=True, blank=True)
+    error_message = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'video_tasks'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.topic} ({self.status})'
