@@ -2,8 +2,10 @@ import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import {
   assessmentAPI,
   videoAPI,
+  resourceAPI,
   Syllabus,
   AssessmentQuestion,
+  Resource,
 } from '../../services/api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -57,12 +59,14 @@ export interface SyllabusState {
   generatedQuizzes: Record<string, GeneratedQuiz>;
   quizResults: Record<string, QuizResult>;
   videoTasks: Record<string, VideoTask>;
+  resources: Record<string, Resource[]>; // lessonId -> resources
 
   // Loading state per operation
   contentLoading: Record<string, boolean>;
   quizLoading: Record<string, boolean>;
   quizEvaluating: Record<string, boolean>;
   videoLoading: Record<string, boolean>;
+  resourcesLoading: Record<string, boolean>; // lessonId -> loading
 }
 
 const initialState: SyllabusState = {
@@ -77,10 +81,12 @@ const initialState: SyllabusState = {
   generatedQuizzes: {},
   quizResults: {},
   videoTasks: {},
+  resources: {},
   contentLoading: {},
   quizLoading: {},
   quizEvaluating: {},
   videoLoading: {},
+  resourcesLoading: {},
 };
 
 // ─── Async Thunks ────────────────────────────────────────────────────────────
@@ -252,6 +258,21 @@ export const pollVideoStatus = createAsyncThunk(
   }
 );
 
+export const fetchResources = createAsyncThunk(
+  'syllabus/fetchResources',
+  async (lessonId: number, { rejectWithValue }) => {
+    try {
+      const resources = await resourceAPI.listByLesson(lessonId);
+      return { lessonId, resources };
+    } catch (error: any) {
+      console.error('❌ Failed to fetch resources:', error);
+      return rejectWithValue(
+        error.response?.data?.error || 'Failed to fetch resources'
+      );
+    }
+  }
+);
+
 // ─── Slice ───────────────────────────────────────────────────────────────────
 
 const syllabusSlice = createSlice({
@@ -403,6 +424,19 @@ const syllabusSlice = createSlice({
         console.warn('⚠️ No existing video task found for key:', key);
       }
     });
+
+    // fetchResources
+    builder
+      .addCase(fetchResources.pending, (state, action) => {
+        state.resourcesLoading[action.meta.arg] = true;
+      })
+      .addCase(fetchResources.fulfilled, (state, action) => {
+        state.resourcesLoading[action.payload.lessonId] = false;
+        state.resources[action.payload.lessonId] = action.payload.resources;
+      })
+      .addCase(fetchResources.rejected, (state, action) => {
+        state.resourcesLoading[action.meta.arg] = false;
+      });
   },
 });
 
@@ -438,6 +472,11 @@ export const selectVideoTask = (
   moduleIndex: number,
   topicIndex: number
 ) => state.syllabus.videoTasks[topicId(moduleIndex, topicIndex)];
+
+export const selectResources = (
+  state: { syllabus: SyllabusState },
+  lessonId: number
+) => state.syllabus.resources[lessonId] || [];
 
 export const selectIsTopicComplete = (
   state: { syllabus: SyllabusState },

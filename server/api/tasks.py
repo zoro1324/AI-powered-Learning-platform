@@ -10,8 +10,9 @@ logger = logging.getLogger(__name__)
 @shared_task(bind=True, max_retries=0)
 def generate_video_task(self, task_id: str):
     """Celery task that runs the full video generation pipeline."""
-    from api.models import VideoTask
+    from api.models import VideoTask, Resource
     from api.services.video_generator import VideoGeneratorService
+    import os
 
     try:
         video_task = VideoTask.objects.get(pk=task_id)
@@ -51,6 +52,36 @@ def generate_video_task(self, task_id: str):
         video_task.completed_at = timezone.now()
         video_task.save()
         logger.info("VideoTask %s completed successfully.", task_id)
+
+        # Create Resource record if linked to a lesson
+        if video_task.lesson:
+            try:
+                # Check if resource already exists for this video task
+                existing_resource = Resource.objects.filter(
+                    lesson=video_task.lesson,
+                    resource_type='video',
+                    title=f"{video_task.topic} - Video"
+                ).first()
+                
+                if not existing_resource:
+                    file_size = os.path.getsize(final_path) if os.path.exists(final_path) else 0
+                    
+                    Resource.objects.create(
+                        lesson=video_task.lesson,
+                        resource_type='video',
+                        title=f"{video_task.topic} - Video",
+                        content_json=video_task.script_data,
+                        file=video_task.video_file,
+                        file_size_bytes=file_size,
+                        duration_seconds=video_task.duration_seconds,
+                        is_generated=True,
+                        generation_model='stable-diffusion + edge-tts'
+                    )
+                    logger.info(f"✅ Created Resource record for video: {video_task.topic}")
+                else:
+                    logger.info(f"ℹ️ Resource already exists for video: {video_task.topic}")
+            except Exception as resource_error:
+                logger.error(f"❌ Failed to create Resource record: {resource_error}")
 
     except Exception as exc:
         logger.exception("VideoTask %s failed", task_id)

@@ -180,7 +180,11 @@ SIMPLE_JWT = {
     'TOKEN_TYPE_CLAIM': 'token_type',
 }
 
-# Celery
+# Celery (optional - set to None to disable async tasks)
+# To use async video generation, install and start Redis:
+#   Download: https://github.com/microsoftarchive/redis/releases
+#   Run: redis-server
+USE_CELERY = False  # Set to True when Redis is available
 CELERY_BROKER_URL = 'redis://localhost:6379/0'
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
@@ -190,3 +194,4 @@ CELERY_RESULT_SERIALIZER = 'json'
 # Video generation
 OLLAMA_API_URL = 'http://localhost:11434/api/generate'
 OLLAMA_MODEL = 'phi3:mini'
+OLLAMA_TIMEOUT = 600  # Timeout in seconds (10 minutes)

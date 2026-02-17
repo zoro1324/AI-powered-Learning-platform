@@ -24,6 +24,8 @@ import {
   evaluateTopicQuiz,
   generateVideo,
   pollVideoStatus,
+  fetchResources,
+  selectResources,
 } from '../../store/slices/syllabusSlice';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -67,6 +69,11 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
   const isQuizEvaluating = !!quizEvaluating[topicKey];
   const isVideoLoading = !!videoLoading[topicKey];
 
+  // Get resources from database
+  const resources = useAppSelector((state) =>
+    content?.lessonId ? selectResources(state, content.lessonId) : []
+  );
+
   // Quiz answer state
   const [quizAnswers, setQuizAnswers] = useState<Record<number, string>>({});
   const [expandedTool, setExpandedTool] = useState<string | null>(null);
@@ -96,6 +103,24 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
 
     return () => clearInterval(interval);
   }, [videoTask, dispatch, mIdx, tIdx, isTopicView]);
+
+  // Fetch resources when content is loaded
+  useEffect(() => {
+    if (content?.lessonId && resources.length === 0) {
+      dispatch(fetchResources(content.lessonId));
+    }
+  }, [content?.lessonId, dispatch, resources.length]);
+
+  // Refetch resources when video completes
+  useEffect(() => {
+    if (videoTask?.status === 'completed' && content?.lessonId) {
+      // Wait a bit for the resource to be created in the database
+      const timer = setTimeout(() => {
+        dispatch(fetchResources(content.lessonId));
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [videoTask?.status, content?.lessonId, dispatch]);
 
   const currentTopic = syllabus?.modules[mIdx]?.topics[tIdx];
   const currentModule = syllabus?.modules[mIdx];
@@ -494,7 +519,10 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                 icon={Video}
                 label="Video"
                 bgColor="bg-purple-800/80"
-                hasData={videoTask?.status === 'completed'}
+                hasData={
+                  videoTask?.status === 'completed' ||
+                  resources.some(r => r.resource_type === 'video')
+                }
                 isLoading={
                   isVideoLoading ||
                   videoTask?.status === 'pending' ||
@@ -509,10 +537,27 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                     videoUrl: videoTask?.videoUrl,
                     isCompleted: videoTask?.status === 'completed',
                     hasUrl: !!videoTask?.videoUrl,
+                    resourcesCount: resources.filter(r => r.resource_type === 'video').length,
                   });
                   return null;
                 })()}
-                {videoTask?.status === 'completed' && videoTask.videoUrl && (
+                {/* Show videos from database resources */}
+                {resources.filter(r => r.resource_type === 'video').map((resource) => (
+                  <div key={resource.id} className="space-y-2">
+                    <video
+                      controls
+                      className="w-full rounded-lg"
+                      src={resource.file_url || resource.file}
+                    >
+                      Your browser does not support video playback.
+                    </video>
+                    <p className="text-xs text-gray-400">
+                      {resource.title}
+                    </p>
+                  </div>
+                ))}
+                {/* Fallback to videoTask if no resources */}
+                {resources.filter(r => r.resource_type === 'video').length === 0 && videoTask?.status === 'completed' && videoTask.videoUrl && (
                   <video
                     controls
                     className="w-full rounded-lg"
@@ -521,7 +566,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                     Your browser does not support video playback.
                   </video>
                 )}
-                {videoTask?.status === 'completed' && !videoTask.videoUrl && (
+                {videoTask?.status === 'completed' && !videoTask.videoUrl && resources.filter(r => r.resource_type === 'video').length === 0 && (
                   <div className="text-yellow-400 text-sm flex items-center gap-2">
                     <Clock className="w-4 h-4" />
                     Video completed but URL not available yet
@@ -540,7 +585,10 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                 icon={Headphones}
                 label="Podcast"
                 bgColor="bg-blue-800/80"
-                hasData={!!generatedPodcast}
+                hasData={
+                  !!generatedPodcast ||
+                  resources.some(r => r.resource_type === 'audio')
+                }
                 isLoading={false}
                 onGenerate={handleGeneratePodcast}
                 disabled={!content}
@@ -555,31 +603,59 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                       Content must be generated before creating a podcast
                     </p>
                   </div>
-                ) : generatedPodcast ? (
-                  <div className="space-y-2">
-                    <audio
-                      controls
-                      className="w-full"
-                      src={generatedPodcast.audioUrl.startsWith('http') 
-                        ? generatedPodcast.audioUrl 
-                        : `${(import.meta as any).env?.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000'}${generatedPodcast.audioUrl}`}
-                    >
-                      Your browser does not support the audio element.
-                    </audio>
-                    <div className="text-xs text-gray-400 space-y-1">
-                      <p>Speakers: {generatedPodcast.personas.person1} & {generatedPodcast.personas.person2}</p>
-                      <p>Focus: {generatedPodcast.scenario}</p>
-                    </div>
-                  </div>
                 ) : (
-                  <p className="text-sm text-gray-300">
-                    Convert this topic into an engaging audio conversation
-                  </p>
+                  <div className="space-y-3">
+                    {/* Show podcasts from database resources */}
+                    {resources.filter(r => r.resource_type === 'audio').map((resource) => (
+                      <div key={resource.id} className="space-y-2">
+                        <audio
+                          controls
+                          className="w-full"
+                          src={resource.file_url || resource.file}
+                        >
+                          Your browser does not support the audio element.
+                        </audio>
+                        <div className="text-xs text-gray-400 space-y-1">
+                          <p className="font-medium">{resource.title}</p>
+                          {resource.content_json?.person1 && resource.content_json?.person2 && (
+                            <p>Speakers: {resource.content_json.person1} & {resource.content_json.person2}</p>
+                          )}
+                          {resource.content_json?.instruction && (
+                            <p>Focus: {resource.content_json.instruction}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {/* Fallback to generatedPodcast if no resources */}
+                    {resources.filter(r => r.resource_type === 'audio').length === 0 && generatedPodcast && (
+                      <div className="space-y-2">
+                        <audio
+                          controls
+                          className="w-full"
+                          src={generatedPodcast.audioUrl.startsWith('http') 
+                            ? generatedPodcast.audioUrl 
+                            : `${(import.meta as any).env?.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000'}${generatedPodcast.audioUrl}`}
+                        >
+                          Your browser does not support the audio element.
+                        </audio>
+                        <div className="text-xs text-gray-400 space-y-1">
+                          <p>Speakers: {generatedPodcast.personas.person1} & {generatedPodcast.personas.person2}</p>
+                          <p>Focus: {generatedPodcast.scenario}</p>
+                        </div>
+                      </div>
+                    )}
+                    {/* No podcasts available */}
+                    {resources.filter(r => r.resource_type === 'audio').length === 0 && !generatedPodcast && (
+                      <p className="text-sm text-gray-300">
+                        Convert this topic into an engaging audio conversation
+                      </p>
+                    )}
+                  </div>
                 )}
               </ToolCard>
 
               {/* Generated Content list */}
-              {(content || quiz || videoTask || generatedPodcast) && (
+              {(content || quiz || videoTask || generatedPodcast || resources.length > 0) && (
                 <div className="pt-4 border-t border-gray-700 space-y-2">
                   <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">
                     Generated Resources
@@ -620,7 +696,31 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                       </div>
                     </button>
                   )}
-                  {videoTask?.status === 'completed' && (
+                  {/* Video from database resources */}
+                  {resources.filter(r => r.resource_type === 'video').map((resource) => (
+                    <button
+                      key={resource.id}
+                      onClick={() => {
+                        setExpandedTool('video');
+                        // Could store selected resource ID to display specific resource
+                      }}
+                      className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
+                    >
+                      <Video className="w-4 h-4 text-purple-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-300 truncate">
+                          {resource.title}
+                        </p>
+                        <p className="text-[10px] text-gray-500">
+                          {resource.created_at
+                            ? new Date(resource.created_at).toLocaleDateString()
+                            : 'Generated'}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                  {/* Fallback to videoTask for in-progress videos */}
+                  {videoTask?.status === 'completed' && resources.filter(r => r.resource_type === 'video').length === 0 && (
                     <button
                       onClick={() => setExpandedTool('video')}
                       className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
@@ -634,7 +734,31 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                       </div>
                     </button>
                   )}
-                  {generatedPodcast && (
+                  {/* Podcast from database resources */}
+                  {resources.filter(r => r.resource_type === 'audio').map((resource) => (
+                    <button
+                      key={resource.id}
+                      onClick={() => {
+                        setExpandedTool('podcast');
+                        // Display the persisted podcast
+                      }}
+                      className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
+                    >
+                      <Headphones className="w-4 h-4 text-blue-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-300 truncate">
+                          {resource.title}
+                        </p>
+                        <p className="text-[10px] text-gray-500">
+                          {resource.created_at
+                            ? new Date(resource.created_at).toLocaleDateString()
+                            : 'Generated'}
+                        </p>
+                      </div>
+                    </button>
+                  ))}
+                  {/* Fallback to generatedPodcast for session state */}
+                  {generatedPodcast && resources.filter(r => r.resource_type === 'audio').length === 0 && (
                     <button
                       onClick={() => setExpandedTool('podcast')}
                       className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
@@ -667,7 +791,14 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
           onOpenChange={setPodcastDialogOpen}
           content={content.content}
           topicName={currentTopic.topic_name}
+          lessonId={content.lessonId}
           onPodcastGenerated={(data) => setGeneratedPodcast(data)}
+          onComplete={() => {
+            // Refetch resources after podcast generation
+            if (content?.lessonId) {
+              dispatch(fetchResources(content.lessonId));
+            }
+          }}
         />
       )}
     </aside>

@@ -328,6 +328,24 @@ export const roadmapAPI = {
 };
 
 // ============================================================================
+// RESOURCE API
+// ============================================================================
+
+export const resourceAPI = {
+  listByLesson: async (lessonId: number): Promise<Resource[]> => {
+    const response = await api.get<PaginatedResponse<Resource>>('/resources/', {
+      params: { lesson: lessonId }
+    });
+    return response.data.results;
+  },
+
+  get: async (id: number): Promise<Resource> => {
+    const response = await api.get<Resource>(`/resources/${id}/`);
+    return response.data;
+  },
+};
+
+// ============================================================================
 // ACHIEVEMENT API
 // ============================================================================
 
@@ -586,6 +604,8 @@ export const podcastAPI = {
     instruction?: string;
     person1?: string;
     person2?: string;
+    lesson_id?: number;
+    topic_name?: string;
   }): Promise<{
     audio_url: string;
     message: string;

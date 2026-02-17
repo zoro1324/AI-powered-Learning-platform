@@ -5,6 +5,7 @@ from rest_framework.decorators import action
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
+from django.conf import settings
 from django.db.models import Q, Avg, Count, Sum
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
@@ -557,18 +558,97 @@ class GenerateVideoView(APIView):
             lesson_id=serializer.validated_data.get("lesson_id"),
         )
 
-        # Try async with Celery, fall back to sync if unavailable
-        try:
-            generate_video_task.delay(str(video_task.id))
-            logger.info(f"✅ Video task queued asynchronously: {video_task.id}")
-        except Exception as e:
-            # Fallback to synchronous execution (works without Redis)
-            logger.info(f"ℹ️ Running video generation synchronously (Redis not available)")
+        # Check if Celery is enabled in settings
+        use_celery = getattr(settings, 'USE_CELERY', True)
+        
+        if use_celery:
+            # Try async with Celery
             try:
-                # Run synchronously using .apply() instead of .delay()
-                generate_video_task.apply(args=[str(video_task.id)])
+                generate_video_task.delay(str(video_task.id))
+                logger.info(f"✅ Video task queued asynchronously: {video_task.id}")
+            except Exception as e:
+                logger.warning(f"⚠️ Celery failed ({e}), falling back to synchronous execution")
+                use_celery = False
+        
+        if not use_celery:
+            # Run synchronously (works without Redis)
+            logger.info(f"ℹ️ Running video generation synchronously")
+            try:
+                from api.tasks import generate_video_task as task_func
+                from api.models import VideoTask as VT, Resource
+                from api.services.video_generator import VideoGeneratorService
+                from django.core.files import File
+                from django.utils import timezone
+                
+                # Execute the task logic directly without Celery
+                try:
+                    vt = VT.objects.get(pk=str(video_task.id))
+                except VT.DoesNotExist:
+                    logger.error(f"VideoTask {video_task.id} not found")
+                    return Response(
+                        {"error": "Video task not found"},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
+                
+                # Run in a separate thread to avoid blocking
+                import threading
+                def run_sync():
+                    try:
+                        lesson_content = None
+                        if vt.lesson and vt.lesson.content:
+                            lesson_content = vt.lesson.content
+                        
+                        service = VideoGeneratorService(str(video_task.id))
+                        final_path = service.run(vt.topic, content=lesson_content)
+                        
+                        with open(final_path, "rb") as f:
+                            vt.video_file.save(f"video_{video_task.id}.mp4", File(f), save=False)
+                        
+                        try:
+                            from moviepy import VideoFileClip
+                            clip = VideoFileClip(final_path)
+                            vt.duration_seconds = int(clip.duration)
+                            clip.close()
+                        except Exception:
+                            pass
+                        
+                        vt.status = "completed"
+                        vt.progress_message = "Video generation complete."
+                        vt.completed_at = timezone.now()
+                        vt.save()
+                        
+                        if vt.lesson:
+                            try:
+                                existing = Resource.objects.filter(
+                                    lesson=vt.lesson,
+                                    resource_type='video',
+                                    title__contains=vt.topic
+                                ).first()
+                                
+                                if not existing:
+                                    Resource.objects.create(
+                                        lesson=vt.lesson,
+                                        title=f"Video: {vt.topic}",
+                                        resource_type='video',
+                                        file=vt.video_file,
+                                        duration_seconds=vt.duration_seconds,
+                                    )
+                            except Exception as e:
+                                logger.error(f"Failed to create resource: {e}")
+                        
+                        logger.info(f"VideoTask {video_task.id} completed successfully")
+                    except Exception as e:
+                        logger.error(f"VideoTask {video_task.id} failed: {e}")
+                        vt.status = "failed"
+                        vt.progress_message = f"Error: {str(e)}"
+                        vt.save()
+                
+                thread = threading.Thread(target=run_sync, daemon=True)
+                thread.start()
+                logger.info(f"✅ Video task started in background thread")
+                
             except Exception as sync_error:
-                logger.error(f"❌ Video generation failed: {sync_error}")
+                logger.error(f"❌ Video generation failed to start: {sync_error}")
                 video_task.status = "failed"
                 video_task.progress_message = f"Failed to start: {str(sync_error)}"
                 video_task.save()
@@ -1394,7 +1474,9 @@ class GeneratePodcastView(APIView):
             "text": "Content to create podcast from...",
             "instruction": "Deep dive analysis",  // optional
             "person1": "Professor",               // optional
-            "person2": "Student"                  // optional
+            "person2": "Student",                 // optional
+            "lesson_id": 123,                      // optional
+            "topic_name": "Introduction to ML"    // optional
         }
         """
         try:
@@ -1402,6 +1484,8 @@ class GeneratePodcastView(APIView):
             instruction = request.data.get('instruction', None)
             person1 = request.data.get('person1', None)
             person2 = request.data.get('person2', None)
+            lesson_id = request.data.get('lesson_id', None)
+            topic_name = request.data.get('topic_name', None)
             
             if not text:
                 return Response(
@@ -1432,6 +1516,62 @@ class GeneratePodcastView(APIView):
                 settings.MEDIA_ROOT
             )
             audio_url = f"/media/{relative_path.replace(os.sep, '/')}"
+            
+            # Create Resource record if linked to a lesson
+            if lesson_id:
+                try:
+                    from django.core.files import File as DjangoFile
+                    lesson = Lesson.objects.get(pk=lesson_id)
+                    
+                    # Check if resource already exists
+                    title = f"{topic_name or 'Topic'} - Podcast"
+                    existing_resource = Resource.objects.filter(
+                        lesson=lesson,
+                        resource_type='audio',
+                        title=title
+                    ).first()
+                    
+                    if not existing_resource:
+                        file_size = os.path.getsize(audio_file_path) if os.path.exists(audio_file_path) else 0
+                        
+                        # Get audio duration
+                        duration = None
+                        try:
+                            from moviepy import AudioFileClip
+                            audio_clip = AudioFileClip(audio_file_path)
+                            duration = int(audio_clip.duration)
+                            audio_clip.close()
+                        except Exception:
+                            pass
+                        
+                        with open(audio_file_path, 'rb') as f:
+                            resource = Resource.objects.create(
+                                lesson=lesson,
+                                resource_type='audio',
+                                title=title,
+                                content_text=f"Podcast: {person1 or 'Speaker 1'} & {person2 or 'Speaker 2'}",
+                                content_json={
+                                    'person1': person1,
+                                    'person2': person2,
+                                    'instruction': instruction
+                                },
+                                file_size_bytes=file_size,
+                                duration_seconds=duration,
+                                is_generated=True,
+                                generation_model='ollama + edge-tts'
+                            )
+                            resource.file.save(
+                                os.path.basename(audio_file_path),
+                                DjangoFile(f),
+                                save=True
+                            )
+                        logger.info(f"✅ Created Resource record for podcast: {title}")
+                    else:
+                        logger.info(f"ℹ️ Resource already exists for podcast: {title}")
+                except Lesson.DoesNotExist:
+                    logger.warning(f"Lesson {lesson_id} not found, skipping Resource creation")
+                except Exception as resource_error:
+                    logger.error(f"❌ Failed to create Resource record: {resource_error}", exc_info=True)
             
             # Log activity
             ActivityLog.objects.create(

@@ -123,6 +123,8 @@ class VideoGeneratorService:
         )
 
         try:
+            timeout = getattr(settings, 'OLLAMA_TIMEOUT', 600)
+            logger.info(f"Requesting script from Ollama (timeout: {timeout}s)...")
             response = requests.post(
                 settings.OLLAMA_API_URL,
                 json={
@@ -131,10 +133,11 @@ class VideoGeneratorService:
                     "format": "json",
                     "stream": False,
                 },
-                timeout=300,
+                timeout=timeout,
             )
             response.raise_for_status()
             script_data = json.loads(response.json()["response"])
+            logger.info("✅ Received script from Ollama successfully")
 
             # Persist script to disk
             script_path = os.path.join(self.scripts_dir, "script.json")
@@ -143,11 +146,15 @@ class VideoGeneratorService:
 
             return script_data
 
-        except requests.exceptions.RequestException:
+        except requests.exceptions.RequestException as e:
             logger.exception("Ollama connection error")
+            logger.error(f"❌ Failed to connect to Ollama at {settings.OLLAMA_API_URL}")
+            logger.error(f"   Make sure Ollama is running: ollama serve")
+            logger.error(f"   And model is available: ollama pull {settings.OLLAMA_MODEL}")
             return None
-        except (json.JSONDecodeError, KeyError):
+        except (json.JSONDecodeError, KeyError) as e:
             logger.exception("Invalid JSON from Ollama")
+            logger.error(f"❌ Ollama returned invalid JSON: {e}")
             return None
 
     # ------------------------------------------------------------------
