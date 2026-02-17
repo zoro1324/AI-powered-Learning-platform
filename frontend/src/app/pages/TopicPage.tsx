@@ -1,19 +1,22 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
 import {
   ChevronLeft,
   ChevronRight,
   CheckCircle2,
-  Circle,
   Loader2,
   Sparkles,
   BookOpen,
+  ClipboardCheck,
+  Lock,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store';
 import {
   generateTopicContent,
   toggleTopicCompletion,
   generateVideo,
+  selectRemediationContent,
+  selectRemediationLoading,
 } from '../../store/slices/syllabusSlice';
 import { Button } from '../components/ui/button';
 import {
@@ -26,6 +29,8 @@ import {
 } from '../components/ui/breadcrumb';
 import { Separator } from '../components/ui/separator';
 import { cn } from '../components/ui/utils';
+import { TopicQuizOverlay } from '../components/TopicQuizOverlay';
+import { RemediationDropdown } from '../components/RemediationDropdown';
 
 export default function TopicPage() {
   const dispatch = useAppDispatch();
@@ -42,6 +47,7 @@ export default function TopicPage() {
     generatedContent,
     contentLoading,
     topicCompletion,
+    quizResults,
     videoTasks,
     videoLoading,
   } = useAppSelector((state) => state.syllabus);
@@ -54,6 +60,36 @@ export default function TopicPage() {
 
   const currentModule = syllabus?.modules[mIdx];
   const currentTopic = currentModule?.topics[tIdx];
+
+  // ─── Module unlock check ──────────────────────────────────────────────────
+
+  const isModuleUnlocked = useCallback(
+    (moduleIdx: number): boolean => {
+      if (moduleIdx === 0) return true;
+      if (!syllabus) return false;
+      const prevMod = syllabus.modules[moduleIdx - 1];
+      if (!prevMod) return false;
+      for (let t = 0; t < prevMod.topics.length; t++) {
+        const key = `${moduleIdx - 1}-${t}`;
+        if (!topicCompletion[key]) return false;
+        const result = quizResults[key];
+        if (!result || result.scorePercent < 80) return false;
+      }
+      return true;
+    },
+    [syllabus, topicCompletion, quizResults]
+  );
+
+  // Quiz overlay state
+  const [quizOverlayOpen, setQuizOverlayOpen] = useState(false);
+
+  // Remediation content from Redux
+  const remediationNotes = useAppSelector((state) =>
+    selectRemediationContent(state, mIdx, tIdx)
+  );
+  const isRemediationLoading = useAppSelector((state) =>
+    selectRemediationLoading(state, mIdx, tIdx)
+  );
 
   // ─── Navigation helpers ────────────────────────────────────────────────────
 
@@ -75,14 +111,26 @@ export default function TopicPage() {
     tIdx: number;
   } | null => {
     if (!syllabus) return null;
+    // Next topic within same module
     if (currentModule && tIdx < currentModule.topics.length - 1) {
       return { mIdx, tIdx: tIdx + 1 };
     }
-    if (mIdx < syllabus.modules.length - 1) {
+    // Next module — only if unlocked
+    if (mIdx < syllabus.modules.length - 1 && isModuleUnlocked(mIdx + 1)) {
       return { mIdx: mIdx + 1, tIdx: 0 };
     }
     return null;
-  }, [syllabus, currentModule, mIdx, tIdx]);
+  }, [syllabus, currentModule, mIdx, tIdx, isModuleUnlocked]);
+
+  // Whether the next module exists but is locked
+  const nextModuleLocked = (() => {
+    if (!syllabus || !currentModule) return false;
+    // If we're on the last topic of this module and the next module exists but is locked
+    if (tIdx === currentModule.topics.length - 1 && mIdx < syllabus.modules.length - 1) {
+      return !isModuleUnlocked(mIdx + 1);
+    }
+    return false;
+  })();
 
   const prev = getPrevTopic();
   const next = getNextTopic();
@@ -179,7 +227,18 @@ export default function TopicPage() {
   // ─── Toggle completion ─────────────────────────────────────────────────────
 
   const handleToggleCompletion = () => {
-    dispatch(toggleTopicCompletion({ moduleIndex: mIdx, topicIndex: tIdx }));
+    if (isComplete) {
+      // If already complete, allow toggling off
+      dispatch(toggleTopicCompletion({ moduleIndex: mIdx, topicIndex: tIdx }));
+    } else {
+      // If not complete, open quiz overlay for knowledge check
+      setQuizOverlayOpen(true);
+    }
+  };
+
+  const handleQuizComplete = () => {
+    // Called after quiz is passed (or user chooses to continue)
+    // Navigation to next topic is handled by the next button
   };
 
   // ─── Scroll to top on topic change ─────────────────────────────────────────
@@ -187,6 +246,14 @@ export default function TopicPage() {
   useEffect(() => {
     window.scrollTo?.(0, 0);
   }, [mIdx, tIdx]);
+
+  // ─── Redirect if module is locked ──────────────────────────────────────────
+
+  useEffect(() => {
+    if (syllabus && !isModuleUnlocked(mIdx)) {
+      navigate(`/course/${enrollmentId}`, { replace: true });
+    }
+  }, [syllabus, mIdx, enrollmentId, navigate, isModuleUnlocked]);
 
   if (!syllabus || !currentModule || !currentTopic) {
     return (
@@ -279,6 +346,22 @@ export default function TopicPage() {
                 __html: renderContent(content.content),
               }}
             />
+
+            {/* Remediation notes as collapsible dropdowns */}
+            <RemediationDropdown
+              notes={remediationNotes}
+              renderContent={renderContent}
+            />
+
+            {/* Remediation loading indicator */}
+            {isRemediationLoading && (
+              <div className="mt-6 flex items-center justify-center gap-2 py-4 bg-amber-50 rounded-xl">
+                <Loader2 className="w-4 h-4 animate-spin text-amber-500" />
+                <span className="text-sm text-amber-700">
+                  Generating review notes for weak areas...
+                </span>
+              </div>
+            )}
           </div>
         ) : (
           /* Generate CTA */
@@ -340,8 +423,8 @@ export default function TopicPage() {
                 </>
               ) : (
                 <>
-                  <Circle className="w-4 h-4" />
-                  Mark as Complete
+                  <ClipboardCheck className="w-4 h-4" />
+                  Take Quiz & Complete
                 </>
               )}
             </Button>
@@ -354,6 +437,16 @@ export default function TopicPage() {
                 Next Topic
                 <ChevronRight className="w-4 h-4" />
               </Button>
+            ) : nextModuleLocked ? (
+              <div className="flex flex-col items-end gap-1">
+                <Button disabled className="gap-2 opacity-60 cursor-not-allowed">
+                  <Lock className="w-4 h-4" />
+                  Next Module Locked
+                </Button>
+                <p className="text-xs text-gray-400">
+                  Score 80%+ on all topics to unlock
+                </p>
+              </div>
             ) : (
               <Button
                 onClick={() => navigate(`/course/${enrollmentId}`)}
@@ -366,6 +459,18 @@ export default function TopicPage() {
           </div>
         </div>
       </div>
+
+      {/* Quiz Overlay — triggered when user clicks "Take Quiz & Complete" */}
+      {eId && content && (
+        <TopicQuizOverlay
+          open={quizOverlayOpen}
+          onOpenChange={setQuizOverlayOpen}
+          enrollmentId={eId}
+          moduleIndex={mIdx}
+          topicIndex={tIdx}
+          onComplete={handleQuizComplete}
+        />
+      )}
     </div>
   );
 }

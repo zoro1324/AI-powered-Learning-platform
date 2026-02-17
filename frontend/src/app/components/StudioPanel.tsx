@@ -480,7 +480,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                 {quizResult && (
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
-                      {quizResult.scorePercent >= 70 ? (
+                      {quizResult.scorePercent >= 80 ? (
                         <CheckCircle2 className="w-5 h-5 text-green-400" />
                       ) : (
                         <XCircle className="w-5 h-5 text-red-400" />

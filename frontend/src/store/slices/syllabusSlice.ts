@@ -6,6 +6,7 @@ import {
   Syllabus,
   AssessmentQuestion,
   Resource,
+  RemediationNote,
 } from '../../services/api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -45,6 +46,12 @@ interface VideoTask {
   error?: string;
 }
 
+interface RemediationItem {
+  sub_topic: string;
+  content: string;
+  generatedAt: string;
+}
+
 export interface SyllabusState {
   enrollmentId: number | null;
   courseName: string;
@@ -60,6 +67,7 @@ export interface SyllabusState {
   quizResults: Record<string, QuizResult>;
   videoTasks: Record<string, VideoTask>;
   resources: Record<string, Resource[]>; // lessonId -> resources
+  remediationContent: Record<string, RemediationItem[]>; // topicKey -> remediation notes
 
   // Loading state per operation
   contentLoading: Record<string, boolean>;
@@ -67,6 +75,7 @@ export interface SyllabusState {
   quizEvaluating: Record<string, boolean>;
   videoLoading: Record<string, boolean>;
   resourcesLoading: Record<string, boolean>; // lessonId -> loading
+  remediationLoading: Record<string, boolean>;
 }
 
 const initialState: SyllabusState = {
@@ -82,11 +91,13 @@ const initialState: SyllabusState = {
   quizResults: {},
   videoTasks: {},
   resources: {},
+  remediationContent: {},
   contentLoading: {},
   quizLoading: {},
   quizEvaluating: {},
   videoLoading: {},
   resourcesLoading: {},
+  remediationLoading: {},
 };
 
 // ─── Async Thunks ────────────────────────────────────────────────────────────
@@ -273,6 +284,39 @@ export const fetchResources = createAsyncThunk(
   }
 );
 
+export const generateRemediationContent = createAsyncThunk(
+  'syllabus/generateRemediationContent',
+  async (
+    data: {
+      enrollmentId: number;
+      lessonId: number;
+      topicName: string;
+      weakAreas: string[];
+      moduleIndex: number;
+      topicIndex: number;
+    },
+    { rejectWithValue }
+  ) => {
+    try {
+      const response = await assessmentAPI.generateRemediationContent({
+        enrollment_id: data.enrollmentId,
+        lesson_id: data.lessonId,
+        topic_name: data.topicName,
+        weak_areas: data.weakAreas,
+      });
+      return {
+        ...response,
+        moduleIndex: data.moduleIndex,
+        topicIndex: data.topicIndex,
+      };
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.error || 'Failed to generate remediation content'
+      );
+    }
+  }
+);
+
 // ─── Slice ───────────────────────────────────────────────────────────────────
 
 const syllabusSlice = createSlice({
@@ -437,6 +481,29 @@ const syllabusSlice = createSlice({
       .addCase(fetchResources.rejected, (state, action) => {
         state.resourcesLoading[action.meta.arg] = false;
       });
+
+    // generateRemediationContent
+    builder
+      .addCase(generateRemediationContent.pending, (state, action) => {
+        const key = topicId(action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
+        state.remediationLoading[key] = true;
+      })
+      .addCase(generateRemediationContent.fulfilled, (state, action) => {
+        const key = topicId(action.payload.moduleIndex, action.payload.topicIndex);
+        state.remediationLoading[key] = false;
+        const notes = action.payload.remediation_notes.map((note: any) => ({
+          sub_topic: note.sub_topic,
+          content: note.content,
+          generatedAt: new Date().toISOString(),
+        }));
+        // Append to existing remediation notes (don't overwrite)
+        const existing = state.remediationContent[key] || [];
+        state.remediationContent[key] = [...existing, ...notes];
+      })
+      .addCase(generateRemediationContent.rejected, (state, action) => {
+        const key = topicId(action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
+        state.remediationLoading[key] = false;
+      });
   },
 });
 
@@ -483,5 +550,77 @@ export const selectIsTopicComplete = (
   moduleIndex: number,
   topicIndex: number
 ) => !!state.syllabus.topicCompletion[topicId(moduleIndex, topicIndex)];
+
+export const selectRemediationContent = (
+  state: { syllabus: SyllabusState },
+  moduleIndex: number,
+  topicIndex: number
+) => state.syllabus.remediationContent[topicId(moduleIndex, topicIndex)] || [];
+
+export const selectRemediationLoading = (
+  state: { syllabus: SyllabusState },
+  moduleIndex: number,
+  topicIndex: number
+) => !!state.syllabus.remediationLoading[topicId(moduleIndex, topicIndex)];
+
+/**
+ * A module is unlocked if:
+ *  - It is module 0 (always unlocked), OR
+ *  - ALL topics in the previous module are completed AND
+ *    every topic in the previous module scored >= 80% on the quiz.
+ */
+export const selectIsModuleUnlocked = (
+  state: { syllabus: SyllabusState },
+  moduleIndex: number
+): boolean => {
+  if (moduleIndex === 0) return true;
+
+  const { syllabus, topicCompletion, quizResults } = state.syllabus;
+  if (!syllabus) return false;
+
+  const prevModule = syllabus.modules[moduleIndex - 1];
+  if (!prevModule) return false;
+
+  // Every topic in the previous module must be completed
+  for (let t = 0; t < prevModule.topics.length; t++) {
+    const key = topicId(moduleIndex - 1, t);
+    if (!topicCompletion[key]) return false;
+  }
+
+  // Every topic in the previous module must have a quiz score >= 80%
+  for (let t = 0; t < prevModule.topics.length; t++) {
+    const key = topicId(moduleIndex - 1, t);
+    const result = quizResults[key];
+    if (!result || result.scorePercent < 80) return false;
+  }
+
+  return true;
+};
+
+/**
+ * Returns the best (highest) quiz score percent for the given module,
+ * looking at all topic-level quizResults within that module.
+ * Returns undefined if no quiz has been taken yet.
+ */
+export const selectModuleBestScore = (
+  state: { syllabus: SyllabusState },
+  moduleIndex: number
+): number | undefined => {
+  const { syllabus, quizResults } = state.syllabus;
+  if (!syllabus) return undefined;
+  const mod = syllabus.modules[moduleIndex];
+  if (!mod) return undefined;
+
+  let best: number | undefined;
+  for (let t = 0; t < mod.topics.length; t++) {
+    const result = quizResults[topicId(moduleIndex, t)];
+    if (result) {
+      if (best === undefined || result.scorePercent > best) {
+        best = result.scorePercent;
+      }
+    }
+  }
+  return best;
+};
 
 export default syllabusSlice.reducer;

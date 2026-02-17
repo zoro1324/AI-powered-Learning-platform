@@ -489,6 +489,15 @@ export interface TopicEvaluationResponse {
   refined_roadmap?: Roadmap;
 }
 
+export interface RemediationNote {
+  sub_topic: string;
+  content: string;
+}
+
+export interface RemediationResponse {
+  remediation_notes: RemediationNote[];
+}
+
 export const assessmentAPI = {
   generateInitialAssessment: async (data: {
     course_id: number;
@@ -555,6 +564,19 @@ export const assessmentAPI = {
   }): Promise<TopicEvaluationResponse> => {
     const response = await api.post<TopicEvaluationResponse>(
       '/assessment/topic/evaluate/',
+      data
+    );
+    return response.data;
+  },
+
+  generateRemediationContent: async (data: {
+    enrollment_id: number;
+    lesson_id: number;
+    topic_name: string;
+    weak_areas: string[];
+  }): Promise<RemediationResponse> => {
+    const response = await api.post<RemediationResponse>(
+      '/assessment/topic/remediation/',
       data
     );
     return response.data;

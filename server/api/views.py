@@ -1378,6 +1378,88 @@ class EvaluateTopicQuizView(APIView):
             )
 
 
+class GenerateRemediationContentView(APIView):
+    """Generate focused remediation content for weak sub-topics after quiz"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        """
+        Generate remediation content for sub-topics the user struggled with.
+        
+        Expected payload:
+        {
+            "enrollment_id": 1,
+            "lesson_id": 10,
+            "topic_name": "Introduction to HTML",
+            "weak_areas": ["Question about CSS selectors...", "Question about box model..."]
+        }
+        
+        Returns:
+        {
+            "remediation_notes": [
+                {
+                    "sub_topic": "CSS Selectors Explained",
+                    "content": "Detailed markdown content..."
+                }
+            ]
+        }
+        """
+        from .services.assessment_service import get_assessment_service
+        
+        enrollment_id = request.data.get('enrollment_id')
+        lesson_id = request.data.get('lesson_id')
+        topic_name = request.data.get('topic_name')
+        weak_areas = request.data.get('weak_areas', [])
+        
+        if not all([enrollment_id, lesson_id, topic_name]) or not weak_areas:
+            return Response(
+                {'error': 'enrollment_id, lesson_id, topic_name, and non-empty weak_areas are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            enrollment = Enrollment.objects.get(pk=enrollment_id, user=request.user)
+            lesson = Lesson.objects.get(pk=lesson_id)
+            
+            original_content = lesson.content or ''
+            
+            print("\n**************************************************")
+            print("*** GenerateRemediationContentView ***")
+            print(f"*** Topic: {topic_name} ***")
+            print(f"*** Weak areas: {len(weak_areas)} ***")
+            print("**************************************************")
+            
+            assessment_service = get_assessment_service()
+            result = assessment_service.generate_remediation_content(
+                enrollment.course.title,
+                topic_name,
+                weak_areas,
+                original_content
+            )
+            
+            print(f"*** Remediation notes generated: {len(result.get('remediation_notes', []))} ***")
+            print("**************************************************\n")
+            
+            return Response(result, status=status.HTTP_200_OK)
+            
+        except Enrollment.DoesNotExist:
+            return Response(
+                {'error': 'Enrollment not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Lesson.DoesNotExist:
+            return Response(
+                {'error': 'Lesson not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error generating remediation content: {e}", exc_info=True)
+            return Response(
+                {'error': f'Failed to generate remediation content: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
 # ============================================================================
 # PODCAST GENERATION VIEWS
 # ============================================================================

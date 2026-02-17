@@ -12,6 +12,7 @@ from .views import (
     UserAchievementViewSet, ActivityLogViewSet, DashboardView,
     InitialAssessmentView, EvaluateAssessmentView, GetSyllabusView,
     GenerateTopicContentView, GenerateTopicQuizView, EvaluateTopicQuizView,
+    GenerateRemediationContentView,
     GeneratePersonaOptionsView, GenerateScenarioOptionsView, GeneratePodcastView,
     ChatWithContextView
 )
@@ -57,6 +58,7 @@ urlpatterns = [
     path('assessment/topic/content/', GenerateTopicContentView.as_view(), name='topic-content'),
     path('assessment/topic/quiz/', GenerateTopicQuizView.as_view(), name='topic-quiz'),
     path('assessment/topic/evaluate/', EvaluateTopicQuizView.as_view(), name='topic-evaluate'),
+    path('assessment/topic/remediation/', GenerateRemediationContentView.as_view(), name='topic-remediation'),
     
     # Podcast Generation
     path('podcast/personas/', GeneratePersonaOptionsView.as_view(), name='podcast-personas'),

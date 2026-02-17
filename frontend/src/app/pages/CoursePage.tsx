@@ -6,6 +6,7 @@ import {
   GraduationCap,
   ChevronRight,
   Sparkles,
+  Lock,
 } from 'lucide-react';
 import { useAppSelector } from '../../store';
 import { Badge } from '../components/ui/badge';
@@ -15,7 +16,7 @@ import { cn } from '../components/ui/utils';
 export default function CoursePage() {
   const navigate = useNavigate();
   const { enrollmentId } = useParams();
-  const { syllabus, courseName, topicCompletion } = useAppSelector(
+  const { syllabus, courseName, topicCompletion, quizResults } = useAppSelector(
     (state) => state.syllabus
   );
 
@@ -35,6 +36,19 @@ export default function CoursePage() {
       if (topicCompletion[`${mIdx}-${t}`]) completed++;
     }
     return topicsCount > 0 ? Math.round((completed / topicsCount) * 100) : 0;
+  };
+
+  const isModuleUnlocked = (mIdx: number): boolean => {
+    if (mIdx === 0) return true;
+    const prevModule = syllabus!.modules[mIdx - 1];
+    if (!prevModule) return false;
+    for (let t = 0; t < prevModule.topics.length; t++) {
+      const key = `${mIdx - 1}-${t}`;
+      if (!topicCompletion[key]) return false;
+      const result = quizResults[key];
+      if (!result || result.scorePercent < 80) return false;
+    }
+    return true;
   };
 
   const difficultyColor = (level: string) => {
@@ -95,16 +109,24 @@ export default function CoursePage() {
       <div className="space-y-4">
         {syllabus.modules.map((mod, mIdx) => {
           const progress = getModuleProgress(mIdx, mod.topics.length);
+          const unlocked = isModuleUnlocked(mIdx);
 
           return (
             <button
               key={mIdx}
-              onClick={() =>
+              onClick={() => {
+                if (!unlocked) return;
                 navigate(
                   `/course/${enrollmentId}/module/${mIdx}/topic/0`
-                )
-              }
-              className="w-full bg-white rounded-2xl border border-gray-200 p-6 hover:border-blue-300 hover:shadow-md transition-all text-left group"
+                );
+              }}
+              disabled={!unlocked}
+              className={cn(
+                'w-full bg-white rounded-2xl border p-6 transition-all text-left group',
+                unlocked
+                  ? 'border-gray-200 hover:border-blue-300 hover:shadow-md cursor-pointer'
+                  : 'border-gray-200 opacity-60 cursor-not-allowed'
+              )}
             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
@@ -112,14 +134,18 @@ export default function CoursePage() {
                     <div
                       className={cn(
                         'w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
-                        progress === 100
+                        !unlocked
+                          ? 'bg-gray-100'
+                          : progress === 100
                           ? 'bg-green-100'
                           : progress > 0
                           ? 'bg-blue-100'
                           : 'bg-gray-100'
                       )}
                     >
-                      {progress === 100 ? (
+                      {!unlocked ? (
+                        <Lock className="w-5 h-5 text-gray-400" />
+                      ) : progress === 100 ? (
                         <GraduationCap className="w-5 h-5 text-green-600" />
                       ) : (
                         <BookOpen
@@ -131,16 +157,27 @@ export default function CoursePage() {
                       )}
                     </div>
                     <div>
-                      <h3 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
+                      <h3 className={cn(
+                        'font-semibold transition-colors',
+                        unlocked
+                          ? 'text-gray-900 group-hover:text-blue-600'
+                          : 'text-gray-400'
+                      )}>
                         Module {mIdx + 1}: {mod.module_name}
                       </h3>
                       <p className="text-sm text-gray-500 mt-0.5">
-                        {mod.description}
+                        {!unlocked
+                          ? 'Complete the previous module with 80%+ quiz scores to unlock'
+                          : mod.description}
                       </p>
                     </div>
                   </div>
                 </div>
-                <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-500 transition-colors mt-2 shrink-0" />
+                {unlocked ? (
+                  <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-500 transition-colors mt-2 shrink-0" />
+                ) : (
+                  <Lock className="w-5 h-5 text-gray-300 mt-2 shrink-0" />
+                )}
               </div>
 
               {/* Module meta */}

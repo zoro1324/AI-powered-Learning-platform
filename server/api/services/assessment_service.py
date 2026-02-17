@@ -822,6 +822,79 @@ Return strictly JSON:
         print("=== evaluate_topic_quiz SUCCESS ===")
         return result
     
+    def generate_remediation_content(
+        self,
+        course_name: str,
+        topic_name: str,
+        weak_areas: List[str],
+        original_content: str
+    ) -> Dict[str, Any]:
+        """
+        Generate focused remediation content for sub-topics the user got wrong.
+        
+        Args:
+            course_name: Name of the course
+            topic_name: Name of the parent topic
+            weak_areas: List of question texts / sub-topics the user struggled on
+            original_content: The original lesson content for context
+            
+        Returns:
+            Dictionary with 'remediation_notes' list
+        """
+        print("\n========================================")
+        print("=== generate_remediation_content CALLED ===")
+        print(f"  Course: {course_name}")
+        print(f"  Topic: {topic_name}")
+        print(f"  Weak areas: {len(weak_areas)}")
+        print("========================================")
+
+        # Truncate original content for context
+        max_content = 2000
+        context = original_content[:max_content] if len(original_content) > max_content else original_content
+
+        weak_areas_text = "\n".join([f"- {area}" for area in weak_areas])
+
+        prompt = f"""
+You are an expert tutor for the course "{course_name}".
+The student just took a quiz on the topic "{topic_name}" and struggled with specific sub-topics.
+
+Here is the original lesson content for reference:
+---
+{context}
+---
+
+The student got the following questions/concepts WRONG:
+{weak_areas_text}
+
+For EACH weak area listed above, generate a focused, detailed remediation note that:
+1. Explains the concept in a different, clearer way than the original content
+2. Uses simple analogies and examples
+3. Addresses common misconceptions
+4. Provides a concise but thorough explanation (200-400 words each)
+
+Return strictly JSON:
+
+{{
+  "remediation_notes": [
+    {{
+      "sub_topic": "A short descriptive title for this sub-topic (3-8 words)",
+      "content": "Detailed markdown-formatted remediation content here..."
+    }}
+  ]
+}}
+"""
+
+        response = self._call_ollama(prompt)
+        result = self._extract_json(response)
+        
+        # Ensure we have the right structure
+        if 'remediation_notes' not in result:
+            result = {"remediation_notes": []}
+        
+        print(f"  Generated {len(result.get('remediation_notes', []))} remediation notes")
+        print("=== generate_remediation_content SUCCESS ===")
+        return result
+
     def refine_roadmap(
         self,
         course_name: str,
