@@ -71,7 +71,7 @@ class AssessmentService:
             "messages": messages,
             "stream": False,
             "options": {
-                "num_predict": 2048,  # Increase token limit for complete responses
+                "num_predict": 4096,  # Increased token limit for comprehensive content
                 "temperature": 0.7,
                 "top_p": 0.9
             }
@@ -656,7 +656,8 @@ Generate the full syllabus JSON now:"""
         self,
         course_name: str,
         topic_name: str,
-        study_method: str
+        study_method: str,
+        topic_description: str = ""
     ) -> str:
         """
         Generate detailed educational content for a specific topic.
@@ -665,6 +666,7 @@ Generate the full syllabus JSON now:"""
             course_name: Name of the course
             topic_name: Name of the topic
             study_method: User's preferred study method
+            topic_description: Optional description of the topic to guide content generation
             
         Returns:
             Generated content as markdown text
@@ -673,26 +675,40 @@ Generate the full syllabus JSON now:"""
         print("=== generate_topic_content CALLED ===")
         print(f"  Course: {course_name}")
         print(f"  Topic: {topic_name}")
+        print(f"  Topic Description: {topic_description}")
         print(f"  Study method: {study_method}")
         print("========================================")
+        
+        # Build the description context if available
+        description_context = ""
+        if topic_description:
+            description_context = f"\nTopic Description: {topic_description}\n"
+        
         prompt = f"""
-Generate detailed educational content for:
+Generate comprehensive, detailed educational content for:
 
 Course: {course_name}
-Topic: {topic_name}
+Topic: {topic_name}{description_context}
 Study Method: {study_method}
 
 Requirements:
-- Write in clear, engaging paragraphs
-- Provide comprehensive explanation with examples
-- Use conceptual flow that builds understanding
-- Adapt tone to be beginner-friendly if needed
-- Use markdown formatting for better readability
-- Include relevant examples and analogies
-- NO bullet lists - only paragraphs and code examples if relevant
-- Aim for 300-500 words
+- Create a thorough, in-depth explanation that covers all major aspects of the topic
+- Write in clear, engaging paragraphs with smooth transitions
+- Start with fundamentals and build up to more advanced concepts
+- Include detailed explanations with real-world examples and practical applications
+- Use conceptual flow that progressively builds understanding
+- Add relevant analogies to make complex concepts easier to grasp
+- If applicable, include code examples or technical demonstrations
+- Use markdown formatting for better readability (headings, bold, italic, code blocks)
+- Adapt the depth and tone based on the study method preference
+- Cover historical context, current applications, and future implications where relevant
+- Include common misconceptions and how to avoid them
+- Provide practical tips and best practices
+- NO bullet point lists - use flowing paragraphs and structured sections
+- Make it comprehensive and detailed - aim for 800-1200 words minimum
+- Ensure the content is well-organized with clear section headers
 
-Generate the content:
+Generate the detailed content now:
 """
         
         response = self._call_ollama(prompt)
