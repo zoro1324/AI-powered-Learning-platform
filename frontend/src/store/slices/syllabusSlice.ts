@@ -16,8 +16,8 @@ interface TopicKey {
   topicIndex: number;
 }
 
-function topicId(moduleIndex: number, topicIndex: number): string {
-  return `${moduleIndex}-${topicIndex}`;
+function topicId(enrollmentId: number | null, moduleIndex: number, topicIndex: number): string {
+  return `${enrollmentId}-${moduleIndex}-${topicIndex}`;
 }
 
 interface GeneratedContent {
@@ -67,7 +67,7 @@ export interface SyllabusState {
   loading: boolean;
   error: string | null;
 
-  // Per-topic state keyed by "moduleIndex-topicIndex"
+  // Per-topic state keyed by "enrollmentId-moduleIndex-topicIndex"
   topicCompletion: Record<string, boolean>;
   generatedContent: Record<string, GeneratedContent>;
   generatedQuizzes: Record<string, GeneratedQuiz>;
@@ -366,11 +366,11 @@ const syllabusSlice = createSlice({
   reducers: {
     clearSyllabus: () => initialState,
     toggleTopicCompletion: (state, action: PayloadAction<TopicKey>) => {
-      const key = topicId(action.payload.moduleIndex, action.payload.topicIndex);
+      const key = topicId(state.enrollmentId, action.payload.moduleIndex, action.payload.topicIndex);
       state.topicCompletion[key] = !state.topicCompletion[key];
     },
     markTopicComplete: (state, action: PayloadAction<TopicKey>) => {
-      const key = topicId(action.payload.moduleIndex, action.payload.topicIndex);
+      const key = topicId(state.enrollmentId, action.payload.moduleIndex, action.payload.topicIndex);
       state.topicCompletion[key] = true;
     },
     setSyllabusFromEvaluation: (
@@ -393,7 +393,7 @@ const syllabusSlice = createSlice({
         view: ActiveResourceView | null;
       }>
     ) => {
-      const key = topicId(action.payload.moduleIndex, action.payload.topicIndex);
+      const key = topicId(state.enrollmentId, action.payload.moduleIndex, action.payload.topicIndex);
       if (action.payload.view) {
         state.activeResourceView[key] = action.payload.view;
       } else {
@@ -423,11 +423,11 @@ const syllabusSlice = createSlice({
     // generateTopicContent
     builder
       .addCase(generateTopicContent.pending, (state, action) => {
-        const key = topicId(action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
+        const key = topicId(state.enrollmentId, action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
         state.contentLoading[key] = true;
       })
       .addCase(generateTopicContent.fulfilled, (state, action) => {
-        const key = topicId(action.payload.moduleIndex, action.payload.topicIndex);
+        const key = topicId(state.enrollmentId, action.payload.moduleIndex, action.payload.topicIndex);
         state.contentLoading[key] = false;
         state.generatedContent[key] = {
           lessonId: action.payload.lesson_id,
@@ -436,18 +436,18 @@ const syllabusSlice = createSlice({
         };
       })
       .addCase(generateTopicContent.rejected, (state, action) => {
-        const key = topicId(action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
+        const key = topicId(state.enrollmentId, action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
         state.contentLoading[key] = false;
       });
 
     // generateTopicQuiz
     builder
       .addCase(generateTopicQuiz.pending, (state, action) => {
-        const key = topicId(action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
+        const key = topicId(state.enrollmentId, action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
         state.quizLoading[key] = true;
       })
       .addCase(generateTopicQuiz.fulfilled, (state, action) => {
-        const key = topicId(action.payload.moduleIndex, action.payload.topicIndex);
+        const key = topicId(state.enrollmentId, action.payload.moduleIndex, action.payload.topicIndex);
         state.quizLoading[key] = false;
         state.generatedQuizzes[key] = {
           questions: action.payload.questions,
@@ -455,18 +455,18 @@ const syllabusSlice = createSlice({
         };
       })
       .addCase(generateTopicQuiz.rejected, (state, action) => {
-        const key = topicId(action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
+        const key = topicId(state.enrollmentId, action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
         state.quizLoading[key] = false;
       });
 
     // evaluateTopicQuiz
     builder
       .addCase(evaluateTopicQuiz.pending, (state, action) => {
-        const key = topicId(action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
+        const key = topicId(state.enrollmentId, action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
         state.quizEvaluating[key] = true;
       })
       .addCase(evaluateTopicQuiz.fulfilled, (state, action) => {
-        const key = topicId(action.payload.moduleIndex, action.payload.topicIndex);
+        const key = topicId(state.enrollmentId, action.payload.moduleIndex, action.payload.topicIndex);
         state.quizEvaluating[key] = false;
         state.quizResults[key] = {
           score: action.payload.evaluation.score,
@@ -477,18 +477,18 @@ const syllabusSlice = createSlice({
         };
       })
       .addCase(evaluateTopicQuiz.rejected, (state, action) => {
-        const key = topicId(action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
+        const key = topicId(state.enrollmentId, action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
         state.quizEvaluating[key] = false;
       });
 
     // generateVideo
     builder
       .addCase(generateVideo.pending, (state, action) => {
-        const key = topicId(action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
+        const key = topicId(state.enrollmentId, action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
         state.videoLoading[key] = true;
       })
       .addCase(generateVideo.fulfilled, (state, action) => {
-        const key = topicId(action.payload.moduleIndex, action.payload.topicIndex);
+        const key = topicId(state.enrollmentId, action.payload.moduleIndex, action.payload.topicIndex);
         state.videoLoading[key] = false;
         state.videoTasks[key] = {
           taskId: action.payload.taskId,
@@ -496,13 +496,13 @@ const syllabusSlice = createSlice({
         };
       })
       .addCase(generateVideo.rejected, (state, action) => {
-        const key = topicId(action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
+        const key = topicId(state.enrollmentId, action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
         state.videoLoading[key] = false;
       });
 
     // pollVideoStatus
     builder.addCase(pollVideoStatus.fulfilled, (state, action) => {
-      const key = topicId(action.payload.moduleIndex, action.payload.topicIndex);
+      const key = topicId(state.enrollmentId, action.payload.moduleIndex, action.payload.topicIndex);
       const existing = state.videoTasks[key];
       console.log('🔄 Updating video task for key:', key);
       console.log('📦 Payload:', action.payload);
@@ -541,11 +541,11 @@ const syllabusSlice = createSlice({
     // generateRemediationContent
     builder
       .addCase(generateRemediationContent.pending, (state, action) => {
-        const key = topicId(action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
+        const key = topicId(state.enrollmentId, action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
         state.remediationLoading[key] = true;
       })
       .addCase(generateRemediationContent.fulfilled, (state, action) => {
-        const key = topicId(action.payload.moduleIndex, action.payload.topicIndex);
+        const key = topicId(state.enrollmentId, action.payload.moduleIndex, action.payload.topicIndex);
         state.remediationLoading[key] = false;
         const notes = action.payload.remediation_notes.map((note: any) => ({
           sub_topic: note.sub_topic,
@@ -557,7 +557,7 @@ const syllabusSlice = createSlice({
         state.remediationContent[key] = [...existing, ...notes];
       })
       .addCase(generateRemediationContent.rejected, (state, action) => {
-        const key = topicId(action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
+        const key = topicId(state.enrollmentId, action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
         state.remediationLoading[key] = false;
       });
 
@@ -585,25 +585,25 @@ export const selectTopicContent = (
   state: { syllabus: SyllabusState },
   moduleIndex: number,
   topicIndex: number
-) => state.syllabus.generatedContent[topicId(moduleIndex, topicIndex)];
+) => state.syllabus.generatedContent[topicId(state.syllabus.enrollmentId, moduleIndex, topicIndex)];
 
 export const selectTopicQuiz = (
   state: { syllabus: SyllabusState },
   moduleIndex: number,
   topicIndex: number
-) => state.syllabus.generatedQuizzes[topicId(moduleIndex, topicIndex)];
+) => state.syllabus.generatedQuizzes[topicId(state.syllabus.enrollmentId, moduleIndex, topicIndex)];
 
 export const selectQuizResult = (
   state: { syllabus: SyllabusState },
   moduleIndex: number,
   topicIndex: number
-) => state.syllabus.quizResults[topicId(moduleIndex, topicIndex)];
+) => state.syllabus.quizResults[topicId(state.syllabus.enrollmentId, moduleIndex, topicIndex)];
 
 export const selectVideoTask = (
   state: { syllabus: SyllabusState },
   moduleIndex: number,
   topicIndex: number
-) => state.syllabus.videoTasks[topicId(moduleIndex, topicIndex)];
+) => state.syllabus.videoTasks[topicId(state.syllabus.enrollmentId, moduleIndex, topicIndex)];
 
 export const selectResources = (
   state: { syllabus: SyllabusState },
@@ -614,19 +614,19 @@ export const selectIsTopicComplete = (
   state: { syllabus: SyllabusState },
   moduleIndex: number,
   topicIndex: number
-) => !!state.syllabus.topicCompletion[topicId(moduleIndex, topicIndex)];
+) => !!state.syllabus.topicCompletion[topicId(state.syllabus.enrollmentId, moduleIndex, topicIndex)];
 
 export const selectRemediationContent = (
   state: { syllabus: SyllabusState },
   moduleIndex: number,
   topicIndex: number
-) => state.syllabus.remediationContent[topicId(moduleIndex, topicIndex)] || [];
+) => state.syllabus.remediationContent[topicId(state.syllabus.enrollmentId, moduleIndex, topicIndex)] || [];
 
 export const selectRemediationLoading = (
   state: { syllabus: SyllabusState },
   moduleIndex: number,
   topicIndex: number
-) => !!state.syllabus.remediationLoading[topicId(moduleIndex, topicIndex)];
+) => !!state.syllabus.remediationLoading[topicId(state.syllabus.enrollmentId, moduleIndex, topicIndex)];
 
 /**
  * A module is unlocked if:
@@ -640,7 +640,7 @@ export const selectIsModuleUnlocked = (
 ): boolean => {
   if (moduleIndex === 0) return true;
 
-  const { syllabus, topicCompletion, quizResults } = state.syllabus;
+  const { syllabus, topicCompletion, quizResults, enrollmentId } = state.syllabus;
   if (!syllabus) return false;
 
   const prevModule = syllabus.modules[moduleIndex - 1];
@@ -648,13 +648,13 @@ export const selectIsModuleUnlocked = (
 
   // Every topic in the previous module must be completed
   for (let t = 0; t < prevModule.topics.length; t++) {
-    const key = topicId(moduleIndex - 1, t);
+    const key = topicId(enrollmentId, moduleIndex - 1, t);
     if (!topicCompletion[key]) return false;
   }
 
   // Every topic in the previous module must have a quiz score >= 80%
   for (let t = 0; t < prevModule.topics.length; t++) {
-    const key = topicId(moduleIndex - 1, t);
+    const key = topicId(enrollmentId, moduleIndex - 1, t);
     const result = quizResults[key];
     if (!result || result.scorePercent < 80) return false;
   }
@@ -671,14 +671,14 @@ export const selectModuleBestScore = (
   state: { syllabus: SyllabusState },
   moduleIndex: number
 ): number | undefined => {
-  const { syllabus, quizResults } = state.syllabus;
+  const { syllabus, quizResults, enrollmentId } = state.syllabus;
   if (!syllabus) return undefined;
   const mod = syllabus.modules[moduleIndex];
   if (!mod) return undefined;
 
   let best: number | undefined;
   for (let t = 0; t < mod.topics.length; t++) {
-    const result = quizResults[topicId(moduleIndex, t)];
+    const result = quizResults[topicId(enrollmentId, moduleIndex, t)];
     if (result) {
       if (best === undefined || result.scorePercent > best) {
         best = result.scorePercent;
@@ -693,6 +693,6 @@ export const selectActiveResourceView = (
   moduleIndex: number,
   topicIndex: number
 ): ActiveResourceView | null =>
-  state.syllabus.activeResourceView[topicId(moduleIndex, topicIndex)] || null;
+  state.syllabus.activeResourceView[topicId(state.syllabus.enrollmentId, moduleIndex, topicIndex)] || null;
 
 export default syllabusSlice.reducer;

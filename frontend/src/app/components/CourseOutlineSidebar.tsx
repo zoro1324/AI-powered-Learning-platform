@@ -33,6 +33,7 @@ export function CourseOutlineSidebar({
 }: CourseOutlineSidebarProps) {
   const navigate = useNavigate();
   const { enrollmentId, moduleIndex, topicIndex } = useParams();
+  const eId = enrollmentId ? parseInt(enrollmentId) : null;
   const currentModuleIdx = moduleIndex ? parseInt(moduleIndex) : -1;
   const currentTopicIdx = topicIndex ? parseInt(topicIndex) : -1;
 
@@ -45,13 +46,13 @@ export function CourseOutlineSidebar({
   } = useAppSelector((state) => state.syllabus);
 
   const isTopicComplete = useCallback(
-    (mIdx: number, tIdx: number) => !!topicCompletion[`${mIdx}-${tIdx}`],
-    [topicCompletion]
+    (mIdx: number, tIdx: number) => !!topicCompletion[`${eId}-${mIdx}-${tIdx}`],
+    [topicCompletion, eId]
   );
 
   const hasContent = useCallback(
-    (mIdx: number, tIdx: number) => !!generatedContent[`${mIdx}-${tIdx}`],
-    [generatedContent]
+    (mIdx: number, tIdx: number) => !!generatedContent[`${eId}-${mIdx}-${tIdx}`],
+    [generatedContent, eId]
   );
 
   const getModuleCompletionCount = useCallback(
@@ -77,14 +78,14 @@ export function CourseOutlineSidebar({
       const prevModule = syllabus.modules[mIdx - 1];
       if (!prevModule) return false;
       for (let t = 0; t < prevModule.topics.length; t++) {
-        const key = `${mIdx - 1}-${t}`;
+        const key = `${eId}-${mIdx - 1}-${t}`;
         if (!topicCompletion[key]) return false;
         const result = quizResults[key];
         if (!result || result.scorePercent < 80) return false;
       }
       return true;
     },
-    [syllabus, topicCompletion, quizResults]
+    [syllabus, topicCompletion, quizResults, eId]
   );
 
   if (collapsed) {

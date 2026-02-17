@@ -14,6 +14,7 @@ import {
   Headphones,
   Save,
   X,
+  ListTree,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store';
 import {
@@ -37,6 +38,7 @@ import {
 import { Separator } from '../components/ui/separator';
 import { cn } from '../components/ui/utils';
 import { TopicQuizOverlay } from '../components/TopicQuizOverlay';
+import { CourseStructureDialog } from '../components/CourseStructureDialog';
 
 export default function TopicPage() {
   const dispatch = useAppDispatch();
@@ -45,7 +47,7 @@ export default function TopicPage() {
   const eId = enrollmentId ? parseInt(enrollmentId) : null;
   const mIdx = moduleIndex ? parseInt(moduleIndex) : 0;
   const tIdx = topicIndex ? parseInt(topicIndex) : 0;
-  const topicKey = `${mIdx}-${tIdx}`;
+  const topicKey = `${eId}-${mIdx}-${tIdx}`;
 
   const {
     syllabus,
@@ -89,6 +91,7 @@ export default function TopicPage() {
   const [noteTitle, setNoteTitle] = useState('');
   const [noteContent, setNoteContent] = useState('');
   const [noteSaving, setNoteSaving] = useState(false);
+  const [structureDialogOpen, setStructureDialogOpen] = useState(false);
 
   const handleSaveNote = async () => {
     if (!content?.lessonId || !noteTitle.trim() || !noteContent.trim()) return;
@@ -118,14 +121,14 @@ export default function TopicPage() {
       const prevMod = syllabus.modules[moduleIdx - 1];
       if (!prevMod) return false;
       for (let t = 0; t < prevMod.topics.length; t++) {
-        const key = `${moduleIdx - 1}-${t}`;
+        const key = `${eId}-${moduleIdx - 1}-${t}`;
         if (!topicCompletion[key]) return false;
         const result = quizResults[key];
         if (!result || result.scorePercent < 80) return false;
       }
       return true;
     },
-    [syllabus, topicCompletion, quizResults]
+    [syllabus, topicCompletion, quizResults, eId]
   );
 
   // Quiz overlay state
@@ -336,29 +339,41 @@ export default function TopicPage() {
   // ─── Main render ───────────────────────────────────────────────────────────
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-6">
-      {/* Breadcrumb */}
-      <Breadcrumb className="mb-6">
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link to={`/course/${enrollmentId}`}>{courseName}</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link to={`/course/${enrollmentId}/module/${mIdx}/topic/0`}>
-                {currentModule.module_name}
-              </Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator />
-          <BreadcrumbItem>
-            <BreadcrumbPage>{currentTopic.topic_name}</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+    <div className="min-h-screen bg-background p-8">
+      <div className="flex items-center justify-between mb-6">
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link to={`/course/${enrollmentId}`}>{courseName}</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link to={`/course/${enrollmentId}/module/${mIdx}/topic/0`}>
+                  {currentModule.module_name}
+                </Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>{currentTopic.topic_name}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+        
+        {syllabus && eId && (
+          <Button
+            onClick={() => setStructureDialogOpen(true)}
+            variant="outline"
+            size="sm"
+          >
+            <ListTree className="w-4 h-4 mr-2" />
+            Structure
+          </Button>
+        )}
+      </div>
 
       {/* Topic Header */}
       <div className="mb-8">
@@ -733,6 +748,21 @@ export default function TopicPage() {
           moduleIndex={mIdx}
           topicIndex={tIdx}
           onComplete={handleQuizComplete}
+        />
+      )}
+
+      {/* Course Structure Dialog */}
+      {syllabus && eId && (
+        <CourseStructureDialog
+          open={structureDialogOpen}
+          onOpenChange={setStructureDialogOpen}
+          syllabus={syllabus}
+          courseName={courseName}
+          enrollmentId={eId}
+          topicCompletion={topicCompletion}
+          onNavigateToTopic={(moduleIndex, topicIndex) => {
+            navigate(`/course/${enrollmentId}/module/${moduleIndex}/topic/${topicIndex}`);
+          }}
         />
       )}
     </div>

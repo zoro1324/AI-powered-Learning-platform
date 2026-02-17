@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import {
   BookOpen,
@@ -7,18 +8,23 @@ import {
   ChevronRight,
   Sparkles,
   Lock,
+  ListTree,
 } from 'lucide-react';
 import { useAppSelector } from '../../store';
 import { Badge } from '../components/ui/badge';
 import { Progress } from '../components/ui/progress';
+import { Button } from '../components/ui/button';
 import { cn } from '../components/ui/utils';
+import { CourseStructureDialog } from '../components/CourseStructureDialog';
 
 export default function CoursePage() {
   const navigate = useNavigate();
   const { enrollmentId } = useParams();
+  const eId = enrollmentId ? parseInt(enrollmentId) : null;
   const { syllabus, courseName, topicCompletion, quizResults } = useAppSelector(
     (state) => state.syllabus
   );
+  const [structureDialogOpen, setStructureDialogOpen] = useState(false);
 
   if (!syllabus) return null;
 
@@ -33,7 +39,7 @@ export default function CoursePage() {
   const getModuleProgress = (mIdx: number, topicsCount: number) => {
     let completed = 0;
     for (let t = 0; t < topicsCount; t++) {
-      if (topicCompletion[`${mIdx}-${t}`]) completed++;
+      if (topicCompletion[`${eId}-${mIdx}-${t}`]) completed++;
     }
     return topicsCount > 0 ? Math.round((completed / topicsCount) * 100) : 0;
   };
@@ -43,7 +49,7 @@ export default function CoursePage() {
     const prevModule = syllabus!.modules[mIdx - 1];
     if (!prevModule) return false;
     for (let t = 0; t < prevModule.topics.length; t++) {
-      const key = `${mIdx - 1}-${t}`;
+      const key = `${eId}-${mIdx - 1}-${t}`;
       if (!topicCompletion[key]) return false;
       const result = quizResults[key];
       if (!result || result.scorePercent < 80) return false;
@@ -72,7 +78,17 @@ export default function CoursePage() {
           <Sparkles className="w-4 h-4 text-blue-500" />
           <span>AI-Personalized Course</span>
         </div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">{courseName}</h1>
+        <div className="flex items-start justify-between gap-4 mb-2">
+          <h1 className="text-3xl font-bold text-gray-900 flex-1">{courseName}</h1>
+          <Button
+            onClick={() => setStructureDialogOpen(true)}
+            variant="outline"
+            className="shrink-0"
+          >
+            <ListTree className="w-4 h-4 mr-2" />
+            View Course Structure
+          </Button>
+        </div>
         <div className="flex items-center gap-4 text-sm text-gray-500">
           <Badge
             className={cn(
@@ -211,6 +227,21 @@ export default function CoursePage() {
           );
         })}
       </div>
+
+      {/* Course Structure Dialog */}
+      {eId && (
+        <CourseStructureDialog
+          open={structureDialogOpen}
+          onOpenChange={setStructureDialogOpen}
+          syllabus={syllabus}
+          courseName={courseName}
+          enrollmentId={eId}
+          topicCompletion={topicCompletion}
+          onNavigateToTopic={(moduleIndex, topicIndex) => {
+            navigate(`/course/${enrollmentId}/module/${moduleIndex}/topic/${topicIndex}`);
+          }}
+        />
+      )}
     </div>
   );
 }

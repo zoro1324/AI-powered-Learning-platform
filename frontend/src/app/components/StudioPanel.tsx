@@ -41,7 +41,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
   const eId = enrollmentId ? parseInt(enrollmentId) : null;
   const mIdx = moduleIndex ? parseInt(moduleIndex) : -1;
   const tIdx = topicIndex ? parseInt(topicIndex) : -1;
-  const topicKey = `${mIdx}-${tIdx}`;
+  const topicKey = `${eId}-${mIdx}-${tIdx}`;
   const isTopicView = mIdx >= 0 && tIdx >= 0;
 
   const {

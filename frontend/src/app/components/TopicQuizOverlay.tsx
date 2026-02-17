@@ -47,7 +47,7 @@ export function TopicQuizOverlay({
   onComplete,
 }: TopicQuizOverlayProps) {
   const dispatch = useAppDispatch();
-  const topicKey = `${moduleIndex}-${topicIndex}`;
+  const topicKey = `${enrollmentId}-${moduleIndex}-${topicIndex}`;
 
   const {
     syllabus,
