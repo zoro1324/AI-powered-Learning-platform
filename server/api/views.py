@@ -944,6 +944,23 @@ class GenerateTopicContentView(APIView):
                         status=status.HTTP_404_NOT_FOUND
                     )
             
+            # ── Check if content already exists in DB ──────────────────────
+            try:
+                existing_lesson = Lesson.objects.filter(
+                    module=module,
+                    title=topic_name,
+                ).exclude(content__isnull=True).exclude(content__exact='').first()
+                
+                if existing_lesson:
+                    print(f"*** Returning cached content for '{topic_name}' ({len(existing_lesson.content)} chars) ***")
+                    return Response({
+                        'lesson_id': existing_lesson.id,
+                        'content': existing_lesson.content
+                    }, status=status.HTTP_200_OK)
+            except Exception:
+                pass  # Fall through to generation if check fails
+            
+            # ── No cached content – generate with AI ─────────────────────
             # Get study method from enrollment
             study_method = enrollment.learning_style_override or 'summary'
             
@@ -982,13 +999,14 @@ class GenerateTopicContentView(APIView):
             print(f"*** Content generated: {len(content)} chars ***")
             print("**************************************************\n")
             
-            # Create or update lesson
+            # Create or update lesson (keyed by module + title so each topic is stored separately)
+            existing_count = Lesson.objects.filter(module=module).count()
             lesson, created = Lesson.objects.get_or_create(
                 module=module,
-                order=1,
+                title=topic_name,
                 defaults={
-                    'title': topic_name,
-                    'content': content
+                    'order': existing_count + 1,
+                    'content': content,
                 }
             )
             
