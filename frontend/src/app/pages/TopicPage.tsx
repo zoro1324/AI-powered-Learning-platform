@@ -457,11 +457,9 @@ export default function TopicPage() {
                   ))}
 
                 {/* Extra note resources (user-created) */}
+                {/* Notes resources (both AI-generated and user-created) */}
                 {resources
-                  .filter(
-                    (r) =>
-                      r.resource_type === 'notes' && !r.is_generated
-                  )
+                  .filter((r) => r.resource_type === 'notes')
                   .map((r) => (
                     <button
                       key={r.id}

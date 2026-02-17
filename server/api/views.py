@@ -619,20 +619,21 @@ class GenerateVideoView(APIView):
                         
                         if vt.lesson:
                             try:
-                                existing = Resource.objects.filter(
+                                # Count existing video resources to create unique title
+                                existing_count = Resource.objects.filter(
                                     lesson=vt.lesson,
                                     resource_type='video',
-                                    title__contains=vt.topic
-                                ).first()
+                                ).count()
                                 
-                                if not existing:
-                                    Resource.objects.create(
-                                        lesson=vt.lesson,
-                                        title=f"Video: {vt.topic}",
-                                        resource_type='video',
-                                        file=vt.video_file,
-                                        duration_seconds=vt.duration_seconds,
-                                    )
+                                # Always create a new resource (allow multiple videos per topic)
+                                Resource.objects.create(
+                                    lesson=vt.lesson,
+                                    title=f"Video: {vt.topic} #{existing_count + 1}",
+                                    resource_type='video',
+                                    file=vt.video_file,
+                                    duration_seconds=vt.duration_seconds,
+                                )
+                                logger.info(f"✅ Created video resource #{existing_count + 1} for: {vt.topic}")
                             except Exception as e:
                                 logger.error(f"Failed to create resource: {e}")
                         
@@ -1094,21 +1095,22 @@ class GenerateTopicContentView(APIView):
                 lesson.content = content
                 lesson.save()
             
-            # Also save as a Resource of type 'notes' so it appears in the
-            # unified resources list alongside videos & podcasts.
-            notes_resource, res_created = Resource.objects.get_or_create(
+            # Count existing note resources to create unique title
+            existing_notes_count = Resource.objects.filter(
                 lesson=lesson,
                 resource_type='notes',
-                title=f'{topic_name} - Notes',
-                defaults={
-                    'content_text': content,
-                    'is_generated': True,
-                    'generation_model': 'phi3:mini',
-                }
+            ).count()
+            
+            # Always create a new Resource of type 'notes' (allow multiple notes per topic)
+            Resource.objects.create(
+                lesson=lesson,
+                resource_type='notes',
+                title=f'{topic_name} - Notes #{existing_notes_count + 1}',
+                content_text=content,
+                is_generated=True,
+                generation_model='phi3:mini',
             )
-            if not res_created:
-                notes_resource.content_text = content
-                notes_resource.save()
+            logger.info(f"✅ Created notes resource #{existing_notes_count + 1} for: {topic_name}")
             
             return Response({
                 'lesson_id': lesson.id,
@@ -1129,13 +1131,15 @@ class GenerateTopicContentView(APIView):
 
 
 class GenerateTopicQuizView(APIView):
-    """Generate quiz for a specific topic"""
+    """Generate quiz for a specific topic and save questions to DB"""
     permission_classes = [permissions.IsAuthenticated]
     
     def post(self, request):
         """
-        Generate quiz for a topic based on its content.
-        
+        Generate quiz for a topic based on its content, persist every
+        question in the Question table, and return them *without*
+        correct_answer so the browser never sees the answers.
+
         Expected payload:
         {
             "lesson_id": 10,
@@ -1144,7 +1148,13 @@ class GenerateTopicQuizView(APIView):
         
         Returns:
         {
-            "questions": [...]
+            "questions": [
+                {
+                    "id": 42,
+                    "question": "...",
+                    "options": ["A", "B", "C", "D"]
+                }
+            ]
         }
         """
         from .services.assessment_service import get_assessment_service
@@ -1167,6 +1177,10 @@ class GenerateTopicQuizView(APIView):
                     {'error': 'Lesson content not found. Generate content first.'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
+
+            # We need the module's course to save Question records
+            module = lesson.module
+            course = module.course
             
             print("\n**************************************************")
             print("*** GenerateTopicQuizView: Calling assessment service ***")
@@ -1174,13 +1188,54 @@ class GenerateTopicQuizView(APIView):
             print(f"*** Topic: {topic_name} ***")
             print(f"*** Content length: {len(content)} chars ***")
             print("**************************************************")
-            # Generate quiz
+            # Generate quiz via AI
             assessment_service = get_assessment_service()
             quiz_data = assessment_service.generate_topic_quiz(topic_name, content)
-            print(f"*** Quiz generated with {len(quiz_data.get('questions', []))} questions ***")
+            raw_questions = quiz_data.get('questions', [])
+            print(f"*** Quiz generated with {len(raw_questions)} questions ***")
+
+            # ── Persist every question in the DB ──────────────────────
+            saved_questions = []
+            for q in raw_questions:
+                options_list = q.get('options', [])
+                correct_text = q.get('correct_answer', '')
+
+                # Determine correct_answer_index from the option list
+                try:
+                    correct_idx = next(
+                        i for i, o in enumerate(options_list)
+                        if o.strip().upper() == correct_text.strip().upper()
+                    )
+                except StopIteration:
+                    correct_idx = 0  # fallback
+
+                db_question = Question.objects.create(
+                    course=course,
+                    module=module,
+                    question_type='topic_quiz',
+                    difficulty='intermediate',
+                    question_text=q.get('question', ''),
+                    options=options_list,
+                    correct_answer_index=correct_idx,
+                    explanation='',
+                    is_generated=True,
+                )
+                saved_questions.append(db_question)
+
+            print(f"*** Saved {len(saved_questions)} questions to DB ***")
             print("**************************************************\n")
+
+            # ── Build response WITHOUT correct_answer ─────────────────
+            response_questions = [
+                {
+                    'id': dbq.id,
+                    'question': dbq.question_text,
+                    'options': dbq.options,
+                }
+                for dbq in saved_questions
+            ]
             
-            return Response(quiz_data, status=status.HTTP_200_OK)
+            return Response({'questions': response_questions}, status=status.HTTP_200_OK)
             
         except Lesson.DoesNotExist:
             return Response(
@@ -1196,18 +1251,20 @@ class GenerateTopicQuizView(APIView):
 
 
 class EvaluateTopicQuizView(APIView):
-    """Evaluate topic quiz and refine roadmap if needed"""
+    """Evaluate topic quiz using server-side answers from the DB"""
     permission_classes = [permissions.IsAuthenticated]
     
     def post(self, request):
         """
-        Evaluate topic quiz answers and refine remaining roadmap.
-        
+        Evaluate topic quiz answers by looking up correct answers from
+        the Question table.  Creates QuizAttempt + individual QuizAnswer
+        records.
+
         Expected payload:
         {
             "enrollment_id": 1,
             "module_id": 5,
-            "questions": [...],
+            "question_ids": [42, 43, 44, 45, 46],
             "answers": ["Option A", "Option B", ...]
         }
         
@@ -1218,21 +1275,25 @@ class EvaluateTopicQuizView(APIView):
                 "score_percent": 80,
                 "weak_areas": [...]
             },
-            "refined_roadmap": {
-                "topics": [...]
-            }
+            "refined_roadmap": { ... }   // only when weak areas exist
         }
         """
         from .services.assessment_service import get_assessment_service
         
         enrollment_id = request.data.get('enrollment_id')
         module_id = request.data.get('module_id')
-        questions = request.data.get('questions')
+        question_ids = request.data.get('question_ids')
         answers = request.data.get('answers')
         
-        if not all([enrollment_id, module_id, questions, answers]):
+        if not all([enrollment_id, module_id, question_ids, answers]):
             return Response(
-                {'error': 'enrollment_id, module_id, questions, and answers are required'},
+                {'error': 'enrollment_id, module_id, question_ids, and answers are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if len(question_ids) != len(answers):
+            return Response(
+                {'error': 'question_ids and answers must have the same length'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -1276,30 +1337,78 @@ class EvaluateTopicQuizView(APIView):
                         {'error': 'Syllabus not found for this enrollment'},
                         status=status.HTTP_404_NOT_FOUND
                     )
-            
+
+            # ── Fetch questions from DB ──────────────────────────────
+            db_questions = Question.objects.filter(id__in=question_ids)
+            q_map = {q.id: q for q in db_questions}
+
+            if len(q_map) != len(question_ids):
+                return Response(
+                    {'error': 'One or more question IDs are invalid'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # ── Evaluate each answer server-side ─────────────────────
+            correct_count = 0
+            weak_areas = []
+            answer_records = []   # (question, selected_index, is_correct)
+
+            for qid, user_answer in zip(question_ids, answers):
+                q = q_map[qid]
+                correct_text = q.options[q.correct_answer_index] if q.options else ''
+                is_correct = user_answer.strip().upper() == correct_text.strip().upper()
+
+                if is_correct:
+                    correct_count += 1
+                else:
+                    weak_areas.append(q.question_text)
+
+                # Determine selected_option_index
+                selected_idx = None
+                for idx, opt in enumerate(q.options or []):
+                    if opt.strip().upper() == user_answer.strip().upper():
+                        selected_idx = idx
+                        break
+
+                answer_records.append((q, selected_idx, is_correct))
+
+            total_questions = len(question_ids)
+            score_percent = round((correct_count / total_questions) * 100) if total_questions else 0
+
+            evaluation = {
+                'score': f'{correct_count}/{total_questions}',
+                'correct_count': correct_count,
+                'total_questions': total_questions,
+                'score_percent': score_percent,
+                'weak_areas': weak_areas,
+            }
+
             print("\n**************************************************")
-            print("*** EvaluateTopicQuizView: Calling assessment service ***")
+            print("*** EvaluateTopicQuizView: Server-side evaluation ***")
             print(f"*** Enrollment ID: {enrollment_id}, Module ID: {module_id} ***")
-            print(f"*** Number of questions: {len(questions)}, Number of answers: {len(answers)} ***")
-            print("**************************************************")
-            # Evaluate quiz
-            assessment_service = get_assessment_service()
-            quiz_data = {'questions': questions}
-            evaluation = assessment_service.evaluate_topic_quiz(quiz_data, answers)
-            print(f"*** Quiz evaluation: {evaluation} ***")
+            print(f"*** Score: {correct_count}/{total_questions} ({score_percent}%) ***")
+            print("**************************************************\n")
             
-            # Create QuizAttempt record
+            # ── Create QuizAttempt + QuizAnswer records ──────────────
             quiz_attempt = QuizAttempt.objects.create(
                 enrollment=enrollment,
                 module=module,
                 attempt_type='topic_quiz',
-                score_percent=evaluation['score_percent'],
-                total_questions=evaluation['total_questions'],
-                correct_answers=evaluation['correct_count'],
-                weak_areas=evaluation['weak_areas']
+                score_percent=score_percent,
+                total_questions=total_questions,
+                correct_answers=correct_count,
+                weak_areas=weak_areas,
             )
             quiz_attempt.completed_at = timezone.now()
             quiz_attempt.save()
+
+            for q_obj, sel_idx, is_c in answer_records:
+                QuizAnswer.objects.create(
+                    attempt=quiz_attempt,
+                    question=q_obj,
+                    selected_option_index=sel_idx,
+                    is_correct=is_c,
+                )
             
             # Update module progress
             module_progress, created = ModuleProgress.objects.get_or_create(
@@ -1319,6 +1428,7 @@ class EvaluateTopicQuizView(APIView):
             ).order_by('order')
             
             refined_roadmap = None
+            assessment_service = get_assessment_service()
             if remaining_modules.exists() and evaluation['weak_areas']:
                 # Convert modules to topic format
                 remaining_topics = [
@@ -1621,51 +1731,48 @@ class GeneratePodcastView(APIView):
                     from django.core.files import File as DjangoFile
                     lesson = Lesson.objects.get(pk=lesson_id)
                     
-                    # Check if resource already exists
-                    title = f"{topic_name or 'Topic'} - Podcast"
-                    existing_resource = Resource.objects.filter(
+                    # Count existing podcast resources to create unique title
+                    existing_count = Resource.objects.filter(
                         lesson=lesson,
                         resource_type='audio',
-                        title=title
-                    ).first()
+                    ).count()
                     
-                    if not existing_resource:
-                        file_size = os.path.getsize(audio_file_path) if os.path.exists(audio_file_path) else 0
-                        
-                        # Get audio duration
-                        duration = None
-                        try:
-                            from moviepy import AudioFileClip
-                            audio_clip = AudioFileClip(audio_file_path)
-                            duration = int(audio_clip.duration)
-                            audio_clip.close()
-                        except Exception:
-                            pass
-                        
-                        with open(audio_file_path, 'rb') as f:
-                            resource = Resource.objects.create(
-                                lesson=lesson,
-                                resource_type='audio',
-                                title=title,
-                                content_text=f"Podcast: {person1 or 'Speaker 1'} & {person2 or 'Speaker 2'}",
-                                content_json={
-                                    'person1': person1,
-                                    'person2': person2,
-                                    'instruction': instruction
-                                },
-                                file_size_bytes=file_size,
-                                duration_seconds=duration,
-                                is_generated=True,
-                                generation_model='ollama + edge-tts'
-                            )
-                            resource.file.save(
-                                os.path.basename(audio_file_path),
-                                DjangoFile(f),
-                                save=True
-                            )
-                        logger.info(f"✅ Created Resource record for podcast: {title}")
-                    else:
-                        logger.info(f"ℹ️ Resource already exists for podcast: {title}")
+                    # Always create a new resource (allow multiple podcasts per topic)
+                    title = f"{topic_name or 'Topic'} - Podcast #{existing_count + 1}"
+                    file_size = os.path.getsize(audio_file_path) if os.path.exists(audio_file_path) else 0
+                    
+                    # Get audio duration
+                    duration = None
+                    try:
+                        from moviepy import AudioFileClip
+                        audio_clip = AudioFileClip(audio_file_path)
+                        duration = int(audio_clip.duration)
+                        audio_clip.close()
+                    except Exception:
+                        pass
+                    
+                    with open(audio_file_path, 'rb') as f:
+                        resource = Resource.objects.create(
+                            lesson=lesson,
+                            resource_type='audio',
+                            title=title,
+                            content_text=f"Podcast: {person1 or 'Speaker 1'} & {person2 or 'Speaker 2'}",
+                            content_json={
+                                'person1': person1,
+                                'person2': person2,
+                                'instruction': instruction
+                            },
+                            file_size_bytes=file_size,
+                            duration_seconds=duration,
+                            is_generated=True,
+                            generation_model='ollama + edge-tts'
+                        )
+                        resource.file.save(
+                            os.path.basename(audio_file_path),
+                            DjangoFile(f),
+                            save=True
+                        )
+                    logger.info(f"✅ Created podcast resource #{existing_count + 1} for: {topic_name}")
                 except Lesson.DoesNotExist:
                     logger.warning(f"Lesson {lesson_id} not found, skipping Resource creation")
                 except Exception as resource_error:

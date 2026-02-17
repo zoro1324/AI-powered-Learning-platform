@@ -111,11 +111,12 @@ export function TopicQuizOverlay({
   const handleSubmitQuiz = useCallback(() => {
     if (!currentModule || !quiz) return;
     const answers = quiz.questions.map((_, i) => quizAnswers[i] || '');
+    const questionIds = quiz.questions.map((q) => q.id!);
     dispatch(
       evaluateTopicQuiz({
         enrollmentId,
         moduleId: currentModule.order,
-        questions: quiz.questions,
+        questionIds,
         answers,
         moduleIndex,
         topicIndex,

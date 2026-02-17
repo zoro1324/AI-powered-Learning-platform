@@ -191,7 +191,7 @@ export const evaluateTopicQuiz = createAsyncThunk(
     data: {
       enrollmentId: number;
       moduleId: number;
-      questions: AssessmentQuestion[];
+      questionIds: number[];
       answers: string[];
       moduleIndex: number;
       topicIndex: number;
@@ -202,7 +202,7 @@ export const evaluateTopicQuiz = createAsyncThunk(
       const response = await assessmentAPI.evaluateTopicQuiz({
         enrollment_id: data.enrollmentId,
         module_id: data.moduleId,
-        questions: data.questions,
+        question_ids: data.questionIds,
         answers: data.answers,
       });
       return {

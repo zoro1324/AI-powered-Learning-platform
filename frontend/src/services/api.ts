@@ -423,6 +423,7 @@ export const videoAPI = {
 // ============================================================================
 
 export interface AssessmentQuestion {
+  id?: number;
   question: string;
   options: string[];
   correct_answer?: string | null;
@@ -571,7 +572,7 @@ export const assessmentAPI = {
   evaluateTopicQuiz: async (data: {
     enrollment_id: number;
     module_id: number;
-    questions: AssessmentQuestion[];
+    question_ids: number[];
     answers: string[];
   }): Promise<TopicEvaluationResponse> => {
     const response = await api.post<TopicEvaluationResponse>(
