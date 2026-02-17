@@ -1,19 +1,29 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
 import {
   ChevronLeft,
   ChevronRight,
   CheckCircle2,
-  Circle,
   Loader2,
   Sparkles,
   BookOpen,
+  ClipboardCheck,
+  Lock,
+  FileText,
+  Play,
+  Headphones,
+  Save,
+  X,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store';
 import {
   generateTopicContent,
   toggleTopicCompletion,
-  generateVideo,
+  fetchResources,
+  selectResources,
+  selectActiveResourceView,
+  setActiveResourceView,
+  createNote,
 } from '../../store/slices/syllabusSlice';
 import { Button } from '../components/ui/button';
 import {
@@ -26,6 +36,7 @@ import {
 } from '../components/ui/breadcrumb';
 import { Separator } from '../components/ui/separator';
 import { cn } from '../components/ui/utils';
+import { TopicQuizOverlay } from '../components/TopicQuizOverlay';
 
 export default function TopicPage() {
   const dispatch = useAppDispatch();
@@ -42,18 +53,83 @@ export default function TopicPage() {
     generatedContent,
     contentLoading,
     topicCompletion,
-    videoTasks,
-    videoLoading,
+    quizResults,
   } = useAppSelector((state) => state.syllabus);
 
   const content = generatedContent[topicKey];
   const isLoading = !!contentLoading[topicKey];
   const isComplete = !!topicCompletion[topicKey];
-  const videoTask = videoTasks[topicKey];
-  const isVideoLoading = !!videoLoading[topicKey];
 
   const currentModule = syllabus?.modules[mIdx];
   const currentTopic = currentModule?.topics[tIdx];
+
+  // ─── Resources & active view from Redux ────────────────────────────────────
+
+  const resources = useAppSelector((state) =>
+    content?.lessonId ? selectResources(state, content.lessonId) : []
+  );
+  const activeView = useAppSelector((state) =>
+    selectActiveResourceView(state, mIdx, tIdx)
+  );
+
+  // Fetch resources when content is loaded
+  useEffect(() => {
+    if (content?.lessonId && resources.length === 0) {
+      dispatch(fetchResources(content.lessonId));
+    }
+  }, [content?.lessonId, dispatch, resources.length]);
+
+  // Find the active resource data when user has selected one
+  const activeResource = activeView?.resourceId
+    ? resources.find((r) => r.id === activeView.resourceId)
+    : null;
+
+  // ─── Create Note state ─────────────────────────────────────────────────────
+
+  const [noteTitle, setNoteTitle] = useState('');
+  const [noteContent, setNoteContent] = useState('');
+  const [noteSaving, setNoteSaving] = useState(false);
+
+  const handleSaveNote = async () => {
+    if (!content?.lessonId || !noteTitle.trim() || !noteContent.trim()) return;
+    setNoteSaving(true);
+    await dispatch(
+      createNote({
+        lessonId: content.lessonId,
+        title: noteTitle.trim(),
+        content: noteContent.trim(),
+        moduleIndex: mIdx,
+        topicIndex: tIdx,
+      })
+    );
+    setNoteSaving(false);
+    setNoteTitle('');
+    setNoteContent('');
+    // Switch to text view after saving
+    dispatch(setActiveResourceView({ moduleIndex: mIdx, topicIndex: tIdx, view: null }));
+  };
+
+  // ─── Module unlock check ──────────────────────────────────────────────────
+
+  const isModuleUnlocked = useCallback(
+    (moduleIdx: number): boolean => {
+      if (moduleIdx === 0) return true;
+      if (!syllabus) return false;
+      const prevMod = syllabus.modules[moduleIdx - 1];
+      if (!prevMod) return false;
+      for (let t = 0; t < prevMod.topics.length; t++) {
+        const key = `${moduleIdx - 1}-${t}`;
+        if (!topicCompletion[key]) return false;
+        const result = quizResults[key];
+        if (!result || result.scorePercent < 80) return false;
+      }
+      return true;
+    },
+    [syllabus, topicCompletion, quizResults]
+  );
+
+  // Quiz overlay state
+  const [quizOverlayOpen, setQuizOverlayOpen] = useState(false);
 
   // ─── Navigation helpers ────────────────────────────────────────────────────
 
@@ -75,14 +151,26 @@ export default function TopicPage() {
     tIdx: number;
   } | null => {
     if (!syllabus) return null;
+    // Next topic within same module
     if (currentModule && tIdx < currentModule.topics.length - 1) {
       return { mIdx, tIdx: tIdx + 1 };
     }
-    if (mIdx < syllabus.modules.length - 1) {
+    // Next module — only if unlocked
+    if (mIdx < syllabus.modules.length - 1 && isModuleUnlocked(mIdx + 1)) {
       return { mIdx: mIdx + 1, tIdx: 0 };
     }
     return null;
-  }, [syllabus, currentModule, mIdx, tIdx]);
+  }, [syllabus, currentModule, mIdx, tIdx, isModuleUnlocked]);
+
+  // Whether the next module exists but is locked
+  const nextModuleLocked = (() => {
+    if (!syllabus || !currentModule) return false;
+    // If we're on the last topic of this module and the next module exists but is locked
+    if (tIdx === currentModule.topics.length - 1 && mIdx < syllabus.modules.length - 1) {
+      return !isModuleUnlocked(mIdx + 1);
+    }
+    return false;
+  })();
 
   const prev = getPrevTopic();
   const next = getNextTopic();
@@ -179,14 +267,37 @@ export default function TopicPage() {
   // ─── Toggle completion ─────────────────────────────────────────────────────
 
   const handleToggleCompletion = () => {
-    dispatch(toggleTopicCompletion({ moduleIndex: mIdx, topicIndex: tIdx }));
+    if (isComplete) {
+      // If already complete, allow toggling off
+      dispatch(toggleTopicCompletion({ moduleIndex: mIdx, topicIndex: tIdx }));
+    } else {
+      // If not complete, open quiz overlay for knowledge check
+      setQuizOverlayOpen(true);
+    }
   };
 
-  // ─── Scroll to top on topic change ─────────────────────────────────────────
+  const handleQuizComplete = () => {
+    // Called after quiz is passed (or user chooses to continue)
+    // Navigation to next topic is handled by the next button
+  };
+
+  // ─── Scroll to top & reset view on topic change ─────────────────────────────
 
   useEffect(() => {
     window.scrollTo?.(0, 0);
-  }, [mIdx, tIdx]);
+    // Reset active resource view when navigating to a new topic
+    dispatch(setActiveResourceView({ moduleIndex: mIdx, topicIndex: tIdx, view: null }));
+    setNoteTitle('');
+    setNoteContent('');
+  }, [mIdx, tIdx, dispatch]);
+
+  // ─── Redirect if module is locked ──────────────────────────────────────────
+
+  useEffect(() => {
+    if (syllabus && !isModuleUnlocked(mIdx)) {
+      navigate(`/course/${enrollmentId}`, { replace: true });
+    }
+  }, [syllabus, mIdx, enrollmentId, navigate, isModuleUnlocked]);
 
   if (!syllabus || !currentModule || !currentTopic) {
     return (
@@ -257,7 +368,7 @@ export default function TopicPage() {
         <p className="text-gray-500">{currentTopic.description}</p>
       </div>
 
-      {/* Content Area */}
+      {/* Content Area — switches between text, video, audio, notes based on activeView */}
       <div className="bg-white rounded-2xl border border-gray-200 min-h-[400px]">
         {isLoading ? (
           /* Loading state */
@@ -271,15 +382,251 @@ export default function TopicPage() {
             </p>
           </div>
         ) : content ? (
-          /* Rendered content */
-          <div className="p-8">
-            <article
-              className="prose prose-gray max-w-none"
-              dangerouslySetInnerHTML={{
-                __html: renderContent(content.content),
-              }}
-            />
-          </div>
+          <>
+            {/* View-type tabs (visible when resources exist) */}
+            {resources.length > 0 && (
+              <div className="flex items-center gap-1 px-6 pt-4 pb-2 border-b border-gray-100 overflow-x-auto">
+                {/* Default text view */}
+                <button
+                  onClick={() =>
+                    dispatch(setActiveResourceView({ moduleIndex: mIdx, topicIndex: tIdx, view: null }))
+                  }
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap',
+                    !activeView
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'text-gray-500 hover:bg-gray-50'
+                  )}
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  Reading
+                </button>
+
+                {/* Video resources */}
+                {resources
+                  .filter((r) => r.resource_type === 'video')
+                  .map((r) => (
+                    <button
+                      key={r.id}
+                      onClick={() =>
+                        dispatch(
+                          setActiveResourceView({
+                            moduleIndex: mIdx,
+                            topicIndex: tIdx,
+                            view: { type: 'video', resourceId: r.id },
+                          })
+                        )
+                      }
+                      className={cn(
+                        'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap',
+                        activeView?.type === 'video' && activeView.resourceId === r.id
+                          ? 'bg-purple-50 text-purple-700'
+                          : 'text-gray-500 hover:bg-gray-50'
+                      )}
+                    >
+                      <Play className="w-3.5 h-3.5" />
+                      {r.title.length > 25 ? r.title.slice(0, 25) + '...' : r.title}
+                    </button>
+                  ))}
+
+                {/* Audio resources */}
+                {resources
+                  .filter((r) => r.resource_type === 'audio')
+                  .map((r) => (
+                    <button
+                      key={r.id}
+                      onClick={() =>
+                        dispatch(
+                          setActiveResourceView({
+                            moduleIndex: mIdx,
+                            topicIndex: tIdx,
+                            view: { type: 'audio', resourceId: r.id },
+                          })
+                        )
+                      }
+                      className={cn(
+                        'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap',
+                        activeView?.type === 'audio' && activeView.resourceId === r.id
+                          ? 'bg-blue-50 text-blue-700'
+                          : 'text-gray-500 hover:bg-gray-50'
+                      )}
+                    >
+                      <Headphones className="w-3.5 h-3.5" />
+                      {r.title.length > 25 ? r.title.slice(0, 25) + '...' : r.title}
+                    </button>
+                  ))}
+
+                {/* Extra note resources (user-created) */}
+                {/* Notes resources (both AI-generated and user-created) */}
+                {resources
+                  .filter((r) => r.resource_type === 'notes')
+                  .map((r) => (
+                    <button
+                      key={r.id}
+                      onClick={() =>
+                        dispatch(
+                          setActiveResourceView({
+                            moduleIndex: mIdx,
+                            topicIndex: tIdx,
+                            view: { type: 'notes', resourceId: r.id },
+                          })
+                        )
+                      }
+                      className={cn(
+                        'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap',
+                        activeView?.type === 'notes' && activeView.resourceId === r.id
+                          ? 'bg-emerald-50 text-emerald-700'
+                          : 'text-gray-500 hover:bg-gray-50'
+                      )}
+                    >
+                      <FileText className="w-3.5 h-3.5" />
+                      {r.title.length > 20 ? r.title.slice(0, 20) + '...' : r.title}
+                    </button>
+                  ))}
+              </div>
+            )}
+
+            {/* ── Render the active view ─────────────────────────────── */}
+
+            {/* Create Note Form */}
+            {activeView?.type === 'create-note' ? (
+              <div className="p-8 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-emerald-500" />
+                    Create New Note
+                  </h2>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() =>
+                      dispatch(
+                        setActiveResourceView({ moduleIndex: mIdx, topicIndex: tIdx, view: null })
+                      )
+                    }
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+                <input
+                  type="text"
+                  placeholder="Note title..."
+                  value={noteTitle}
+                  onChange={(e) => setNoteTitle(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                />
+                <textarea
+                  placeholder="Write your note in Markdown..."
+                  value={noteContent}
+                  onChange={(e) => setNoteContent(e.target.value)}
+                  rows={14}
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 resize-y font-mono"
+                />
+                <div className="flex items-center gap-3">
+                  <Button
+                    onClick={handleSaveNote}
+                    disabled={noteSaving || !noteTitle.trim() || !noteContent.trim()}
+                    className="gap-2"
+                  >
+                    {noteSaving ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Save className="w-4 h-4" />
+                    )}
+                    Save Note
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      dispatch(
+                        setActiveResourceView({ moduleIndex: mIdx, topicIndex: tIdx, view: null })
+                      )
+                    }
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : activeView?.type === 'video' && activeResource ? (
+              /* ── Video player ──────────────────────────────────────── */
+              <div className="p-8">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <Play className="w-5 h-5 text-purple-500" />
+                  {activeResource.title}
+                </h2>
+                <video
+                  controls
+                  autoPlay
+                  className="w-full rounded-xl shadow-lg"
+                  src={activeResource.file_url || activeResource.file}
+                >
+                  Your browser does not support video playback.
+                </video>
+                {activeResource.duration_seconds && (
+                  <p className="text-xs text-gray-400 mt-2">
+                    Duration: {Math.floor(activeResource.duration_seconds / 60)}m{' '}
+                    {activeResource.duration_seconds % 60}s
+                  </p>
+                )}
+              </div>
+            ) : activeView?.type === 'audio' && activeResource ? (
+              /* ── Audio player ──────────────────────────────────────── */
+              <div className="p-8">
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 text-center">
+                  <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Headphones className="w-10 h-10 text-blue-600" />
+                  </div>
+                  <h2 className="text-lg font-semibold text-gray-900 mb-1">
+                    {activeResource.title}
+                  </h2>
+                  {activeResource.content_json?.person1 &&
+                    activeResource.content_json?.person2 && (
+                      <p className="text-sm text-gray-500 mb-4">
+                        {activeResource.content_json.person1} &{' '}
+                        {activeResource.content_json.person2}
+                      </p>
+                    )}
+                  <audio
+                    controls
+                    autoPlay
+                    className="w-full max-w-lg mx-auto"
+                    src={activeResource.file_url || activeResource.file}
+                  >
+                    Your browser does not support the audio element.
+                  </audio>
+                  {activeResource.content_json?.instruction && (
+                    <p className="text-xs text-gray-400 mt-4">
+                      Focus: {activeResource.content_json.instruction}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : activeView?.type === 'notes' && activeResource ? (
+              /* ── Note resource view ────────────────────────────────── */
+              <div className="p-8">
+                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-emerald-500" />
+                  {activeResource.title}
+                </h2>
+                <article
+                  className="prose prose-gray max-w-none"
+                  dangerouslySetInnerHTML={{
+                    __html: renderContent(activeResource.content_text || ''),
+                  }}
+                />
+              </div>
+            ) : (
+              /* ── Default: text reading view ────────────────────────── */
+              <div className="p-8">
+                <article
+                  className="prose prose-gray max-w-none"
+                  dangerouslySetInnerHTML={{
+                    __html: renderContent(content.content),
+                  }}
+                />
+              </div>
+            )}
+          </>
         ) : (
           /* Generate CTA */
           <div className="flex flex-col items-center justify-center py-20">
@@ -291,7 +638,7 @@ export default function TopicPage() {
             </h2>
             <p className="text-gray-500 text-sm mb-6 text-center max-w-md">
               Generate AI-powered content personalized to your learning level
-              and style for "{currentTopic.topic_name}".
+              and style for &quot;{currentTopic.topic_name}&quot;.
             </p>
             <Button onClick={handleGenerate} size="lg">
               <Sparkles className="w-4 h-4 mr-2" />
@@ -340,8 +687,8 @@ export default function TopicPage() {
                 </>
               ) : (
                 <>
-                  <Circle className="w-4 h-4" />
-                  Mark as Complete
+                  <ClipboardCheck className="w-4 h-4" />
+                  Take Quiz & Complete
                 </>
               )}
             </Button>
@@ -354,6 +701,16 @@ export default function TopicPage() {
                 Next Topic
                 <ChevronRight className="w-4 h-4" />
               </Button>
+            ) : nextModuleLocked ? (
+              <div className="flex flex-col items-end gap-1">
+                <Button disabled className="gap-2 opacity-60 cursor-not-allowed">
+                  <Lock className="w-4 h-4" />
+                  Next Module Locked
+                </Button>
+                <p className="text-xs text-gray-400">
+                  Score 80%+ on all topics to unlock
+                </p>
+              </div>
             ) : (
               <Button
                 onClick={() => navigate(`/course/${enrollmentId}`)}
@@ -366,6 +723,18 @@ export default function TopicPage() {
           </div>
         </div>
       </div>
+
+      {/* Quiz Overlay — triggered when user clicks "Take Quiz & Complete" */}
+      {eId && content && (
+        <TopicQuizOverlay
+          open={quizOverlayOpen}
+          onOpenChange={setQuizOverlayOpen}
+          enrollmentId={eId}
+          moduleIndex={mIdx}
+          topicIndex={tIdx}
+          onComplete={handleQuizComplete}
+        />
+      )}
     </div>
   );
 }

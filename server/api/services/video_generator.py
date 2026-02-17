@@ -88,14 +88,27 @@ class VideoGeneratorService:
     # 1. Script generation (Ollama)
     # ------------------------------------------------------------------
 
-    def generate_script(self, topic: str) -> dict | None:
+    def generate_script(self, topic: str, content: str = None) -> dict | None:
+        # Build content context if lesson content is available
+        content_context = ""
+        if content:
+            # Truncate to fit in context window but keep substantial detail
+            max_len = 4000
+            truncated = content[:max_len] + "..." if len(content) > max_len else content
+            content_context = (
+                f"\n\nUse the following lesson content as the PRIMARY basis for the video script. "
+                f"The scenes should cover the key concepts from this content:\n\n{truncated}\n\n"
+            )
+
         prompt = (
-            f"Create an educational video script about: {topic}\n\n"
+            f"Create an educational video script about: {topic}\n"
+            f"{content_context}"
             "Requirements:\n"
             "- Create 3-5 scenes (slides)\n"
             "- Each scene MUST have a 'narration' field with spoken text (2-3 sentences)\n"
             "- Each scene should have 'title', 'bullets' (key points), and 'image_prompt'\n"
-            "- Keep narration concise and educational\n\n"
+            "- Keep narration concise and educational\n"
+            "- Base the scenes on the provided content if available\n\n"
             "Return ONLY valid JSON in this exact format:\n"
             '{\n'
             '  "scenes": [\n'
@@ -110,6 +123,8 @@ class VideoGeneratorService:
         )
 
         try:
+            timeout = getattr(settings, 'OLLAMA_TIMEOUT', 600)
+            logger.info(f"Requesting script from Ollama (timeout: {timeout}s)...")
             response = requests.post(
                 settings.OLLAMA_API_URL,
                 json={
@@ -118,10 +133,11 @@ class VideoGeneratorService:
                     "format": "json",
                     "stream": False,
                 },
-                timeout=300,
+                timeout=timeout,
             )
             response.raise_for_status()
             script_data = json.loads(response.json()["response"])
+            logger.info("✅ Received script from Ollama successfully")
 
             # Persist script to disk
             script_path = os.path.join(self.scripts_dir, "script.json")
@@ -130,11 +146,15 @@ class VideoGeneratorService:
 
             return script_data
 
-        except requests.exceptions.RequestException:
+        except requests.exceptions.RequestException as e:
             logger.exception("Ollama connection error")
+            logger.error(f"❌ Failed to connect to Ollama at {settings.OLLAMA_API_URL}")
+            logger.error(f"   Make sure Ollama is running: ollama serve")
+            logger.error(f"   And model is available: ollama pull {settings.OLLAMA_MODEL}")
             return None
-        except (json.JSONDecodeError, KeyError):
+        except (json.JSONDecodeError, KeyError) as e:
             logger.exception("Invalid JSON from Ollama")
+            logger.error(f"❌ Ollama returned invalid JSON: {e}")
             return None
 
     # ------------------------------------------------------------------
@@ -375,17 +395,21 @@ class VideoGeneratorService:
     # 7. Full pipeline
     # ------------------------------------------------------------------
 
-    def run(self, topic: str) -> str:
+    def run(self, topic: str, content: str = None) -> str:
         """
         Execute the full pipeline. Returns the path to the final video file.
         Raises RuntimeError on failure.
+        
+        Args:
+            topic: The topic name for the video
+            content: Optional generated lesson content to base the video on
         """
         # --- Script ---
         self._update_task(
             status="processing",
             progress_message="Generating script...",
         )
-        script_data = self.generate_script(topic)
+        script_data = self.generate_script(topic, content=content)
         if not script_data:
             raise RuntimeError("Failed to generate script from Ollama.")
 

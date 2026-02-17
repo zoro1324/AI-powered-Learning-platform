@@ -822,6 +822,79 @@ Return strictly JSON:
         print("=== evaluate_topic_quiz SUCCESS ===")
         return result
     
+    def generate_remediation_content(
+        self,
+        course_name: str,
+        topic_name: str,
+        weak_areas: List[str],
+        original_content: str
+    ) -> Dict[str, Any]:
+        """
+        Generate focused remediation content for sub-topics the user got wrong.
+        
+        Args:
+            course_name: Name of the course
+            topic_name: Name of the parent topic
+            weak_areas: List of question texts / sub-topics the user struggled on
+            original_content: The original lesson content for context
+            
+        Returns:
+            Dictionary with 'remediation_notes' list
+        """
+        print("\n========================================")
+        print("=== generate_remediation_content CALLED ===")
+        print(f"  Course: {course_name}")
+        print(f"  Topic: {topic_name}")
+        print(f"  Weak areas: {len(weak_areas)}")
+        print("========================================")
+
+        # Truncate original content for context
+        max_content = 2000
+        context = original_content[:max_content] if len(original_content) > max_content else original_content
+
+        weak_areas_text = "\n".join([f"- {area}" for area in weak_areas])
+
+        prompt = f"""
+You are an expert tutor for the course "{course_name}".
+The student just took a quiz on the topic "{topic_name}" and struggled with specific sub-topics.
+
+Here is the original lesson content for reference:
+---
+{context}
+---
+
+The student got the following questions/concepts WRONG:
+{weak_areas_text}
+
+For EACH weak area listed above, generate a focused, detailed remediation note that:
+1. Explains the concept in a different, clearer way than the original content
+2. Uses simple analogies and examples
+3. Addresses common misconceptions
+4. Provides a concise but thorough explanation (200-400 words each)
+
+Return strictly JSON:
+
+{{
+  "remediation_notes": [
+    {{
+      "sub_topic": "A short descriptive title for this sub-topic (3-8 words)",
+      "content": "Detailed markdown-formatted remediation content here..."
+    }}
+  ]
+}}
+"""
+
+        response = self._call_ollama(prompt)
+        result = self._extract_json(response)
+        
+        # Ensure we have the right structure
+        if 'remediation_notes' not in result:
+            result = {"remediation_notes": []}
+        
+        print(f"  Generated {len(result.get('remediation_notes', []))} remediation notes")
+        print("=== generate_remediation_content SUCCESS ===")
+        return result
+
     def refine_roadmap(
         self,
         course_name: str,
@@ -873,6 +946,102 @@ Return strictly JSON:
         
         response = self._call_ollama(prompt)
         return self._extract_json(response)
+
+    def chat_with_context(
+        self,
+        message: str,
+        context: str,
+        topic_name: str,
+        course_name: str,
+        chat_history: list = None
+    ) -> str:
+        """
+        RAG-based chat: answer user questions using generated topic content as context.
+        
+        Args:
+            message: The user's question/message
+            context: The generated lesson content to use as knowledge base
+            topic_name: Name of the current topic
+            course_name: Name of the course
+            chat_history: Optional list of previous messages [{role, content}]
+            
+        Returns:
+            The AI assistant's response as a string
+        """
+        print("\n========================================")
+        print("=== chat_with_context CALLED ===")
+        print(f"  Course: {course_name}")
+        print(f"  Topic: {topic_name}")
+        print(f"  Message: {message[:100]}")
+        print(f"  Context length: {len(context)} chars")
+        print(f"  History length: {len(chat_history) if chat_history else 0}")
+        print("========================================")
+        
+        # Truncate context if very long to fit in context window
+        max_context = 6000
+        if len(context) > max_context:
+            context = context[:max_context] + "\n\n[Content truncated for brevity...]"
+        
+        system_prompt = f"""You are a helpful AI tutor for the course "{course_name}". 
+You are currently helping the student with the topic: "{topic_name}".
+
+Use the following lesson content as your knowledge base to answer questions. 
+Answer based on this content. If the question is related to the topic but not covered 
+in the content, you may provide additional helpful information while noting that.
+If the question is completely unrelated, politely redirect to the topic.
+
+Be conversational, encouraging, and thorough in your explanations.
+Use examples where helpful. Format your response in markdown for readability.
+
+=== LESSON CONTENT ===
+{context}
+=== END CONTENT ==="""
+
+        # Build messages array with history
+        messages = []
+        messages.append({"role": "system", "content": system_prompt})
+        
+        # Add chat history if provided
+        if chat_history:
+            for msg in chat_history[-10:]:  # Keep last 10 messages for context window
+                messages.append({
+                    "role": msg.get("role", "user"),
+                    "content": msg.get("content", "")
+                })
+        
+        # Add current message
+        messages.append({"role": "user", "content": message})
+        
+        # Call Ollama directly with messages array (bypasses _call_ollama to include history)
+        payload = {
+            "model": self.ollama_model,
+            "messages": messages,
+            "stream": False,
+            "options": {
+                "num_predict": 2048,
+                "temperature": 0.7,
+                "top_p": 0.9
+            }
+        }
+        
+        try:
+            response = requests.post(
+                self.ollama_url,
+                json=payload,
+                headers={"Content-Type": "application/json"},
+                timeout=120
+            )
+            response.raise_for_status()
+            data = response.json()
+            reply = data.get('message', {}).get('content', '')
+            print(f"  Chat response length: {len(reply)} chars")
+            print("=== chat_with_context SUCCESS ===")
+            return reply
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Chat Ollama API error: {e}")
+            print(f"  ERROR in chat_with_context: {e}")
+            print("=== chat_with_context FAILED ===")
+            raise RuntimeError(f"Failed to get chat response: {e}")
 
 
 # Singleton instance

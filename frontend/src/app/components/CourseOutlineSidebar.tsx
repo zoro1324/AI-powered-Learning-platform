@@ -8,6 +8,7 @@ import {
   Clock,
   BookOpen,
   Menu,
+  Lock,
 } from 'lucide-react';
 import { useAppSelector } from '../../store';
 import { ScrollArea } from './ui/scroll-area';
@@ -40,6 +41,7 @@ export function CourseOutlineSidebar({
     courseName,
     topicCompletion,
     generatedContent,
+    quizResults,
   } = useAppSelector((state) => state.syllabus);
 
   const isTopicComplete = useCallback(
@@ -61,6 +63,28 @@ export function CourseOutlineSidebar({
       return completed;
     },
     [isTopicComplete]
+  );
+
+  /**
+   * Module 0 is always unlocked.
+   * Module N requires all topics in module N-1 to be completed
+   * AND every topic quiz in module N-1 scored >= 80%.
+   */
+  const isModuleUnlocked = useCallback(
+    (mIdx: number) => {
+      if (mIdx === 0) return true;
+      if (!syllabus) return false;
+      const prevModule = syllabus.modules[mIdx - 1];
+      if (!prevModule) return false;
+      for (let t = 0; t < prevModule.topics.length; t++) {
+        const key = `${mIdx - 1}-${t}`;
+        if (!topicCompletion[key]) return false;
+        const result = quizResults[key];
+        if (!result || result.scorePercent < 80) return false;
+      }
+      return true;
+    },
+    [syllabus, topicCompletion, quizResults]
   );
 
   if (collapsed) {
@@ -116,22 +140,35 @@ export function CourseOutlineSidebar({
           {syllabus.modules.map((mod, mIdx) => {
             const completedCount = getModuleCompletionCount(mIdx, mod.topics.length);
             const allComplete = completedCount === mod.topics.length;
+            const unlocked = isModuleUnlocked(mIdx);
 
             return (
               <AccordionItem
                 key={`module-${mIdx}`}
                 value={`module-${mIdx}`}
                 className="border-b-0"
+                disabled={!unlocked}
               >
-                <AccordionTrigger className="px-3 py-3 hover:no-underline hover:bg-gray-50 rounded-lg text-left">
+                <AccordionTrigger
+                  className={cn(
+                    'px-3 py-3 hover:no-underline rounded-lg text-left',
+                    unlocked ? 'hover:bg-gray-50' : 'opacity-60 cursor-not-allowed'
+                  )}
+                  disabled={!unlocked}
+                >
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      {allComplete ? (
+                      {!unlocked ? (
+                        <Lock className="w-4 h-4 text-gray-400 shrink-0" />
+                      ) : allComplete ? (
                         <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
                       ) : (
                         <BookOpen className="w-4 h-4 text-blue-500 shrink-0" />
                       )}
-                      <span className="font-medium text-sm text-gray-900 truncate">
+                      <span className={cn(
+                        'font-medium text-sm truncate',
+                        unlocked ? 'text-gray-900' : 'text-gray-400'
+                      )}>
                         {mod.module_name}
                       </span>
                     </div>
@@ -142,12 +179,19 @@ export function CourseOutlineSidebar({
                       >
                         {mod.difficulty_level}
                       </Badge>
-                      <span className="text-[10px] text-gray-400">
-                        {completedCount}/{mod.topics.length} topics
-                      </span>
+                      {unlocked ? (
+                        <span className="text-[10px] text-gray-400">
+                          {completedCount}/{mod.topics.length} topics
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-gray-400">
+                          Locked — complete previous module with 80%+
+                        </span>
+                      )}
                     </div>
                   </div>
                 </AccordionTrigger>
+                {unlocked && (
                 <AccordionContent className="pb-1">
                   <div className="space-y-0.5 ml-2">
                     {mod.topics.map((topic, tIdx) => {
@@ -202,6 +246,7 @@ export function CourseOutlineSidebar({
                     })}
                   </div>
                 </AccordionContent>
+                )}
               </AccordionItem>
             );
           })}

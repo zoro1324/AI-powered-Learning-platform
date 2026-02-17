@@ -328,6 +328,36 @@ export const roadmapAPI = {
 };
 
 // ============================================================================
+// RESOURCE API
+// ============================================================================
+
+export const resourceAPI = {
+  listByLesson: async (lessonId: number): Promise<Resource[]> => {
+    const response = await api.get<PaginatedResponse<Resource>>('/resources/', {
+      params: { lesson: lessonId }
+    });
+    return response.data.results;
+  },
+
+  get: async (id: number): Promise<Resource> => {
+    const response = await api.get<Resource>(`/resources/${id}/`);
+    return response.data;
+  },
+
+  createNote: async (data: {
+    lesson: number;
+    title: string;
+    content_text: string;
+  }): Promise<Resource> => {
+    const response = await api.post<Resource>('/resources/', {
+      ...data,
+      resource_type: 'notes',
+    });
+    return response.data;
+  },
+};
+
+// ============================================================================
 // ACHIEVEMENT API
 // ============================================================================
 
@@ -393,6 +423,7 @@ export const videoAPI = {
 // ============================================================================
 
 export interface AssessmentQuestion {
+  id?: number;
   question: string;
   options: string[];
   correct_answer?: string | null;
@@ -471,6 +502,15 @@ export interface TopicEvaluationResponse {
   refined_roadmap?: Roadmap;
 }
 
+export interface RemediationNote {
+  sub_topic: string;
+  content: string;
+}
+
+export interface RemediationResponse {
+  remediation_notes: RemediationNote[];
+}
+
 export const assessmentAPI = {
   generateInitialAssessment: async (data: {
     course_id: number;
@@ -532,11 +572,24 @@ export const assessmentAPI = {
   evaluateTopicQuiz: async (data: {
     enrollment_id: number;
     module_id: number;
-    questions: AssessmentQuestion[];
+    question_ids: number[];
     answers: string[];
   }): Promise<TopicEvaluationResponse> => {
     const response = await api.post<TopicEvaluationResponse>(
       '/assessment/topic/evaluate/',
+      data
+    );
+    return response.data;
+  },
+
+  generateRemediationContent: async (data: {
+    enrollment_id: number;
+    lesson_id: number;
+    topic_name: string;
+    weak_areas: string[];
+  }): Promise<RemediationResponse> => {
+    const response = await api.post<RemediationResponse>(
+      '/assessment/topic/remediation/',
       data
     );
     return response.data;
@@ -586,11 +639,39 @@ export const podcastAPI = {
     instruction?: string;
     person1?: string;
     person2?: string;
+    lesson_id?: number;
+    topic_name?: string;
   }): Promise<{
     audio_url: string;
     message: string;
   }> => {
     const response = await api.post('/podcast/generate/', data);
+    return response.data;
+  },
+};
+
+// ============================================================================
+// RAG CHATBOT API
+// ============================================================================
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatResponse {
+  response: string;
+}
+
+export const chatAPI = {
+  sendMessage: async (data: {
+    message: string;
+    context: string;
+    topic_name: string;
+    course_name: string;
+    chat_history?: ChatMessage[];
+  }): Promise<ChatResponse> => {
+    const response = await api.post<ChatResponse>('/chat/', data);
     return response.data;
   },
 };

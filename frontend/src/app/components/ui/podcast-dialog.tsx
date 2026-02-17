@@ -20,7 +20,9 @@ interface PodcastDialogProps {
   onOpenChange: (open: boolean) => void;
   content: string;
   topicName: string;
+  lessonId?: number;
   onPodcastGenerated?: (data: { audioUrl: string; personas: PersonaOption; scenario: string; generatedAt: string }) => void;
+  onComplete?: () => void; // Callback to refresh resources
 }
 
 type Step = 'personas' | 'scenarios' | 'generating' | 'complete';
@@ -30,7 +32,9 @@ export function PodcastDialog({
   onOpenChange,
   content,
   topicName,
+  lessonId,
   onPodcastGenerated,
+  onComplete,
 }: PodcastDialogProps) {
   const [currentStep, setCurrentStep] = useState<Step>('personas');
   const [personaOptions, setPersonaOptions] = useState<PersonaOption[]>([]);
@@ -90,6 +94,8 @@ export function PodcastDialog({
         instruction: scenario,
         person1: selectedPersonas?.person1,
         person2: selectedPersonas?.person2,
+        lesson_id: lessonId,
+        topic_name: topicName,
       });
 
       setAudioUrl(response.audio_url);
@@ -103,6 +109,11 @@ export function PodcastDialog({
           scenario,
           generatedAt: new Date().toISOString(),
         });
+      }
+      
+      // Trigger refresh callback if lesson is linked
+      if (onComplete && lessonId) {
+        onComplete();
       }
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to generate podcast');
