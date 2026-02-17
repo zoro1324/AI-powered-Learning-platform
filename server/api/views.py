@@ -1094,6 +1094,22 @@ class GenerateTopicContentView(APIView):
                 lesson.content = content
                 lesson.save()
             
+            # Also save as a Resource of type 'notes' so it appears in the
+            # unified resources list alongside videos & podcasts.
+            notes_resource, res_created = Resource.objects.get_or_create(
+                lesson=lesson,
+                resource_type='notes',
+                title=f'{topic_name} - Notes',
+                defaults={
+                    'content_text': content,
+                    'is_generated': True,
+                    'generation_model': 'phi3:mini',
+                }
+            )
+            if not res_created:
+                notes_resource.content_text = content
+                notes_resource.save()
+            
             return Response({
                 'lesson_id': lesson.id,
                 'content': content

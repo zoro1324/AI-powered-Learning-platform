@@ -68,11 +68,15 @@ export interface Resource {
   id: number;
   lesson: number;
   title: string;
-  resource_type: 'video' | 'pdf' | 'quiz' | 'mindmap' | 'notes' | 'external_link';
+  resource_type: 'video' | 'pdf' | 'quiz' | 'mindmap' | 'notes' | 'audio' | 'image' | 'reel' | 'video_script' | 'ppt' | 'external_link';
   file?: string;
   file_url?: string;
+  content_text?: string;
+  content_json?: any;
   external_url?: string;
   description?: string;
+  duration_seconds?: number;
+  is_generated?: boolean;
   created_at: string;
 }
 

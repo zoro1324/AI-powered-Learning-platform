@@ -16,6 +16,7 @@ import {
   ChevronUp,
   MessageSquare,
   Wrench,
+  Plus,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store';
 import {
@@ -26,6 +27,7 @@ import {
   pollVideoStatus,
   fetchResources,
   selectResources,
+  setActiveResourceView,
 } from '../../store/slices/syllabusSlice';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -657,12 +659,42 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
               {/* Generated Content list */}
               {(content || quiz || videoTask || generatedPodcast || resources.length > 0) && (
                 <div className="pt-4 border-t border-gray-700 space-y-2">
-                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">
-                    Generated Resources
-                  </p>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs text-gray-500 uppercase tracking-wider">
+                      Generated Resources
+                    </p>
+                    {/* Create Note button */}
+                    {content && (
+                      <button
+                        onClick={() =>
+                          dispatch(
+                            setActiveResourceView({
+                              moduleIndex: mIdx,
+                              topicIndex: tIdx,
+                              view: { type: 'create-note' },
+                            })
+                          )
+                        }
+                        className="flex items-center gap-1 text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors"
+                      >
+                        <Plus className="w-3 h-3" />
+                        New Note
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Notes — click to switch center view to text reading */}
                   {content && (
                     <button
-                      onClick={() => setExpandedTool('notes')}
+                      onClick={() =>
+                        dispatch(
+                          setActiveResourceView({
+                            moduleIndex: mIdx,
+                            topicIndex: tIdx,
+                            view: null,
+                          })
+                        )
+                      }
                       className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
                     >
                       <FileText className="w-4 h-4 text-emerald-400 shrink-0" />
@@ -678,6 +710,38 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                       </div>
                     </button>
                   )}
+
+                  {/* User-created notes */}
+                  {resources
+                    .filter((r) => r.resource_type === 'notes' && !r.is_generated)
+                    .map((resource) => (
+                      <button
+                        key={resource.id}
+                        onClick={() =>
+                          dispatch(
+                            setActiveResourceView({
+                              moduleIndex: mIdx,
+                              topicIndex: tIdx,
+                              view: { type: 'notes', resourceId: resource.id },
+                            })
+                          )
+                        }
+                        className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
+                      >
+                        <FileText className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-300 truncate">
+                            {resource.title}
+                          </p>
+                          <p className="text-[10px] text-gray-500">
+                            {resource.created_at
+                              ? new Date(resource.created_at).toLocaleDateString()
+                              : ''}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+
                   {quiz && (
                     <button
                       onClick={() => setExpandedTool('quiz')}
@@ -696,86 +760,106 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                       </div>
                     </button>
                   )}
-                  {/* Video from database resources */}
-                  {resources.filter(r => r.resource_type === 'video').map((resource) => (
-                    <button
-                      key={resource.id}
-                      onClick={() => {
-                        setExpandedTool('video');
-                        // Could store selected resource ID to display specific resource
-                      }}
-                      className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
-                    >
-                      <Video className="w-4 h-4 text-purple-400 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-300 truncate">
-                          {resource.title}
-                        </p>
-                        <p className="text-[10px] text-gray-500">
-                          {resource.created_at
-                            ? new Date(resource.created_at).toLocaleDateString()
-                            : 'Generated'}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
+
+                  {/* Video resources — click to switch center to video player */}
+                  {resources
+                    .filter((r) => r.resource_type === 'video')
+                    .map((resource) => (
+                      <button
+                        key={resource.id}
+                        onClick={() =>
+                          dispatch(
+                            setActiveResourceView({
+                              moduleIndex: mIdx,
+                              topicIndex: tIdx,
+                              view: { type: 'video', resourceId: resource.id },
+                            })
+                          )
+                        }
+                        className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
+                      >
+                        <Video className="w-4 h-4 text-purple-400 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-300 truncate">
+                            {resource.title}
+                          </p>
+                          <p className="text-[10px] text-gray-500">
+                            {resource.created_at
+                              ? new Date(resource.created_at).toLocaleDateString()
+                              : 'Generated'}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
                   {/* Fallback to videoTask for in-progress videos */}
-                  {videoTask?.status === 'completed' && resources.filter(r => r.resource_type === 'video').length === 0 && (
-                    <button
-                      onClick={() => setExpandedTool('video')}
-                      className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
-                    >
-                      <Video className="w-4 h-4 text-purple-400 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-300 truncate">
-                          {currentTopic?.topic_name} - Video
-                        </p>
-                        <p className="text-[10px] text-gray-500">Generated</p>
-                      </div>
-                    </button>
-                  )}
-                  {/* Podcast from database resources */}
-                  {resources.filter(r => r.resource_type === 'audio').map((resource) => (
-                    <button
-                      key={resource.id}
-                      onClick={() => {
-                        setExpandedTool('podcast');
-                        // Display the persisted podcast
-                      }}
-                      className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
-                    >
-                      <Headphones className="w-4 h-4 text-blue-400 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-300 truncate">
-                          {resource.title}
-                        </p>
-                        <p className="text-[10px] text-gray-500">
-                          {resource.created_at
-                            ? new Date(resource.created_at).toLocaleDateString()
-                            : 'Generated'}
-                        </p>
-                      </div>
-                    </button>
-                  ))}
+                  {videoTask?.status === 'completed' &&
+                    resources.filter((r) => r.resource_type === 'video').length === 0 && (
+                      <button
+                        onClick={() => setExpandedTool('video')}
+                        className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
+                      >
+                        <Video className="w-4 h-4 text-purple-400 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-300 truncate">
+                            {currentTopic?.topic_name} - Video
+                          </p>
+                          <p className="text-[10px] text-gray-500">Generated</p>
+                        </div>
+                      </button>
+                    )}
+
+                  {/* Audio/Podcast resources — click to switch center to audio player */}
+                  {resources
+                    .filter((r) => r.resource_type === 'audio')
+                    .map((resource) => (
+                      <button
+                        key={resource.id}
+                        onClick={() =>
+                          dispatch(
+                            setActiveResourceView({
+                              moduleIndex: mIdx,
+                              topicIndex: tIdx,
+                              view: { type: 'audio', resourceId: resource.id },
+                            })
+                          )
+                        }
+                        className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
+                      >
+                        <Headphones className="w-4 h-4 text-blue-400 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-300 truncate">
+                            {resource.title}
+                          </p>
+                          <p className="text-[10px] text-gray-500">
+                            {resource.created_at
+                              ? new Date(resource.created_at).toLocaleDateString()
+                              : 'Generated'}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
                   {/* Fallback to generatedPodcast for session state */}
-                  {generatedPodcast && resources.filter(r => r.resource_type === 'audio').length === 0 && (
-                    <button
-                      onClick={() => setExpandedTool('podcast')}
-                      className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
-                    >
-                      <Headphones className="w-4 h-4 text-blue-400 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-300 truncate">
-                          {currentTopic?.topic_name} - Podcast
-                        </p>
-                        <p className="text-[10px] text-gray-500">
-                          {generatedPodcast.generatedAt
-                            ? new Date(generatedPodcast.generatedAt).toLocaleDateString()
-                            : 'Generated'}
-                        </p>
-                      </div>
-                    </button>
-                  )}
+                  {generatedPodcast &&
+                    resources.filter((r) => r.resource_type === 'audio').length === 0 && (
+                      <button
+                        onClick={() => setExpandedTool('podcast')}
+                        className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
+                      >
+                        <Headphones className="w-4 h-4 text-blue-400 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-300 truncate">
+                            {currentTopic?.topic_name} - Podcast
+                          </p>
+                          <p className="text-[10px] text-gray-500">
+                            {generatedPodcast.generatedAt
+                              ? new Date(
+                                  generatedPodcast.generatedAt
+                                ).toLocaleDateString()
+                              : 'Generated'}
+                          </p>
+                        </div>
+                      </button>
+                    )}
                 </div>
               )}
             </>

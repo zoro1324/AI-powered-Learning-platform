@@ -52,6 +52,13 @@ interface RemediationItem {
   generatedAt: string;
 }
 
+export type ActiveResourceViewType = 'text' | 'video' | 'audio' | 'notes' | 'create-note';
+
+export interface ActiveResourceView {
+  type: ActiveResourceViewType;
+  resourceId?: number;
+}
+
 export interface SyllabusState {
   enrollmentId: number | null;
   courseName: string;
@@ -68,6 +75,7 @@ export interface SyllabusState {
   videoTasks: Record<string, VideoTask>;
   resources: Record<string, Resource[]>; // lessonId -> resources
   remediationContent: Record<string, RemediationItem[]>; // topicKey -> remediation notes
+  activeResourceView: Record<string, ActiveResourceView>; // topicKey -> which resource is shown
 
   // Loading state per operation
   contentLoading: Record<string, boolean>;
@@ -92,6 +100,7 @@ const initialState: SyllabusState = {
   videoTasks: {},
   resources: {},
   remediationContent: {},
+  activeResourceView: {},
   contentLoading: {},
   quizLoading: {},
   quizEvaluating: {},
@@ -317,6 +326,38 @@ export const generateRemediationContent = createAsyncThunk(
   }
 );
 
+export const createNote = createAsyncThunk(
+  'syllabus/createNote',
+  async (
+    data: {
+      lessonId: number;
+      title: string;
+      content: string;
+      moduleIndex: number;
+      topicIndex: number;
+    },
+    { rejectWithValue }
+  ) => {
+    try {
+      const resource = await resourceAPI.createNote({
+        lesson: data.lessonId,
+        title: data.title,
+        content_text: data.content,
+      });
+      return {
+        resource,
+        lessonId: data.lessonId,
+        moduleIndex: data.moduleIndex,
+        topicIndex: data.topicIndex,
+      };
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.error || 'Failed to create note'
+      );
+    }
+  }
+);
+
 // ─── Slice ───────────────────────────────────────────────────────────────────
 
 const syllabusSlice = createSlice({
@@ -343,6 +384,21 @@ const syllabusSlice = createSlice({
       state.enrollmentId = action.payload.enrollmentId;
       state.courseName = action.payload.courseName;
       state.syllabus = action.payload.syllabus;
+    },
+    setActiveResourceView: (
+      state,
+      action: PayloadAction<{
+        moduleIndex: number;
+        topicIndex: number;
+        view: ActiveResourceView | null;
+      }>
+    ) => {
+      const key = topicId(action.payload.moduleIndex, action.payload.topicIndex);
+      if (action.payload.view) {
+        state.activeResourceView[key] = action.payload.view;
+      } else {
+        delete state.activeResourceView[key];
+      }
     },
   },
   extraReducers: (builder) => {
@@ -504,6 +560,14 @@ const syllabusSlice = createSlice({
         const key = topicId(action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
         state.remediationLoading[key] = false;
       });
+
+    // createNote — add the new resource into the resources array for the lesson
+    builder
+      .addCase(createNote.fulfilled, (state, action) => {
+        const { resource, lessonId } = action.payload;
+        const existing = state.resources[lessonId] || [];
+        state.resources[lessonId] = [...existing, resource];
+      });
   },
 });
 
@@ -512,6 +576,7 @@ export const {
   toggleTopicCompletion,
   markTopicComplete,
   setSyllabusFromEvaluation,
+  setActiveResourceView,
 } = syllabusSlice.actions;
 
 // ─── Selectors ───────────────────────────────────────────────────────────────
@@ -622,5 +687,12 @@ export const selectModuleBestScore = (
   }
   return best;
 };
+
+export const selectActiveResourceView = (
+  state: { syllabus: SyllabusState },
+  moduleIndex: number,
+  topicIndex: number
+): ActiveResourceView | null =>
+  state.syllabus.activeResourceView[topicId(moduleIndex, topicIndex)] || null;
 
 export default syllabusSlice.reducer;

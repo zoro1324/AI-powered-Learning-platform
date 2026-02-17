@@ -343,6 +343,18 @@ export const resourceAPI = {
     const response = await api.get<Resource>(`/resources/${id}/`);
     return response.data;
   },
+
+  createNote: async (data: {
+    lesson: number;
+    title: string;
+    content_text: string;
+  }): Promise<Resource> => {
+    const response = await api.post<Resource>('/resources/', {
+      ...data,
+      resource_type: 'notes',
+    });
+    return response.data;
+  },
 };
 
 // ============================================================================
