@@ -101,6 +101,15 @@ class LearningProfile(models.Model):
     attention_span_minutes = models.PositiveIntegerField(
         default=25, help_text='Estimated attention span in minutes',
     )
+    
+    # Podcast preferences
+    podcast_enabled = models.BooleanField(
+        default=True, help_text='Enable audio podcast generation for topics',
+    )
+    podcast_auto_generate = models.BooleanField(
+        default=False, help_text='Automatically generate podcasts for new topics',
+    )
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -31,6 +31,7 @@ from .serializers import (
 )
 from .tasks import generate_video_task
 from .services.assessment_service import get_assessment_service
+from .services.podcast_service import get_podcast_service
 
 User = get_user_model()
 
@@ -518,7 +519,7 @@ class DashboardView(APIView):
         avg_progress = enrollments.aggregate(Avg('overall_progress'))['overall_progress__avg'] or 0
         
         # Get recent activity
-        recent_activities = ActivityLog.objects.filter(user=user).order_by('-timestamp')[:10]
+        recent_activities = ActivityLog.objects.filter(user=user).order_by('-created_at')[:10]
         
         # Get earned achievements
         user_achievements = UserAchievement.objects.filter(user=user).count()
@@ -1258,3 +1259,161 @@ class EvaluateTopicQuizView(APIView):
                 {'error': f'Failed to evaluate quiz: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+# ============================================================================
+# PODCAST GENERATION VIEWS
+# ============================================================================
+
+class GeneratePersonaOptionsView(APIView):
+    """Generate persona options for podcast"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        """
+        Generate 3 persona pair options based on content
+        
+        Expected payload:
+        {
+            "text": "Content to analyze..."
+        }
+        """
+        try:
+            text = request.data.get('text', '')
+            
+            if not text:
+                return Response(
+                    {'error': 'Text content is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            service = get_podcast_service()
+            options = service.generate_persona_options(text)
+            
+            return Response({
+                'options': options
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error generating persona options: {e}", exc_info=True)
+            return Response(
+                {'error': f'Failed to generate persona options: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class GenerateScenarioOptionsView(APIView):
+    """Generate scenario options for podcast"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        """
+        Generate 3 scenario options based on content and personas
+        
+        Expected payload:
+        {
+            "text": "Content to analyze...",
+            "personas": {
+                "person1": "Expert",
+                "person2": "Novice"
+            }
+        }
+        """
+        try:
+            text = request.data.get('text', '')
+            personas = request.data.get('personas', None)
+            
+            if not text:
+                return Response(
+                    {'error': 'Text content is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            service = get_podcast_service()
+            options = service.generate_scenario_options(text, personas)
+            
+            return Response({
+                'options': options
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error generating scenario options: {e}", exc_info=True)
+            return Response(
+                {'error': f'Failed to generate scenario options: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class GeneratePodcastView(APIView):
+    """Generate complete podcast from content"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        """
+        Generate a complete podcast
+        
+        Expected payload:
+        {
+            "text": "Content to create podcast from...",
+            "instruction": "Deep dive analysis",  // optional
+            "person1": "Professor",               // optional
+            "person2": "Student"                  // optional
+        }
+        """
+        try:
+            text = request.data.get('text', '')
+            instruction = request.data.get('instruction', None)
+            person1 = request.data.get('person1', None)
+            person2 = request.data.get('person2', None)
+            
+            if not text:
+                return Response(
+                    {'error': 'Text content is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            service = get_podcast_service()
+            audio_file_path = service.generate_podcast(
+                text=text,
+                instruction=instruction,
+                person1=person1,
+                person2=person2
+            )
+            
+            if not audio_file_path:
+                return Response(
+                    {'error': 'Failed to generate podcast'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+            
+            # Convert absolute path to relative media URL
+            import os
+            from django.conf import settings
+            
+            relative_path = os.path.relpath(
+                audio_file_path,
+                settings.MEDIA_ROOT
+            )
+            audio_url = f"/media/{relative_path.replace(os.sep, '/')}"
+            
+            # Log activity
+            ActivityLog.objects.create(
+                user=request.user,
+                activity_type='podcast_generated',
+                title='Generated Podcast',
+                description='Generated audio podcast from content',
+                metadata={'audio_url': audio_url}
+            )
+            
+            return Response({
+                'audio_url': audio_url,
+                'message': 'Podcast generated successfully'
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error generating podcast: {e}", exc_info=True)
+            return Response(
+                {'error': f'Failed to generate podcast: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+

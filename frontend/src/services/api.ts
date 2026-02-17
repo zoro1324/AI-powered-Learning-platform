@@ -556,6 +556,45 @@ export const assessmentAPI = {
   },
 };
 
+// ============================================================================
+// PODCAST API
+// ============================================================================
+
+export const podcastAPI = {
+  generatePersonaOptions: async (text: string): Promise<{
+    options: Array<{ person1: string; person2: string }>;
+  }> => {
+    const response = await api.post('/podcast/personas/', { text });
+    return response.data;
+  },
+
+  generateScenarioOptions: async (
+    text: string,
+    personas?: { person1: string; person2: string }
+  ): Promise<{
+    options: string[];
+  }> => {
+    const response = await api.post('/podcast/scenarios/', {
+      text,
+      personas,
+    });
+    return response.data;
+  },
+
+  generatePodcast: async (data: {
+    text: string;
+    instruction?: string;
+    person1?: string;
+    person2?: string;
+  }): Promise<{
+    audio_url: string;
+    message: string;
+  }> => {
+    const response = await api.post('/podcast/generate/', data);
+    return response.data;
+  },
+};
+
 // Re-export types for convenience
 export type { 
   User, 

@@ -4,6 +4,7 @@ import {
   FileText,
   ListChecks,
   Video,
+  Headphones,
   Sparkles,
   Loader2,
   PanelRightClose,
@@ -26,6 +27,7 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
 import { cn } from './ui/utils';
+import { PodcastDialog } from './ui/podcast-dialog';
 
 interface StudioPanelProps {
   collapsed: boolean;
@@ -65,6 +67,13 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
   // Quiz answer state
   const [quizAnswers, setQuizAnswers] = useState<Record<number, string>>({});
   const [expandedTool, setExpandedTool] = useState<string | null>(null);
+  const [podcastDialogOpen, setPodcastDialogOpen] = useState(false);
+  const [generatedPodcast, setGeneratedPodcast] = useState<{
+    audioUrl: string;
+    personas: { person1: string; person2: string };
+    scenario: string;
+    generatedAt: string;
+  } | null>(null);
 
   // Poll video status
   useEffect(() => {
@@ -160,9 +169,16 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
     setExpandedTool('video');
   }, [dispatch, currentTopic, content, mIdx, tIdx]);
 
-  // Reset quiz answers when topic changes
+  const handleGeneratePodcast = useCallback(() => {
+    if (!content) return;
+    setPodcastDialogOpen(true);
+    setExpandedTool('podcast');
+  }, [content]);
+
+  // Reset quiz answers and podcast when topic changes
   useEffect(() => {
     setQuizAnswers({});
+    setGeneratedPodcast(null);
   }, [topicKey]);
 
   // ─── Collapsed state ──────────────────────────────────────────────────────
@@ -240,12 +256,21 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
 
         {isExpanded && (
           <div className="bg-gray-800 rounded-xl p-3 space-y-3">
-            {!hasData && !isLoading && (
+            {!hasData && !isLoading && !disabled && (
               <Button
                 size="sm"
                 onClick={onGenerate}
-                disabled={disabled}
                 className="w-full bg-white/10 hover:bg-white/20 text-white border-0"
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                Generate {label}
+              </Button>
+            )}
+            {!hasData && !isLoading && disabled && (
+              <Button
+                size="sm"
+                disabled
+                className="w-full bg-gray-700 text-gray-400 border-0 cursor-not-allowed"
               >
                 <Sparkles className="w-4 h-4 mr-2" />
                 Generate {label}
@@ -258,6 +283,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
               </div>
             )}
             {hasData && children}
+            {!hasData && !isLoading && children}
           </div>
         )}
       </div>
@@ -468,8 +494,51 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                 )}
               </ToolCard>
 
+              <ToolCard
+                id="podcast"
+                icon={Headphones}
+                label="Podcast"
+                bgColor="bg-blue-800/80"
+                hasData={!!generatedPodcast}
+                isLoading={false}
+                onGenerate={handleGeneratePodcast}
+                disabled={!content}
+              >
+                {!content ? (
+                  <div className="text-sm text-gray-300 space-y-2">
+                    <p className="text-yellow-400 flex items-center gap-2">
+                      <Sparkles className="w-4 h-4" />
+                      Generate Notes first
+                    </p>
+                    <p className="text-xs text-gray-400">
+                      Content must be generated before creating a podcast
+                    </p>
+                  </div>
+                ) : generatedPodcast ? (
+                  <div className="space-y-2">
+                    <audio
+                      controls
+                      className="w-full"
+                      src={generatedPodcast.audioUrl.startsWith('http') 
+                        ? generatedPodcast.audioUrl 
+                        : `${(import.meta as any).env?.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000'}${generatedPodcast.audioUrl}`}
+                    >
+                      Your browser does not support the audio element.
+                    </audio>
+                    <div className="text-xs text-gray-400 space-y-1">
+                      <p>Speakers: {generatedPodcast.personas.person1} & {generatedPodcast.personas.person2}</p>
+                      <p>Focus: {generatedPodcast.scenario}</p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-300">
+                    Convert this topic into an engaging audio conversation
+                  </p>
+                )}
+              </ToolCard>
+
               {/* Generated Content list */}
-              {(content || quiz || videoTask) && (
+              {(content || quiz || videoTask || generatedPodcast) && (
                 <div className="pt-4 border-t border-gray-700 space-y-2">
                   <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">
                     Generated Resources
@@ -524,12 +593,41 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                       </div>
                     </button>
                   )}
+                  {generatedPodcast && (
+                    <button
+                      onClick={() => setExpandedTool('podcast')}
+                      className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
+                    >
+                      <Headphones className="w-4 h-4 text-blue-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-300 truncate">
+                          {currentTopic?.topic_name} - Podcast
+                        </p>
+                        <p className="text-[10px] text-gray-500">
+                          {generatedPodcast.generatedAt
+                            ? new Date(generatedPodcast.generatedAt).toLocaleDateString()
+                            : 'Generated'}
+                        </p>
+                      </div>
+                    </button>
+                  )}
                 </div>
               )}
             </>
           )}
         </div>
       </ScrollArea>
+
+      {/* Podcast Dialog */}
+      {content && currentTopic && (
+        <PodcastDialog
+          open={podcastDialogOpen}
+          onOpenChange={setPodcastDialogOpen}
+          content={content.content}
+          topicName={currentTopic.topic_name}
+          onPodcastGenerated={(data) => setGeneratedPodcast(data)}
+        />
+      )}
     </aside>
   );
 }
