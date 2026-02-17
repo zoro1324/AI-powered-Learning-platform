@@ -108,6 +108,16 @@ export default function TopicPage() {
     );
   }, [dispatch, eId, currentModule, currentTopic, mIdx, tIdx]);
 
+  // ─── Auto-generate content on first visit ─────────────────────────────────
+
+  useEffect(() => {
+    // Auto-generate content when the topic page loads if content doesn't exist
+    if (!content && !isLoading && currentTopic && eId && currentModule) {
+      console.log(`📚 Auto-generating content for: ${currentTopic.topic_name}`);
+      handleGenerate();
+    }
+  }, [content, isLoading, currentTopic, eId, currentModule, handleGenerate]);
+
   // ─── Auto-generate video on page load (DISABLED) ──────────────────────────
   // Video generation now only happens when user clicks "Generate Video" button
 

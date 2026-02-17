@@ -947,10 +947,28 @@ class GenerateTopicContentView(APIView):
             # Get study method from enrollment
             study_method = enrollment.learning_style_override or 'summary'
             
+            # Extract topic description from syllabus data
+            topic_description = ""
+            try:
+                syllabus_obj = PersonalizedSyllabus.objects.get(enrollment=enrollment)
+                syllabus_data = syllabus_obj.syllabus_data
+                
+                # Find the topic in the syllabus JSON
+                for mod in syllabus_data.get('modules', []):
+                    if mod.get('order') == module_id:
+                        for topic in mod.get('topics', []):
+                            if topic.get('topic_name') == topic_name:
+                                topic_description = topic.get('description', '')
+                                break
+                        break
+            except PersonalizedSyllabus.DoesNotExist:
+                pass  # Continue without description if not found
+            
             print("\n**************************************************")
             print("*** GenerateTopicContentView: Calling assessment service ***")
             print(f"*** Course: {enrollment.course.title} ***")
             print(f"*** Topic: {topic_name} ***")
+            print(f"*** Topic Description: {topic_description} ***")
             print(f"*** Study method: {study_method} ***")
             print("**************************************************")
             # Generate content
@@ -958,7 +976,8 @@ class GenerateTopicContentView(APIView):
             content = assessment_service.generate_topic_content(
                 enrollment.course.title,
                 topic_name,
-                study_method
+                study_method,
+                topic_description
             )
             print(f"*** Content generated: {len(content)} chars ***")
             print("**************************************************\n")
