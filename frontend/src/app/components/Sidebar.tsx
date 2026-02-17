@@ -9,8 +9,8 @@ export function Sidebar() {
 
   const menuItems = [
     { icon: Home, label: 'Dashboard', path: '/dashboard' },
+    { icon: BookOpen, label: 'My Courses', path: '/my-courses' },
     { icon: Star, label: 'Popular Courses', path: '/courses/popular' },
-    { icon: BookOpen, label: 'My Course', path: '/course-entry' },
     { icon: TrendingUp, label: 'Progress', path: '/progress' },
     { icon: Layers, label: 'Modules', path: '/modules' },
     { icon: Settings, label: 'Settings', path: '/settings' },
@@ -59,7 +59,7 @@ export function Sidebar() {
         {menuItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path || 
-                          (item.path === '/course-entry' && location.pathname.startsWith('/course'));
+                          (item.path === '/my-courses' && location.pathname.startsWith('/course'));
           
           return (
             <Link

@@ -1,12 +1,17 @@
 import { useState } from 'react';
 import { Sidebar } from '../components/Sidebar';
-import { User, Bell, Lock, Palette, Globe, Mail } from 'lucide-react';
+import { User, Bell, Lock, Palette, Globe, Headphones } from 'lucide-react';
 
 export default function SettingsPage() {
   const [notifications, setNotifications] = useState({
     email: true,
     push: true,
     courseUpdates: false,
+  });
+
+  const [podcastPreferences, setPodcastPreferences] = useState({
+    enabled: true,
+    autoGenerate: false,
   });
 
   const [profile, setProfile] = useState({
@@ -84,8 +89,9 @@ export default function SettingsPage() {
 
                   {/* Name */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                    <label htmlFor="full-name" className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
                     <input
+                      id="full-name"
                       type="text"
                       value={profile.name}
                       onChange={(e) => setProfile({ ...profile, name: e.target.value })}
@@ -95,8 +101,9 @@ export default function SettingsPage() {
 
                   {/* Email */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+                    <label htmlFor="email-address" className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
                     <input
+                      id="email-address"
                       type="email"
                       value={profile.email}
                       onChange={(e) => setProfile({ ...profile, email: e.target.value })}
@@ -135,6 +142,7 @@ export default function SettingsPage() {
                     </div>
                     <button
                       onClick={() => setNotifications({ ...notifications, email: !notifications.email })}
+                      aria-label="Toggle email notifications"
                       className={`relative w-12 h-6 rounded-full transition-all ${
                         notifications.email ? 'bg-blue-500' : 'bg-gray-300'
                       }`}
@@ -154,6 +162,7 @@ export default function SettingsPage() {
                     </div>
                     <button
                       onClick={() => setNotifications({ ...notifications, push: !notifications.push })}
+                      aria-label="Toggle push notifications"
                       className={`relative w-12 h-6 rounded-full transition-all ${
                         notifications.push ? 'bg-blue-500' : 'bg-gray-300'
                       }`}
@@ -173,6 +182,7 @@ export default function SettingsPage() {
                     </div>
                     <button
                       onClick={() => setNotifications({ ...notifications, courseUpdates: !notifications.courseUpdates })}
+                      aria-label="Toggle course update notifications"
                       className={`relative w-12 h-6 rounded-full transition-all ${
                         notifications.courseUpdates ? 'bg-blue-500' : 'bg-gray-300'
                       }`}
@@ -180,6 +190,57 @@ export default function SettingsPage() {
                       <div
                         className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-all ${
                           notifications.courseUpdates ? 'translate-x-6' : ''
+                        }`}
+                      />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Podcast Settings */}
+              <div className="bg-white rounded-2xl shadow-lg p-8">
+                <div className="flex items-center gap-4 mb-8">
+                  <Headphones className="w-6 h-6 text-gray-900" />
+                  <h2 className="text-2xl font-semibold text-gray-900">Podcast Preferences</h2>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between py-4 border-b border-gray-200">
+                    <div>
+                      <p className="font-medium text-gray-900">Enable Audio Podcasts</p>
+                      <p className="text-sm text-gray-600">Generate audio conversations from course content</p>
+                    </div>
+                    <button
+                      onClick={() => setPodcastPreferences({ ...podcastPreferences, enabled: !podcastPreferences.enabled })}
+                      aria-label="Toggle audio podcasts"
+                      className={`relative w-12 h-6 rounded-full transition-all ${
+                        podcastPreferences.enabled ? 'bg-blue-500' : 'bg-gray-300'
+                      }`}
+                    >
+                      <div
+                        className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-all ${
+                          podcastPreferences.enabled ? 'translate-x-6' : ''
+                        }`}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center justify-between py-4">
+                    <div>
+                      <p className="font-medium text-gray-900">Auto-Generate Podcasts</p>
+                      <p className="text-sm text-gray-600">Automatically create podcasts for new topics</p>
+                    </div>
+                    <button
+                      onClick={() => setPodcastPreferences({ ...podcastPreferences, autoGenerate: !podcastPreferences.autoGenerate })}
+                      disabled={!podcastPreferences.enabled}
+                      aria-label="Toggle auto-generate podcasts"
+                      className={`relative w-12 h-6 rounded-full transition-all ${
+                        podcastPreferences.autoGenerate && podcastPreferences.enabled ? 'bg-blue-500' : 'bg-gray-300'
+                      } ${!podcastPreferences.enabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    >
+                      <div
+                        className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-all ${
+                          podcastPreferences.autoGenerate && podcastPreferences.enabled ? 'translate-x-6' : ''
                         }`}
                       />
                     </button>

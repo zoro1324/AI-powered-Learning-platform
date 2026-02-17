@@ -11,7 +11,8 @@ from .views import (
     ModuleProgressViewSet, LearningRoadmapViewSet, AchievementViewSet,
     UserAchievementViewSet, ActivityLogViewSet, DashboardView,
     InitialAssessmentView, EvaluateAssessmentView, GetSyllabusView,
-    GenerateTopicContentView, GenerateTopicQuizView, EvaluateTopicQuizView
+    GenerateTopicContentView, GenerateTopicQuizView, EvaluateTopicQuizView,
+    GeneratePersonaOptionsView, GenerateScenarioOptionsView, GeneratePodcastView
 )
 
 # Create router for ViewSets
@@ -55,6 +56,11 @@ urlpatterns = [
     path('assessment/topic/content/', GenerateTopicContentView.as_view(), name='topic-content'),
     path('assessment/topic/quiz/', GenerateTopicQuizView.as_view(), name='topic-quiz'),
     path('assessment/topic/evaluate/', EvaluateTopicQuizView.as_view(), name='topic-evaluate'),
+    
+    # Podcast Generation
+    path('podcast/personas/', GeneratePersonaOptionsView.as_view(), name='podcast-personas'),
+    path('podcast/scenarios/', GenerateScenarioOptionsView.as_view(), name='podcast-scenarios'),
+    path('podcast/generate/', GeneratePodcastView.as_view(), name='podcast-generate'),
     
     # Router URLs (all ViewSets)
     path('', include(router.urls)),

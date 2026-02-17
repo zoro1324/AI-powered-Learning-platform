@@ -31,6 +31,7 @@ from .serializers import (
 )
 from .tasks import generate_video_task
 from .services.assessment_service import get_assessment_service
+from .services.podcast_service import get_podcast_service
 
 User = get_user_model()
 
@@ -518,7 +519,7 @@ class DashboardView(APIView):
         avg_progress = enrollments.aggregate(Avg('overall_progress'))['overall_progress__avg'] or 0
         
         # Get recent activity
-        recent_activities = ActivityLog.objects.filter(user=user).order_by('-timestamp')[:10]
+        recent_activities = ActivityLog.objects.filter(user=user).order_by('-created_at')[:10]
         
         # Get earned achievements
         user_achievements = UserAchievement.objects.filter(user=user).count()
@@ -556,7 +557,21 @@ class GenerateVideoView(APIView):
             lesson_id=serializer.validated_data.get("lesson_id"),
         )
 
-        generate_video_task.delay(str(video_task.id))
+        # Try async with Celery, fall back to sync if unavailable
+        try:
+            generate_video_task.delay(str(video_task.id))
+            logger.info(f"✅ Video task queued asynchronously: {video_task.id}")
+        except Exception as e:
+            # Fallback to synchronous execution (works without Redis)
+            logger.info(f"ℹ️ Running video generation synchronously (Redis not available)")
+            try:
+                # Run synchronously using .apply() instead of .delay()
+                generate_video_task.apply(args=[str(video_task.id)])
+            except Exception as sync_error:
+                logger.error(f"❌ Video generation failed: {sync_error}")
+                video_task.status = "failed"
+                video_task.progress_message = f"Failed to start: {str(sync_error)}"
+                video_task.save()
 
         return Response(
             VideoTaskStatusSerializer(video_task, context={"request": request}).data,
@@ -889,7 +904,45 @@ class GenerateTopicContentView(APIView):
         
         try:
             enrollment = Enrollment.objects.get(pk=enrollment_id, user=request.user)
-            module = Module.objects.get(pk=module_id, course=enrollment.course)
+            
+            # Get or create the Module using the order field
+            # Modules are stored in PersonalizedSyllabus JSON, not always in DB
+            try:
+                module = Module.objects.get(course=enrollment.course, order=module_id)
+            except Module.DoesNotExist:
+                # Create module dynamically from syllabus data
+                try:
+                    syllabus_obj = PersonalizedSyllabus.objects.get(enrollment=enrollment)
+                    syllabus_data = syllabus_obj.syllabus_data
+                    
+                    # Find the module by order in the syllabus JSON
+                    matching_module = None
+                    for mod in syllabus_data.get('modules', []):
+                        if mod.get('order') == module_id:
+                            matching_module = mod
+                            break
+                    
+                    if not matching_module:
+                        return Response(
+                            {'error': f'Module with order {module_id} not found in syllabus'},
+                            status=status.HTTP_404_NOT_FOUND
+                        )
+                    
+                    # Create the Module record
+                    module = Module.objects.create(
+                        course=enrollment.course,
+                        title=matching_module.get('module_name', f'Module {module_id}'),
+                        description=matching_module.get('description', ''),
+                        order=module_id,
+                        difficulty_level=matching_module.get('difficulty_level', 'beginner'),
+                        estimated_duration_minutes=matching_module.get('estimated_duration_minutes', 60),
+                        is_generated=True
+                    )
+                except PersonalizedSyllabus.DoesNotExist:
+                    return Response(
+                        {'error': 'Syllabus not found for this enrollment'},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
             
             # Get study method from enrollment
             study_method = enrollment.learning_style_override or 'summary'
@@ -929,9 +982,9 @@ class GenerateTopicContentView(APIView):
                 'content': content
             }, status=status.HTTP_200_OK)
             
-        except (Enrollment.DoesNotExist, Module.DoesNotExist):
+        except Enrollment.DoesNotExist:
             return Response(
-                {'error': 'Enrollment or Module not found'},
+                {'error': 'Enrollment not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
@@ -1052,7 +1105,44 @@ class EvaluateTopicQuizView(APIView):
         
         try:
             enrollment = Enrollment.objects.get(pk=enrollment_id, user=request.user)
-            module = Module.objects.get(pk=module_id, course=enrollment.course)
+            
+            # Get or create the Module using the order field
+            try:
+                module = Module.objects.get(course=enrollment.course, order=module_id)
+            except Module.DoesNotExist:
+                # Create module dynamically from syllabus data
+                try:
+                    syllabus_obj = PersonalizedSyllabus.objects.get(enrollment=enrollment)
+                    syllabus_data = syllabus_obj.syllabus_data
+                    
+                    # Find the module by order in the syllabus JSON
+                    matching_module = None
+                    for mod in syllabus_data.get('modules', []):
+                        if mod.get('order') == module_id:
+                            matching_module = mod
+                            break
+                    
+                    if not matching_module:
+                        return Response(
+                            {'error': f'Module with order {module_id} not found in syllabus'},
+                            status=status.HTTP_404_NOT_FOUND
+                        )
+                    
+                    # Create the Module record
+                    module = Module.objects.create(
+                        course=enrollment.course,
+                        title=matching_module.get('module_name', f'Module {module_id}'),
+                        description=matching_module.get('description', ''),
+                        order=module_id,
+                        difficulty_level=matching_module.get('difficulty_level', 'beginner'),
+                        estimated_duration_minutes=matching_module.get('estimated_duration_minutes', 60),
+                        is_generated=True
+                    )
+                except PersonalizedSyllabus.DoesNotExist:
+                    return Response(
+                        {'error': 'Syllabus not found for this enrollment'},
+                        status=status.HTTP_404_NOT_FOUND
+                    )
             
             print("\n**************************************************")
             print("*** EvaluateTopicQuizView: Calling assessment service ***")
@@ -1158,9 +1248,9 @@ class EvaluateTopicQuizView(APIView):
             
             return Response(response_data, status=status.HTTP_200_OK)
             
-        except (Enrollment.DoesNotExist, Module.DoesNotExist):
+        except Enrollment.DoesNotExist:
             return Response(
-                {'error': 'Enrollment or Module not found'},
+                {'error': 'Enrollment not found'},
                 status=status.HTTP_404_NOT_FOUND
             )
         except Exception as e:
@@ -1169,3 +1259,161 @@ class EvaluateTopicQuizView(APIView):
                 {'error': f'Failed to evaluate quiz: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+# ============================================================================
+# PODCAST GENERATION VIEWS
+# ============================================================================
+
+class GeneratePersonaOptionsView(APIView):
+    """Generate persona options for podcast"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        """
+        Generate 3 persona pair options based on content
+        
+        Expected payload:
+        {
+            "text": "Content to analyze..."
+        }
+        """
+        try:
+            text = request.data.get('text', '')
+            
+            if not text:
+                return Response(
+                    {'error': 'Text content is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            service = get_podcast_service()
+            options = service.generate_persona_options(text)
+            
+            return Response({
+                'options': options
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error generating persona options: {e}", exc_info=True)
+            return Response(
+                {'error': f'Failed to generate persona options: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class GenerateScenarioOptionsView(APIView):
+    """Generate scenario options for podcast"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        """
+        Generate 3 scenario options based on content and personas
+        
+        Expected payload:
+        {
+            "text": "Content to analyze...",
+            "personas": {
+                "person1": "Expert",
+                "person2": "Novice"
+            }
+        }
+        """
+        try:
+            text = request.data.get('text', '')
+            personas = request.data.get('personas', None)
+            
+            if not text:
+                return Response(
+                    {'error': 'Text content is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            service = get_podcast_service()
+            options = service.generate_scenario_options(text, personas)
+            
+            return Response({
+                'options': options
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error generating scenario options: {e}", exc_info=True)
+            return Response(
+                {'error': f'Failed to generate scenario options: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class GeneratePodcastView(APIView):
+    """Generate complete podcast from content"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        """
+        Generate a complete podcast
+        
+        Expected payload:
+        {
+            "text": "Content to create podcast from...",
+            "instruction": "Deep dive analysis",  // optional
+            "person1": "Professor",               // optional
+            "person2": "Student"                  // optional
+        }
+        """
+        try:
+            text = request.data.get('text', '')
+            instruction = request.data.get('instruction', None)
+            person1 = request.data.get('person1', None)
+            person2 = request.data.get('person2', None)
+            
+            if not text:
+                return Response(
+                    {'error': 'Text content is required'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            service = get_podcast_service()
+            audio_file_path = service.generate_podcast(
+                text=text,
+                instruction=instruction,
+                person1=person1,
+                person2=person2
+            )
+            
+            if not audio_file_path:
+                return Response(
+                    {'error': 'Failed to generate podcast'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+            
+            # Convert absolute path to relative media URL
+            import os
+            from django.conf import settings
+            
+            relative_path = os.path.relpath(
+                audio_file_path,
+                settings.MEDIA_ROOT
+            )
+            audio_url = f"/media/{relative_path.replace(os.sep, '/')}"
+            
+            # Log activity
+            ActivityLog.objects.create(
+                user=request.user,
+                activity_type='podcast_generated',
+                title='Generated Podcast',
+                description='Generated audio podcast from content',
+                metadata={'audio_url': audio_url}
+            )
+            
+            return Response({
+                'audio_url': audio_url,
+                'message': 'Podcast generated successfully'
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error generating podcast: {e}", exc_info=True)
+            return Response(
+                {'error': f'Failed to generate podcast: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
