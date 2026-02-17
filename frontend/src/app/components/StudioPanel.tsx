@@ -14,6 +14,8 @@ import {
   Clock,
   ChevronDown,
   ChevronUp,
+  MessageSquare,
+  Wrench,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store';
 import {
@@ -28,6 +30,7 @@ import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
 import { cn } from './ui/utils';
 import { PodcastDialog } from './ui/podcast-dialog';
+import { ChatPanel } from './ChatPanel';
 
 interface StudioPanelProps {
   collapsed: boolean;
@@ -68,6 +71,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
   const [quizAnswers, setQuizAnswers] = useState<Record<number, string>>({});
   const [expandedTool, setExpandedTool] = useState<string | null>(null);
   const [podcastDialogOpen, setPodcastDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'studio' | 'chat'>('studio');
   const [generatedPodcast, setGeneratedPodcast] = useState<{
     audioUrl: string;
     personas: { person1: string; person2: string };
@@ -294,19 +298,56 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
 
   return (
     <aside className="w-80 bg-gray-900 border-l border-gray-700 flex flex-col h-full shrink-0">
-      {/* Header */}
-      <div className="p-4 border-b border-gray-700 flex items-center justify-between">
-        <h3 className="text-white font-semibold text-base">Studio</h3>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onToggle}
-          className="text-gray-400 hover:text-white hover:bg-gray-800"
-        >
-          <PanelRightClose className="w-4 h-4" />
-        </Button>
+      {/* Header with Tab Toggle */}
+      <div className="p-3 border-b border-gray-700">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1 bg-gray-800 rounded-lg p-0.5">
+            <button
+              onClick={() => setActiveTab('studio')}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all',
+                activeTab === 'studio'
+                  ? 'bg-gray-700 text-white shadow-sm'
+                  : 'text-gray-400 hover:text-gray-300'
+              )}
+            >
+              <Wrench className="w-3.5 h-3.5" />
+              Studio
+            </button>
+            <button
+              onClick={() => setActiveTab('chat')}
+              className={cn(
+                'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all',
+                activeTab === 'chat'
+                  ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-sm'
+                  : 'text-gray-400 hover:text-gray-300'
+              )}
+            >
+              <MessageSquare className="w-3.5 h-3.5" />
+              Chat
+            </button>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onToggle}
+            className="text-gray-400 hover:text-white hover:bg-gray-800 h-7 w-7"
+          >
+            <PanelRightClose className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
 
+      {/* Chat Tab */}
+      {activeTab === 'chat' ? (
+        <ChatPanel
+          context={content?.content || ''}
+          topicName={currentTopic?.topic_name || ''}
+          courseName={syllabus?.course_name || ''}
+          hasContent={!!content}
+        />
+      ) : (
+      /* Studio Tab */
       <ScrollArea className="flex-1 overflow-y-auto">
         <div className="p-4 space-y-3">
           {!isTopicView ? (
@@ -617,6 +658,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
           )}
         </div>
       </ScrollArea>
+      )}
 
       {/* Podcast Dialog */}
       {content && currentTopic && (

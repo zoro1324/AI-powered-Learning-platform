@@ -1436,3 +1436,74 @@ class GeneratePodcastView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+
+# ============================================================================
+# RAG CHATBOT VIEW
+# ============================================================================
+
+class ChatWithContextView(APIView):
+    """RAG-based chatbot that answers questions using generated topic content as context"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        """
+        Chat with AI using generated topic content as context.
+        
+        Expected payload:
+        {
+            "message": "What is the main concept here?",
+            "context": "The generated lesson content...",
+            "topic_name": "Introduction to HTML",
+            "course_name": "Web Development",
+            "chat_history": [
+                {"role": "user", "content": "previous question"},
+                {"role": "assistant", "content": "previous answer"}
+            ]
+        }
+        
+        Returns:
+        {
+            "response": "AI assistant's response..."
+        }
+        """
+        from .services.assessment_service import get_assessment_service
+        
+        message = request.data.get('message', '').strip()
+        context = request.data.get('context', '').strip()
+        topic_name = request.data.get('topic_name', '')
+        course_name = request.data.get('course_name', '')
+        chat_history = request.data.get('chat_history', [])
+        
+        if not message:
+            return Response(
+                {'error': 'message is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        if not context:
+            return Response(
+                {'error': 'context (generated content) is required. Generate notes first.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            assessment_service = get_assessment_service()
+            response_text = assessment_service.chat_with_context(
+                message=message,
+                context=context,
+                topic_name=topic_name,
+                course_name=course_name,
+                chat_history=chat_history
+            )
+            
+            return Response({
+                'response': response_text
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error in chat: {e}", exc_info=True)
+            return Response(
+                {'error': f'Failed to get chat response: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+

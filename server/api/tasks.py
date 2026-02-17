@@ -20,8 +20,14 @@ def generate_video_task(self, task_id: str):
         return
 
     try:
+        # Fetch generated lesson content if linked to a lesson
+        lesson_content = None
+        if video_task.lesson and video_task.lesson.content:
+            lesson_content = video_task.lesson.content
+            logger.info("Using lesson content (%d chars) for video generation", len(lesson_content))
+
         service = VideoGeneratorService(task_id)
-        final_path = service.run(video_task.topic)
+        final_path = service.run(video_task.topic, content=lesson_content)
 
         # Save the video file to the model's FileField
         with open(final_path, "rb") as f:

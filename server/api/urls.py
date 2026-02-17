@@ -12,7 +12,8 @@ from .views import (
     UserAchievementViewSet, ActivityLogViewSet, DashboardView,
     InitialAssessmentView, EvaluateAssessmentView, GetSyllabusView,
     GenerateTopicContentView, GenerateTopicQuizView, EvaluateTopicQuizView,
-    GeneratePersonaOptionsView, GenerateScenarioOptionsView, GeneratePodcastView
+    GeneratePersonaOptionsView, GenerateScenarioOptionsView, GeneratePodcastView,
+    ChatWithContextView
 )
 
 # Create router for ViewSets
@@ -61,6 +62,9 @@ urlpatterns = [
     path('podcast/personas/', GeneratePersonaOptionsView.as_view(), name='podcast-personas'),
     path('podcast/scenarios/', GenerateScenarioOptionsView.as_view(), name='podcast-scenarios'),
     path('podcast/generate/', GeneratePodcastView.as_view(), name='podcast-generate'),
+    
+    # RAG Chatbot
+    path('chat/', ChatWithContextView.as_view(), name='chat'),
     
     # Router URLs (all ViewSets)
     path('', include(router.urls)),

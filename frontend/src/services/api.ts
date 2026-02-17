@@ -595,6 +595,32 @@ export const podcastAPI = {
   },
 };
 
+// ============================================================================
+// RAG CHATBOT API
+// ============================================================================
+
+export interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+}
+
+export interface ChatResponse {
+  response: string;
+}
+
+export const chatAPI = {
+  sendMessage: async (data: {
+    message: string;
+    context: string;
+    topic_name: string;
+    course_name: string;
+    chat_history?: ChatMessage[];
+  }): Promise<ChatResponse> => {
+    const response = await api.post<ChatResponse>('/chat/', data);
+    return response.data;
+  },
+};
+
 // Re-export types for convenience
 export type { 
   User, 
