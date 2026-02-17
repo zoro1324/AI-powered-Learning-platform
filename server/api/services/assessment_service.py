@@ -478,8 +478,10 @@ Student Profile:
 - Weak Areas: {', '.join(weak_areas[:3]) if weak_areas else 'None identified'}
 
 Requirements:
-- Decide the number of modules based on course complexity (3-8 modules)
-- Each module must have 2-5 topics with short descriptions
+- Decide the number of modules based on course complexity (4-8 modules)
+- Each module must have 3-7 topics - VARY the number based on module complexity
+- Simple introductory modules might have 3-4 topics
+- Complex or in-depth modules should have 5-7 topics
 - Start with fundamentals if student is a beginner
 - Add extra modules for weak areas
 - Progress from easier to harder
@@ -499,10 +501,12 @@ Return ONLY this JSON structure:
       "description": "Foundation concepts and setup",
       "order": 1,
       "difficulty_level": "beginner",
-      "estimated_duration_minutes": 30,
+      "estimated_duration_minutes": 40,
       "topics": [
         {{"topic_name": "What is {course_name}", "description": "Overview and importance", "order": 1}},
-        {{"topic_name": "Core Terminology", "description": "Key terms and definitions", "order": 2}}
+        {{"topic_name": "Core Terminology", "description": "Key terms and definitions", "order": 2}},
+        {{"topic_name": "Setting Up Your Environment", "description": "Installation and configuration", "order": 3}},
+        {{"topic_name": "First Steps", "description": "Getting started with basics", "order": 4}}
       ]
     }},
     {{
@@ -510,16 +514,34 @@ Return ONLY this JSON structure:
       "description": "Essential principles and techniques",
       "order": 2,
       "difficulty_level": "intermediate",
-      "estimated_duration_minutes": 45,
+      "estimated_duration_minutes": 60,
       "topics": [
-        {{"topic_name": "Fundamental Principles", "description": "Core ideas explained", "order": 1}},
-        {{"topic_name": "Practical Examples", "description": "Hands-on demonstrations", "order": 2}}
+        {{"topic_name": "Fundamental Principles", "description": "Core ideas and concepts", "order": 1}},
+        {{"topic_name": "Key Patterns", "description": "Common approaches and patterns", "order": 2}},
+        {{"topic_name": "Best Practices", "description": "Industry standards and recommendations", "order": 3}},
+        {{"topic_name": "Practical Examples", "description": "Hands-on demonstrations", "order": 4}},
+        {{"topic_name": "Common Pitfalls", "description": "Mistakes to avoid", "order": 5}}
+      ]
+    }},
+    {{
+      "module_name": "Advanced Techniques",
+      "description": "Deep dive into advanced topics",
+      "order": 3,
+      "difficulty_level": "advanced",
+      "estimated_duration_minutes": 75,
+      "topics": [
+        {{"topic_name": "Advanced Patterns", "description": "Complex design patterns", "order": 1}},
+        {{"topic_name": "Performance Optimization", "description": "Speed and efficiency techniques", "order": 2}},
+        {{"topic_name": "Security Considerations", "description": "Security best practices", "order": 3}},
+        {{"topic_name": "Scalability", "description": "Building for scale", "order": 4}},
+        {{"topic_name": "Testing Strategies", "description": "Comprehensive testing approaches", "order": 5}},
+        {{"topic_name": "Debugging Techniques", "description": "Finding and fixing issues", "order": 6}}
       ]
     }}
   ]
 }}
 
-Generate the full syllabus JSON now:"""
+Generate the full syllabus JSON now with varied topic counts per module:"""
         
         try:
             response = self._call_ollama(prompt, system_prompt)
@@ -579,11 +601,12 @@ Generate the full syllabus JSON now:"""
                 "description": "Foundation concepts and overview of the subject",
                 "order": 1,
                 "difficulty_level": "beginner",
-                "estimated_duration_minutes": 30,
+                "estimated_duration_minutes": 40,
                 "topics": [
                     {"topic_name": f"What is {course_name}", "description": "Overview and importance of the subject", "order": 1},
                     {"topic_name": "History and Background", "description": "How the field evolved over time", "order": 2},
                     {"topic_name": "Key Terminology", "description": "Essential terms and definitions", "order": 3},
+                    {"topic_name": "Getting Started", "description": "First steps and initial setup", "order": 4},
                 ]
             },
             {
@@ -591,11 +614,13 @@ Generate the full syllabus JSON now:"""
                 "description": "Fundamental ideas that underpin the subject",
                 "order": 2,
                 "difficulty_level": "beginner",
-                "estimated_duration_minutes": 45,
+                "estimated_duration_minutes": 50,
                 "topics": [
                     {"topic_name": "Fundamental Principles", "description": "The building blocks of knowledge", "order": 1},
                     {"topic_name": "Key Techniques", "description": "Common methods and approaches", "order": 2},
-                    {"topic_name": "Worked Examples", "description": "Step-by-step problem walkthroughs", "order": 3},
+                    {"topic_name": "Basic Patterns", "description": "Common patterns and structures", "order": 3},
+                    {"topic_name": "Worked Examples", "description": "Step-by-step problem walkthroughs", "order": 4},
+                    {"topic_name": "Practice Exercises", "description": "Hands-on practice problems", "order": 5},
                 ]
             },
             {
@@ -603,11 +628,12 @@ Generate the full syllabus JSON now:"""
                 "description": "Applying concepts to real scenarios",
                 "order": 3,
                 "difficulty_level": "intermediate",
-                "estimated_duration_minutes": 45,
+                "estimated_duration_minutes": 60,
                 "topics": [
                     {"topic_name": "Real-World Use Cases", "description": "How concepts apply in practice", "order": 1},
                     {"topic_name": "Problem-Solving Strategies", "description": "Approaches to common challenges", "order": 2},
                     {"topic_name": "Tools and Resources", "description": "Essential tools for practitioners", "order": 3},
+                    {"topic_name": "Integration Techniques", "description": "Combining multiple concepts", "order": 4},
                 ]
             },
             {
@@ -615,11 +641,14 @@ Generate the full syllabus JSON now:"""
                 "description": "Deeper exploration of complex areas",
                 "order": 4,
                 "difficulty_level": "advanced",
-                "estimated_duration_minutes": 60,
+                "estimated_duration_minutes": 70,
                 "topics": [
                     {"topic_name": "Advanced Techniques", "description": "Sophisticated methods and strategies", "order": 1},
-                    {"topic_name": "Best Practices", "description": "Industry standards and recommendations", "order": 2},
-                    {"topic_name": "Current Trends", "description": "Latest developments in the field", "order": 3},
+                    {"topic_name": "Performance Optimization", "description": "Speed and efficiency techniques", "order": 2},
+                    {"topic_name": "Best Practices", "description": "Industry standards and recommendations", "order": 3},
+                    {"topic_name": "Common Pitfalls", "description": "Mistakes to avoid", "order": 4},
+                    {"topic_name": "Current Trends", "description": "Latest developments in the field", "order": 5},
+                    {"topic_name": "Future Directions", "description": "Emerging trends and innovations", "order": 6},
                 ]
             },
         ]
