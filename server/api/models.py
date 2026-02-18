@@ -125,6 +125,15 @@ class LearningProfile(models.Model):
 # ===========================================================================
 
 class Course(models.Model):
+    """
+    Represents both broad topics and individual sub-topics.
+    
+    Broad topics (is_sub_topic=False) like "AI & Machine Learning" cannot be learned directly.
+    Sub-topics (is_sub_topic=True) like "Linear Regression" are the actual learnable units.
+    
+    When a user tries to enroll in a broad topic, the platform will suggest
+    individual sub-topics they can learn instead.
+    """
     CATEGORY_CHOICES = [
         ('web_dev', 'Web Development'),
         ('data_science', 'Data Science'),
@@ -154,6 +163,29 @@ class Course(models.Model):
     )
     thumbnail = models.URLField(blank=True, default='', help_text='URL to course thumbnail image')
     is_popular = models.BooleanField(default=False, db_index=True)
+    
+    # New fields for sub-topic structure
+    is_sub_topic = models.BooleanField(
+        default=True, 
+        help_text='True if this is a learnable sub-topic, False if broad topic category'
+    )
+    parent_topic_name = models.CharField(
+        max_length=255, 
+        blank=True, 
+        default='',
+        help_text='Name of the broad topic this sub-topic belongs to (e.g., "AI & Machine Learning")'
+    )
+    prerequisites = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='List of prerequisite sub-topic names or IDs'
+    )
+    learning_objectives = models.JSONField(
+        default=list,
+        blank=True,
+        help_text='List of specific learning objectives for this sub-topic'
+    )
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -156,7 +156,7 @@ class CourseViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['title', 'name', 'description', 'category']
-    filterset_fields = ['category', 'difficulty_level', 'is_popular']
+    filterset_fields = ['category', 'difficulty_level', 'is_popular', 'is_sub_topic']
     ordering_fields = ['created_at', 'title', 'category']
     
     @action(detail=False, methods=['get'])
@@ -165,6 +165,67 @@ class CourseViewSet(viewsets.ModelViewSet):
         popular_courses = self.queryset.filter(is_popular=True)
         serializer = self.get_serializer(popular_courses, many=True)
         return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def learnable_topics(self, request):
+        """Get all learnable sub-topics (courses where is_sub_topic=True)"""
+        sub_topics = self.queryset.filter(is_sub_topic=True)
+        serializer = self.get_serializer(sub_topics, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=True, methods=['get'])
+    def check_learnable(self, request, pk=None):
+        """
+        Check if a topic is learnable or if it's a broad topic.
+        If it's a broad topic, return suggested sub-topics to learn instead.
+        """
+        course = self.get_object()
+        
+        if not course.is_sub_topic:
+            # This is a broad topic - can't learn it directly
+            # Get all sub-topics for this broad topic
+            sub_topics = Course.objects.filter(
+                is_sub_topic=True,
+                parent_topic_name=course.title
+            )
+            
+            return Response({
+                'learnable': False,
+                'message': f"We can't teach you the entire '{course.title}' topic, but we offer individual sub-topics you can learn one at a time.",
+                'course': self.get_serializer(course).data,
+                'suggested_sub_topics': self.get_serializer(sub_topics, many=True).data,
+                'total_sub_topics': sub_topics.count()
+            })
+        else:
+            # This is a learnable sub-topic
+            return Response({
+                'learnable': True,
+                'message': f"You can learn '{course.title}' as an individual topic.",
+                'course': self.get_serializer(course).data,
+                'prerequisites': course.prerequisites,
+                'learning_objectives': course.learning_objectives
+            })
+    
+    @action(detail=True, methods=['get'])
+    def sub_topics(self, request, pk=None):
+        """Get all sub-topics for a broad topic"""
+        course = self.get_object()
+        
+        if course.is_sub_topic:
+            return Response({
+                'message': f"'{course.title}' is already a sub-topic, not a broad topic."
+            }, status=status.HTTP_400_BAD_REQUEST)
+        
+        sub_topics = Course.objects.filter(
+            is_sub_topic=True,
+            parent_topic_name=course.title
+        )
+        
+        return Response({
+            'broad_topic': self.get_serializer(course).data,
+            'sub_topics': self.get_serializer(sub_topics, many=True).data,
+            'total': sub_topics.count()
+        })
     
     @action(detail=True, methods=['get'])
     def modules(self, request, pk=None):
@@ -687,12 +748,12 @@ class InitialAssessmentView(APIView):
     
     def post(self, request):
         """
-        Generate initial assessment questions for a course.
+        Generate initial assessment questions for a sub-topic.
         
         Expected payload:
         {
             "course_id": 1,
-            "course_name": "Web Development"
+            "course_name": "Linear Regression"
         }
         
         Returns:
@@ -728,11 +789,25 @@ class InitialAssessmentView(APIView):
             # Verify course exists
             course = Course.objects.get(pk=course_id)
             
+            # Check if this is a learnable sub-topic
+            if not course.is_sub_topic:
+                # Get sub-topics for this broad topic
+                sub_topics = Course.objects.filter(
+                    is_sub_topic=True,
+                    parent_topic_name=course.title
+                )
+                return Response({
+                    'error': f"Cannot enroll in '{course.title}' directly.",
+                    'message': f"We can't teach you the entire '{course.title}' topic. Please choose from the individual sub-topics below.",
+                    'learnable': False,
+                    'suggested_sub_topics': CourseSerializer(sub_topics, many=True).data
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
             print("\n**************************************************")
             print("*** GenerateInitialAssessmentView: Calling assessment service ***")
             print(f"*** Course ID: {course_id}, Course Name: {course_name} ***")
             print("**************************************************")
-            # Generate MCQ
+            # Generate MCQ for this specific sub-topic
             assessment_service = get_assessment_service()
             mcq_data = assessment_service.generate_initial_mcq(course_name)
             print("*** GenerateInitialAssessmentView: SUCCESS ***")
@@ -802,6 +877,19 @@ class EvaluateAssessmentView(APIView):
             course = Course.objects.get(pk=course_id)
             user = request.user
             
+            # Check if this is a learnable sub-topic
+            if not course.is_sub_topic:
+                sub_topics = Course.objects.filter(
+                    is_sub_topic=True,
+                    parent_topic_name=course.title
+                )
+                return Response({
+                    'error': f"Cannot enroll in '{course.title}' directly.",
+                    'message': f"We can't teach you the entire '{course.title}' topic. Please choose from the individual sub-topics below.",
+                    'learnable': False,
+                    'suggested_sub_topics': CourseSerializer(sub_topics, many=True).data
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
             # Check if already enrolled
             existing_enrollment = Enrollment.objects.filter(
                 user=user,
@@ -810,7 +898,7 @@ class EvaluateAssessmentView(APIView):
             
             if existing_enrollment:
                 return Response(
-                    {'error': 'Already enrolled in this course'},
+                    {'error': 'Already enrolled in this sub-topic'},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
