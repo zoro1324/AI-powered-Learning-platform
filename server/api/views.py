@@ -1,4 +1,5 @@
 from rest_framework import status, viewsets, permissions
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.decorators import action
@@ -18,10 +19,11 @@ from .models import (
     VideoTask, LearningProfile, Course, Module, Lesson, Resource,
     Enrollment, Question, QuizAttempt, QuizAnswer, ModuleProgress,
     LearningRoadmap, Achievement, UserAchievement, ActivityLog,
-    PersonalizedSyllabus
+    PersonalizedSyllabus, CoursePlanningTask
 )
 from .serializers import (
     VideoTaskCreateSerializer, VideoTaskStatusSerializer,
+    CoursePlanningTaskSerializer,
     UserRegisterSerializer, UserSerializer, LearningProfileSerializer,
     CustomTokenObtainPairSerializer, CourseSerializer, ModuleSerializer,
     LessonSerializer, ResourceSerializer, EnrollmentSerializer,
@@ -156,7 +158,7 @@ class CourseViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['title', 'name', 'description', 'category']
-    filterset_fields = ['category', 'difficulty_level', 'is_popular', 'is_sub_topic']
+    filterset_fields = ['category', 'difficulty_level', 'is_popular', 'is_sub_topic', 'created_by']
     ordering_fields = ['created_at', 'title', 'category']
     
     @action(detail=False, methods=['get'])
@@ -164,6 +166,13 @@ class CourseViewSet(viewsets.ModelViewSet):
         """Get all popular courses"""
         popular_courses = self.queryset.filter(is_popular=True)
         serializer = self.get_serializer(popular_courses, many=True)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def my_created(self, request):
+        """Get courses created by the current user"""
+        created_courses = self.queryset.filter(created_by=request.user)
+        serializer = self.get_serializer(created_courses, many=True)
         return Response(serializer.data)
     
     @action(detail=False, methods=['get'])
@@ -739,16 +748,386 @@ class VideoTaskStatusView(APIView):
 
 
 # ============================================================================
+# COURSE PLANNING VIEWS
+# ============================================================================
+
+
+class CoursePlanningView(APIView):
+    """POST: Create a course planning task and run it in background thread."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = CoursePlanningTaskSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        planning_task = CoursePlanningTask.objects.create(
+            course_title=serializer.validated_data["course_title"],
+            course_description=serializer.validated_data["course_description"],
+            category=serializer.validated_data.get("category", "other"),
+            difficulty_level=serializer.validated_data.get("difficulty_level", "beginner"),
+            estimated_duration=serializer.validated_data.get("estimated_duration", 60),
+            thumbnail=serializer.validated_data.get("thumbnail", ""),
+        )
+
+        # Run course planning in a background thread
+        import threading
+        from api.models import CoursePlanningTask as CPT, Course
+        from api.services.course_planning_service import CoursePlanningService
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        
+        # Capture user_id for the background thread
+        user_id = request.user.id
+        
+        def run_course_planning():
+            try:
+                cpt = CPT.objects.get(pk=str(planning_task.id))
+                cpt.status = "processing"
+                cpt.progress_message = "Analyzing topic and generating course plan..."
+                cpt.save()
+                
+                logger.info(f"Starting course planning for: {cpt.course_title}")
+                
+                # Initialize the course planning service
+                service = CoursePlanningService()
+                
+                # Generate the course plan using LLM
+                course_plan = service.create_course_plan(
+                    course_title=cpt.course_title,
+                    course_description=cpt.course_description
+                )
+                
+                # Convert to dict for storage
+                plan_dict = service.plan_to_dict(course_plan)
+                cpt.result_data = plan_dict
+                cpt.progress_message = f"Course plan generated: {'Broad' if course_plan.is_broad else 'Narrow'} topic, {course_plan.total_courses} course(s)"
+                cpt.save()
+                
+                logger.info(f"Course plan generated: is_broad={course_plan.is_broad}, total_courses={course_plan.total_courses}")
+                
+                # Create Course records based on the plan
+                created_course_ids = []
+                
+                # Get the user who created this course
+                creator = User.objects.get(id=user_id)
+                
+                if course_plan.is_broad:
+                    # Broad topic: Create parent + children
+                    cpt.progress_message = "Creating parent course and sub-courses..."
+                    cpt.save()
+                    
+                    # Create parent course
+                    parent_course = Course.objects.create(
+                        title=cpt.course_title,
+                        name=cpt.course_title,
+                        description=cpt.course_description,
+                        category=cpt.category,
+                        difficulty_level=cpt.difficulty_level,
+                        estimated_duration=cpt.estimated_duration,
+                        thumbnail=cpt.thumbnail,
+                        is_sub_topic=False,
+                        parent_topic_name='',
+                        is_popular=True,
+                        created_by=creator,
+                        learning_objectives=[],
+                        prerequisites=[],
+                    )
+                    created_course_ids.append(str(parent_course.id))
+                    logger.info(f"Created parent course: {parent_course.title} (ID: {parent_course.id})")
+                    
+                    # Create child courses for each course in the plan
+                    difficulty_map = {
+                        'Beginner': 'beginner',
+                        'Intermediate': 'intermediate',
+                        'Advanced': 'advanced',
+                    }
+                    
+                    for idx, course_model in enumerate(course_plan.courses, 1):
+                        child_course = Course.objects.create(
+                            title=course_model.course_name,
+                            name=course_model.course_name,
+                            description=course_model.description,
+                            category=cpt.category,
+                            difficulty_level=difficulty_map.get(course_model.difficulty, 'beginner'),
+                            estimated_duration=cpt.estimated_duration,
+                            thumbnail=cpt.thumbnail,
+                            is_sub_topic=True,
+                            parent_topic_name=cpt.course_title,
+                            is_popular=True,
+                            created_by=creator,
+                            learning_objectives=[],
+                            prerequisites=course_model.prerequisites,
+                        )
+                        created_course_ids.append(str(child_course.id))
+                        logger.info(f"Created child course {idx}/{course_plan.total_courses}: {child_course.title} (ID: {child_course.id})")
+                
+                else:
+                    # Narrow topic: Create single course
+                    cpt.progress_message = "Creating single comprehensive course..."
+                    cpt.save()
+                    
+                    course_model = course_plan.courses[0]
+                    difficulty_map = {
+                        'Beginner': 'beginner',
+                        'Intermediate': 'intermediate',
+                        'Advanced': 'advanced',
+                    }
+                    
+                    single_course = Course.objects.create(
+                        title=course_model.course_name,
+                        name=course_model.course_name,
+                        description=course_model.description,
+                        category=cpt.category,
+                        difficulty_level=difficulty_map.get(course_model.difficulty, cpt.difficulty_level),
+                        estimated_duration=cpt.estimated_duration,
+                        thumbnail=cpt.thumbnail,
+                        is_sub_topic=False,
+                        parent_topic_name='',
+                        is_popular=True,
+                        created_by=creator,
+                        learning_objectives=[],
+                        prerequisites=[],
+                    )
+                    created_course_ids.append(str(single_course.id))
+                    logger.info(f"Created single course: {single_course.title} (ID: {single_course.id})")
+                
+                # Mark task as completed
+                cpt.status = "completed"
+                cpt.created_courses = created_course_ids
+                cpt.progress_message = f"Successfully created {len(created_course_ids)} course(s)"
+                cpt.completed_at = timezone.now()
+                cpt.save()
+                
+                logger.info(f"CoursePlanningTask {planning_task.id} completed successfully. Created {len(created_course_ids)} course(s).")
+                
+            except Exception as e:
+                logger.exception(f"CoursePlanningTask {planning_task.id} failed")
+                CPT.objects.filter(pk=str(planning_task.id)).update(
+                    status="failed",
+                    error_message=str(e),
+                    progress_message="Course planning failed.",
+                )
+        
+        # Start the background thread
+        thread = threading.Thread(target=run_course_planning, daemon=True)
+        thread.start()
+        logger.info(f"✅ Course planning task {planning_task.id} started in background thread")
+
+        return Response(
+            CoursePlanningTaskSerializer(planning_task).data,
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+
+class CoursePlanningStatusView(APIView):
+    """GET: Check the status of a course planning task."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, task_id):
+        try:
+            planning_task = CoursePlanningTask.objects.get(pk=task_id)
+        except CoursePlanningTask.DoesNotExist:
+            return Response(
+                {"detail": "Task not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(
+            CoursePlanningTaskSerializer(planning_task).data,
+        )
+
+
+# ============================================================================
+# ASSESSMENT & PERSONALIZED LEARNING VIEWS
+# ============================================================================
+
+    def post(self, request):
+        serializer = CoursePlanningTaskSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        planning_task = CoursePlanningTask.objects.create(
+            course_title=serializer.validated_data["course_title"],
+            course_description=serializer.validated_data["course_description"],
+            category=serializer.validated_data.get("category", "other"),
+            difficulty_level=serializer.validated_data.get("difficulty_level", "beginner"),
+            estimated_duration=serializer.validated_data.get("estimated_duration", 60),
+            thumbnail=serializer.validated_data.get("thumbnail", ""),
+        )
+
+        # Check if Celery is enabled in settings
+        use_celery = getattr(settings, 'USE_CELERY', True)
+        
+        if use_celery:
+            # Try async with Celery
+            try:
+                from api.tasks import generate_course_plan_task
+                generate_course_plan_task.delay(str(planning_task.id))
+                logger.info(f"✅ Course planning task queued asynchronously: {planning_task.id}")
+            except Exception as e:
+                logger.warning(f"⚠️ Celery failed ({e}), falling back to synchronous execution")
+                use_celery = False
+        
+        if not use_celery:
+            # Run synchronously (works without Celery/Redis)
+            logger.info(f"ℹ️ Running course planning synchronously")
+            try:
+                from api.tasks import generate_course_plan_task as task_func
+                
+                # Run in a separate thread to avoid blocking
+                import threading
+                def run_sync():
+                    try:
+                        # Execute the task logic directly
+                        from api.models import CoursePlanningTask as CPT, Course
+                        from api.services.course_planning_service import CoursePlanningService
+                        from django.utils import timezone
+                        
+                        try:
+                            cpt = CPT.objects.get(pk=str(planning_task.id))
+                        except CPT.DoesNotExist:
+                            logger.error(f"CoursePlanningTask {planning_task.id} not found")
+                            return
+                        
+                        cpt.status = "processing"
+                        cpt.progress_message = "Analyzing topic and generating course plan..."
+                        cpt.save()
+                        
+                        service = CoursePlanningService()
+                        course_plan = service.create_course_plan(
+                            course_title=cpt.course_title,
+                            course_description=cpt.course_description
+                        )
+                        
+                        plan_dict = service.plan_to_dict(course_plan)
+                        cpt.result_data = plan_dict
+                        cpt.progress_message = f"Course plan generated: {'Broad' if course_plan.is_broad else 'Narrow'} topic, {course_plan.total_courses} course(s)"
+                        cpt.save()
+                        
+                        created_course_ids = []
+                        
+                        if course_plan.is_broad:
+                            # Create parent + children
+                            parent_course = Course.objects.create(
+                                title=cpt.course_title,
+                                name=cpt.course_title,
+                                description=cpt.course_description,
+                                category=cpt.category,
+                                difficulty_level=cpt.difficulty_level,
+                                estimated_duration=cpt.estimated_duration,
+                                thumbnail=cpt.thumbnail,
+                                is_sub_topic=False,
+                                parent_topic_name=None,
+                                learning_objectives=[],
+                                prerequisites=[],
+                            )
+                            created_course_ids.append(str(parent_course.id))
+                            
+                            for course_model in course_plan.courses:
+                                difficulty_map = {
+                                    'Beginner': 'beginner',
+                                    'Intermediate': 'intermediate',
+                                    'Advanced': 'advanced',
+                                }
+                                
+                                child_course = Course.objects.create(
+                                    title=course_model.course_name,
+                                    name=course_model.course_name,
+                                    description=course_model.description,
+                                    category=cpt.category,
+                                    difficulty_level=difficulty_map.get(course_model.difficulty, 'beginner'),
+                                    estimated_duration=cpt.estimated_duration,
+                                    thumbnail=cpt.thumbnail,
+                                    is_sub_topic=True,
+                                    parent_topic_name=cpt.course_title,
+                                    learning_objectives=[],
+                                    prerequisites=course_model.prerequisites,
+                                )
+                                created_course_ids.append(str(child_course.id))
+                        else:
+                            # Create single course
+                            course_model = course_plan.courses[0]
+                            difficulty_map = {
+                                'Beginner': 'beginner',
+                                'Intermediate': 'intermediate',
+                                'Advanced': 'advanced',
+                            }
+                            
+                            single_course = Course.objects.create(
+                                title=course_model.course_name,
+                                name=course_model.course_name,
+                                description=course_model.description,
+                                category=cpt.category,
+                                difficulty_level=difficulty_map.get(course_model.difficulty, cpt.difficulty_level),
+                                estimated_duration=cpt.estimated_duration,
+                                thumbnail=cpt.thumbnail,
+                                is_sub_topic=False,
+                                parent_topic_name=None,
+                                learning_objectives=[],
+                                prerequisites=[],
+                            )
+                            created_course_ids.append(str(single_course.id))
+                        
+                        cpt.status = "completed"
+                        cpt.created_courses = created_course_ids
+                        cpt.progress_message = f"Successfully created {len(created_course_ids)} course(s)"
+                        cpt.completed_at = timezone.now()
+                        cpt.save()
+                        
+                        logger.info(f"CoursePlanningTask {planning_task.id} completed successfully")
+                    except Exception as e:
+                        logger.error(f"CoursePlanningTask {planning_task.id} failed: {e}")
+                        cpt.status = "failed"
+                        cpt.error_message = str(e)
+                        cpt.progress_message = "Course planning failed."
+                        cpt.save()
+                
+                thread = threading.Thread(target=run_sync, daemon=True)
+                thread.start()
+                logger.info(f"✅ Course planning task started in background thread")
+                
+            except Exception as sync_error:
+                logger.error(f"❌ Course planning failed to start: {sync_error}")
+                planning_task.status = "failed"
+                planning_task.error_message = str(sync_error)
+                planning_task.progress_message = f"Failed to start: {str(sync_error)}"
+                planning_task.save()
+
+        return Response(
+            CoursePlanningTaskSerializer(planning_task, context={"request": request}).data,
+            status=status.HTTP_202_ACCEPTED,
+        )
+
+
+class CoursePlanningStatusView(APIView):
+    """GET: Check the status of a course planning task."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, task_id):
+        try:
+            planning_task = CoursePlanningTask.objects.get(pk=task_id)
+        except CoursePlanningTask.DoesNotExist:
+            return Response(
+                {"detail": "Task not found."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(
+            CoursePlanningTaskSerializer(planning_task, context={"request": request}).data,
+        )
+
+
+# ============================================================================
 # ASSESSMENT & PERSONALIZED LEARNING VIEWS
 # ============================================================================
 
 class InitialAssessmentView(APIView):
-    """Generate initial diagnostic MCQ questions for course enrollment"""
+    """Generate initial diagnostic MCQ questions for course enrollment using pre-knowledge assessment"""
     permission_classes = [permissions.IsAuthenticated]
     
     def post(self, request):
         """
         Generate initial assessment questions for a sub-topic.
+        LLM determines the number of questions based on course complexity.
         
         Expected payload:
         {
@@ -758,23 +1137,27 @@ class InitialAssessmentView(APIView):
         
         Returns:
         {
+            "question_count": 8,
+            "question_count_reasoning": "...",
             "questions": [
                 {
-                    "question": "...",
-                    "options": [...],
-                    "correct_answer": "..." or null
+                    "question_text": "...",
+                    "topic": "...",
+                    "options": [option1, option2, option3, "I don't know about this course"],
+                    "correct_answer_index": 0-2,
+                    "explanation": "...",
+                    "difficulty_hint": "Beginner"
                 }
             ]
         }
         """
-        print("\n" + "="*60)
-        print("!!! InitialAssessmentView.post() ENTERED !!!")
-        print(f"!!! Request method: {request.method}")
-        print(f"!!! Request user: {request.user}")
-        print(f"!!! Request data: {request.data}")
-        print("="*60 + "\n")
+        logger.info("="*60)
+        logger.info("InitialAssessmentView.post() ENTERED")
+        logger.info(f"Request user: {request.user}")
+        logger.info(f"Request data: {request.data}")
+        logger.info("="*60)
         
-        from .services.assessment_service import get_assessment_service
+        from .services.pre_assessment_service import PreKnowledgeAssessment
         
         course_id = request.data.get('course_id')
         course_name = request.data.get('course_name')
@@ -803,19 +1186,44 @@ class InitialAssessmentView(APIView):
                     'suggested_sub_topics': CourseSerializer(sub_topics, many=True).data
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            print("\n**************************************************")
-            print("*** GenerateInitialAssessmentView: Calling assessment service ***")
-            print(f"*** Course ID: {course_id}, Course Name: {course_name} ***")
-            print("**************************************************")
-            # Generate MCQ for this specific sub-topic
-            assessment_service = get_assessment_service()
-            mcq_data = assessment_service.generate_initial_mcq(course_name)
-            print("*** GenerateInitialAssessmentView: SUCCESS ***")
-            print("**************************************************\n")
+            logger.info("="*60)
+            logger.info("InitialAssessmentView: Calling PreKnowledgeAssessment service")
+            logger.info(f"Course ID: {course_id}, Course Name: {course_name}")
+            logger.info("="*60)
             
-            # Store the MCQ temporarily in session or return directly
-            # For simplicity, we'll return directly
-            return Response(mcq_data, status=status.HTTP_200_OK)
+            # Initialize pre-knowledge assessment service
+            assessment_service = PreKnowledgeAssessment()
+            
+            # Step 1: Let LLM determine optimal question count based on complexity
+            question_decision = assessment_service.determine_question_count(
+                course_name=course.name,
+                course_description=course.description,
+                difficulty=course.difficulty_level
+            )
+            
+            question_count = question_decision['question_count']
+            logger.info(f"LLM determined question count: {question_count}")
+            logger.info(f"Reasoning: {question_decision['reasoning']}")
+            
+            # Step 2: Generate the questions
+            question_set = assessment_service.generate_questions(
+                course_name=course.name,
+                course_description=course.description,
+                difficulty=course.difficulty_level,
+                num_questions=question_count
+            )
+            
+            logger.info(f"Generated {len(question_set.questions)} questions successfully")
+            logger.info("="*60)
+            
+            # Convert to dict for JSON response
+            response_data = {
+                'question_count': question_count,
+                'question_count_reasoning': question_decision['reasoning'],
+                'questions': [q.model_dump() for q in question_set.questions]
+            }
+            
+            return Response(response_data, status=status.HTTP_200_OK)
             
         except Course.DoesNotExist:
             return Response(
@@ -831,45 +1239,74 @@ class InitialAssessmentView(APIView):
 
 
 class EvaluateAssessmentView(APIView):
-    """Evaluate initial assessment and generate personalized roadmap"""
+    """Evaluate initial assessment and generate personalized syllabus with two-layer validation"""
     permission_classes = [permissions.IsAuthenticated]
     
     def post(self, request):
         """
-        Evaluate assessment answers and create enrollment with personalized roadmap.
+        Evaluate assessment answers and create enrollment with personalized syllabus.
         
         Expected payload:
         {
             "course_id": 1,
             "course_name": "Web Development",
-            "questions": [...],
-            "answers": ["Reading", "Beginner", "Option A", "Option B", "Option C"]
+            "questions": [...],  # Full question objects with correct_answer_index and topic
+            "answers": [0, 2, 3, 1, ...],  # User's answer indices (0-3, where 3 is "I don't know")
+            "study_method": "real_world" | "theory_depth" | "project_based" | "custom",
+            "custom_study_method": "..." (required if study_method is "custom")
         }
         
         Returns:
         {
             "enrollment_id": 1,
-            "evaluation": {
-                "study_method": "Reading",
-                "knowledge_level": "Beginner",
-                "score": "2/3",
-                "weak_areas": [...]
+            "assessment_result": {
+                "knowledge_level": "Basic",
+                "knowledge_percentage": 45.5,
+                "correct_answers": 3,
+                "incorrect_answers": 2,
+                "dont_know_answers": 3,
+                "known_topics": [...],
+                "weak_topics": [...],
+                "unknown_topics": [...]
             },
-            "roadmap": {
-                "topics": [...]
-            }
+            "syllabus": {
+                "course_name": "...",
+                "study_method": "...",
+                "total_modules": 5,
+                "total_estimated_hours": 12.5,
+                "modules": [...]
+            },
+            "message": "..."
         }
         """
-        from .services.assessment_service import get_assessment_service
+        from .services.pre_assessment_service import PreKnowledgeAssessment
+        from .services.syllabus_service import SyllabusGenerator
         
         course_id = request.data.get('course_id')
         course_name = request.data.get('course_name')
         questions = request.data.get('questions')
         answers = request.data.get('answers')
+        study_method = request.data.get('study_method', 'real_world')
+        custom_study_method = request.data.get('custom_study_method', '')
         
         if not all([course_id, course_name, questions, answers]):
             return Response(
                 {'error': 'course_id, course_name, questions, and answers are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate study_method
+        valid_study_methods = ['real_world', 'theory_depth', 'project_based', 'custom']
+        if study_method not in valid_study_methods:
+            return Response(
+                {'error': f'study_method must be one of: {", ".join(valid_study_methods)}'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Validate custom_study_method if needed
+        if study_method == 'custom' and not custom_study_method:
+            return Response(
+                {'error': 'custom_study_method is required when study_method is "custom"'},
                 status=status.HTTP_400_BAD_REQUEST
             )
         
@@ -902,66 +1339,89 @@ class EvaluateAssessmentView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Evaluate assessment
-            print("\n**************************************************")
-            print("*** EvaluateAssessmentView: Calling assessment service ***")
-            print(f"*** Course ID: {course_id}, Course Name: {course_name} ***")
-            print(f"*** Number of questions: {len(questions)}, Number of answers: {len(answers)} ***")
-            print("**************************************************")
-            assessment_service = get_assessment_service()
-            mcq_data = {'questions': questions}
-            evaluation = assessment_service.evaluate_initial_assessment(mcq_data, answers)
-            print(f"*** Evaluation result: {evaluation} ***")
+            logger.info("="*60)
+            logger.info("EvaluateAssessmentView: Evaluating assessment")
+            logger.info(f"Course: {course_name}")
+            logger.info(f"Questions: {len(questions)}, Answers: {len(answers)}")
+            logger.info(f"Study method: {study_method}")
+            logger.info("="*60)
             
-            # Generate personalized syllabus
-            print("*** Generating personalized syllabus ***")
-            syllabus_data = assessment_service.generate_personalized_syllabus(course_name, evaluation)
-            print(f"*** Syllabus generated with {syllabus_data.get('total_modules', 0)} modules ***")
-            
-            # Also generate a flat roadmap for backward compatibility
-            roadmap_data = {
-                "topics": [
-                    {
-                        "topic_name": mod.get("module_name", ""),
-                        "level": mod.get("difficulty_level", "beginner"),
-                        "description": mod.get("description", ""),
-                    }
-                    for mod in syllabus_data.get("modules", [])
-                ]
-            }
-            print("**************************************************\n")
-            
-            # Map knowledge level to KnowledgeLevel enum
-            knowledge_level_map = {
-                'beginner': 'beginner',
-                'intermediate': 'intermediate',
-                'advanced': 'advanced',
-            }
-            diagnosed_level = knowledge_level_map.get(
-                evaluation.get('knowledge_level', '').lower(),
-                'beginner'
+            # Step 1: Evaluate assessment locally
+            assessment_service = PreKnowledgeAssessment()
+            assessment_result = assessment_service.evaluate_assessment(
+                questions=questions,
+                user_answers=answers
             )
             
-            # Determine learning style based on knowledge level (since we no longer ask directly)
-            # Beginners often prefer videos, Intermediate prefer summaries, Advanced prefer mindmaps
+            logger.info(f"Assessment Result: {assessment_result.knowledge_level} ({assessment_result.knowledge_percentage:.1f}%)")
+            logger.info(f"Known topics: {len(assessment_result.known_topics)}, Weak: {len(assessment_result.weak_topics)}, Unknown: {len(assessment_result.unknown_topics)}")
+            
+            # Step 2: Generate personalized syllabus with two-layer validation
+            logger.info("Generating personalized syllabus with two-layer validation...")
+            syllabus_generator = SyllabusGenerator()
+            
+            # Convert assessment result to dict for syllabus generation
+            assessment_result_dict = assessment_service.result_to_dict(assessment_result)
+            
+            syllabus, attempt_history = syllabus_generator.generate_syllabus(
+                course_name=course.name,
+                course_description=course.description,
+                difficulty=course.difficulty_level,
+                study_method=study_method,
+                custom_study_method=custom_study_method,
+                assessment_result=assessment_result_dict,
+                max_attempts=3
+            )
+            
+            logger.info(f"Syllabus generated: {syllabus.total_modules} modules, {syllabus.total_estimated_hours:.1f} hrs")
+            logger.info(f"Generation attempts: {len(attempt_history)}")
+            
+            # Convert syllabus to dict for storage
+            syllabus_dict = syllabus_generator.syllabus_to_dict(syllabus)
+            
+            # Map knowledge level to Enrollment.KnowledgeLevel choices
+            knowledge_level_map = {
+                'None': 'beginner',
+                'Basic': 'beginner',
+                'Intermediate': 'intermediate',
+                'Advanced': 'advanced',
+            }
+            diagnosed_level = knowledge_level_map.get(assessment_result.knowledge_level, 'beginner')
+            
+            # Determine learning style based on knowledge level
             level_to_style = {
                 'beginner': 'videos',
                 'intermediate': 'summary',
                 'advanced': 'mindmap',
-                'expert': 'mindmap',
             }
             learning_style = level_to_style.get(diagnosed_level, 'summary')
             
-            # Create enrollment
+            # Create enrollment with new fields
             enrollment = Enrollment.objects.create(
                 user=user,
                 course=course,
                 diagnosed_level=diagnosed_level,
                 learning_style_override=learning_style,
+                study_method_preference=study_method,
+                custom_study_method=custom_study_method,
+                assessment_questions_count=len(questions),
                 status='active'
             )
             
-            # Create learning roadmap (backward compatibility)
+            logger.info(f"Enrollment created: ID={enrollment.id}")
+            
+            # Create backward-compatible flat roadmap
+            roadmap_data = {
+                "topics": [
+                    {
+                        "topic_name": mod.get("module_name", ""),
+                        "level": diagnosed_level,
+                        "description": mod.get("module_description", ""),
+                    }
+                    for mod in syllabus_dict.get("modules", [])
+                ]
+            }
+            
             roadmap = LearningRoadmap.objects.create(
                 enrollment=enrollment,
                 roadmap_data=roadmap_data,
@@ -969,30 +1429,67 @@ class EvaluateAssessmentView(APIView):
                 version=1
             )
             
-            # Create personalized syllabus (new: per-user structured course)
+            # Create personalized syllabus with new structure
             personalized_syllabus = PersonalizedSyllabus.objects.create(
                 enrollment=enrollment,
-                syllabus_data=syllabus_data,
-                generated_by_model='phi3:mini'
+                syllabus_data=syllabus_dict,
+                generated_by_model=getattr(settings, 'OLLAMA_MODEL', 'llama3:8b')
             )
-            print(f"*** PersonalizedSyllabus #{personalized_syllabus.id} created ***")
+            
+            logger.info(f"PersonalizedSyllabus created: ID={personalized_syllabus.id}")
+            
+            # Store topic breakdown in QuizAttempt for analytics
+            quiz_attempt = QuizAttempt.objects.create(
+                enrollment=enrollment,
+                attempt_type='diagnostic',
+                score_percent=assessment_result.knowledge_percentage,
+                correct_answers=assessment_result.correct_answers,
+                total_questions=assessment_result.total_questions,
+                weak_areas={
+                    'known_topics': assessment_result.known_topics,
+                    'weak_topics': assessment_result.weak_topics,
+                    'unknown_topics': assessment_result.unknown_topics,
+                    'knowledge_level': assessment_result.knowledge_level
+                }
+            )
             
             # Log activity
             ActivityLog.objects.create(
                 user=user,
                 activity_type='course_started',
                 title=f'Started {course.title}',
-                description=f'Completed diagnostic assessment for {course.title}',
-                metadata={'course_id': course.id, 'evaluation': evaluation}
+                description=f'Completed pre-knowledge assessment for {course.title}',
+                metadata={
+                    'course_id': course.id,
+                    'knowledge_level': assessment_result.knowledge_level,
+                    'knowledge_percentage': assessment_result.knowledge_percentage,
+                    'study_method': study_method
+                }
             )
+            
+            logger.info("="*60)
+            logger.info("EvaluateAssessmentView: Complete!")
+            logger.info("="*60)
             
             return Response({
                 'enrollment_id': enrollment.id,
-                'evaluation': evaluation,
-                'roadmap': roadmap_data,
-                'syllabus': syllabus_data,
+                'assessment_result': assessment_result_dict,
+                'syllabus': syllabus_dict,
+                'roadmap': roadmap_data,  # Backward compatibility
                 'message': 'Enrollment created successfully with personalized syllabus'
             }, status=status.HTTP_201_CREATED)
+            
+        except Course.DoesNotExist:
+            return Response(
+                {'error': 'Course not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error in EvaluateAssessmentView: {str(e)}", exc_info=True)
+            return Response(
+                {'error': f'Failed to process assessment: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
             
         except Course.DoesNotExist:
             return Response(
