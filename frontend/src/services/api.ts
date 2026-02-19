@@ -461,12 +461,17 @@ export const videoAPI = {
 
 export interface AssessmentQuestion {
   id?: number;
-  question: string;
-  options: string[];
-  correct_answer?: string | null;
+  question_text: string;  // Updated to match backend
+  topic: string;  // New field for topic tracking
+  options: string[];  // Array of 4 options, last is "I don't know"
+  correct_answer_index: number;  // Index of correct answer (0-2)
+  explanation: string;  // Explanation of correct answer
+  difficulty_hint: string;  // Beginner/Intermediate/Advanced
 }
 
 export interface InitialAssessmentResponse {
+  question_count: number;  // LLM-determined count (5-15)
+  question_count_reasoning: string;  // Why this count was chosen
   questions: AssessmentQuestion[];
 }
 
@@ -510,8 +515,18 @@ export interface Syllabus {
 
 export interface EnrollmentResponse {
   enrollment_id: number;
-  evaluation: EvaluationResult;
-  roadmap: Roadmap;
+  assessment_result: {  // Updated from 'evaluation'
+    knowledge_level: string;  // None/Basic/Intermediate/Advanced
+    knowledge_percentage: number;
+    correct_answers: number;
+    incorrect_answers: number;
+    dont_know_answers: number;
+    total_questions: number;
+    known_topics: string[];
+    weak_topics: string[];
+    unknown_topics: string[];
+  };
+  roadmap: Roadmap;  // Kept for backward compatibility
   syllabus: Syllabus;
   message: string;
 }
@@ -574,7 +589,9 @@ export const assessmentAPI = {
     course_id: number;
     course_name: string;
     questions: AssessmentQuestion[];
-    answers: string[];
+    answers: number[];  // Changed to number[] (indices 0-3)
+    study_method: 'real_world' | 'theory_depth' | 'project_based' | 'custom';
+    custom_study_method?: string;  // Required when study_method is 'custom'
   }): Promise<EnrollmentResponse> => {
     const response = await api.post<EnrollmentResponse>(
       '/assessment/evaluate/',

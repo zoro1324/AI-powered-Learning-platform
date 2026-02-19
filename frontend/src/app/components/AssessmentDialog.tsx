@@ -10,7 +10,8 @@ import { Button } from './ui/button';
 import { Card, CardContent } from './ui/card';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Label } from './ui/label';
-import { Loader2, CheckCircle, Brain, Sparkles } from 'lucide-react';
+import { Input } from './ui/input';
+import { Loader2, CheckCircle, Brain, Sparkles, Target } from 'lucide-react';
 import { assessmentAPI, AssessmentQuestion, Syllabus } from '../../services/api';
 import { useAppDispatch } from '../../store';
 import { setSyllabusFromEvaluation } from '../../store/slices/syllabusSlice';
@@ -23,7 +24,8 @@ interface AssessmentDialogProps {
   onEnrollmentComplete: (enrollmentId: number) => void;
 }
 
-type AssessmentStep = 'loading' | 'questions' | 'submitting' | 'complete';
+type AssessmentStep = 'loading' | 'study-method' | 'questions' | 'submitting' | 'complete';
+type StudyMethod = 'real_world' | 'theory_depth' | 'project_based' | 'custom';
 
 export default function AssessmentDialog({
   open,
@@ -34,8 +36,10 @@ export default function AssessmentDialog({
 }: AssessmentDialogProps) {
   const dispatch = useAppDispatch();
   const [step, setStep] = useState<AssessmentStep>('loading');
+  const [studyMethod, setStudyMethod] = useState<StudyMethod>('real_world');
+  const [customStudyMethod, setCustomStudyMethod] = useState<string>('');
   const [questions, setQuestions] = useState<AssessmentQuestion[]>([]);
-  const [answers, setAnswers] = useState<{ [key: number]: string }>({});
+  const [answers, setAnswers] = useState<{ [key: number]: number }>({});  // Changed to store indices
   const [evaluation, setEvaluation] = useState<any>(null);
   const [syllabus, setSyllabus] = useState<Syllabus | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -65,12 +69,12 @@ export default function AssessmentDialog({
       }
       
       setQuestions(validatedQuestions);
-      setStep('questions');
+      setStep('study-method');  // First show study method selection
     } catch (err: any) {
       console.error('🔴 Error loading assessment:', err);
       console.error('🔴 Error details:', err.response?.data);
       setError(err.response?.data?.error || 'Failed to load assessment');
-      setStep('questions'); // Allow retry
+      setStep('study-method');
     }
   };
 
@@ -84,6 +88,8 @@ export default function AssessmentDialog({
       // Dialog is closing - reset state
       console.log('🟡 Dialog is closing, resetting state...');
       setStep('loading');
+      setStudyMethod('real_world');
+      setCustomStudyMethod('');
       setQuestions([]);
       setAnswers({});
       setEvaluation(null);
@@ -98,8 +104,8 @@ export default function AssessmentDialog({
     onOpenChange(newOpen);
   };
 
-  const handleAnswerChange = (questionIndex: number, answer: string) => {
-    setAnswers({ ...answers, [questionIndex]: answer });
+  const handleAnswerChange = (questionIndex: number, optionIndex: number) => {
+    setAnswers({ ...answers, [questionIndex]: optionIndex });
   };
 
   const handleSubmit = async () => {
@@ -107,17 +113,19 @@ export default function AssessmentDialog({
       setStep('submitting');
       setError(null);
 
-      // Convert answers object to array
-      const answersArray = questions.map((_, index) => answers[index] || '');
+      // Convert answers object to array of indices
+      const answersArray = questions.map((_, index) => answers[index] ?? 3);  // Default to "I don't know" if not answered
 
       const response = await assessmentAPI.evaluateAssessment({
         course_id: courseId,
         course_name: courseName,
         questions: questions,
         answers: answersArray,
+        study_method: studyMethod,
+        custom_study_method: studyMethod === 'custom' ? customStudyMethod : '',
       });
 
-      setEvaluation(response.evaluation);
+      setEvaluation(response.assessment_result);
       setSyllabus(response.syllabus);
       setStep('complete');
 
@@ -143,7 +151,7 @@ export default function AssessmentDialog({
   };
 
   const allQuestionsAnswered = questions.length > 0 && 
-    questions.every((_, index) => answers[index] !== undefined && answers[index] !== '');
+    questions.every((_, index) => answers[index] !== undefined);
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -153,6 +161,107 @@ export default function AssessmentDialog({
             <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
             <p className="text-gray-600">Generating personalized assessment...</p>
           </div>
+        )}
+
+        {step === 'study-method' && (
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-2xl">
+                <Target className="w-6 h-6 text-blue-600" />
+                Choose Your Learning Style
+              </DialogTitle>
+              <DialogDescription>
+                Select how you'd like to approach learning{' '}
+                <span className="font-semibold">{courseName}</span>.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-4 py-6">
+              <RadioGroup value={studyMethod} onValueChange={(value) => setStudyMethod(value as StudyMethod)}>
+                <Card className={`cursor-pointer transition-all ${studyMethod === 'real_world' ? 'border-blue-500 border-2' : 'border'}`}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-start space-x-3">
+                      <RadioGroupItem value="real_world" id="real_world" />
+                      <div className="flex-1">
+                        <Label htmlFor="real_world" className="cursor-pointer font-semibold text-base">
+                          Real-World Examples
+                        </Label>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Learn through practical applications and real-world scenarios
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className={`cursor-pointer transition-all ${studyMethod === 'theory_depth' ? 'border-blue-500 border-2' : 'border'}`}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-start space-x-3">
+                      <RadioGroupItem value="theory_depth" id="theory_depth" />
+                      <div className="flex-1">
+                        <Label htmlFor="theory_depth" className="cursor-pointer font-semibold text-base">
+                          Theory Depth
+                        </Label>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Deep dive into concepts, principles, and theoretical foundations
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className={`cursor-pointer transition-all ${studyMethod === 'project_based' ? 'border-blue-500 border-2' : 'border'}`}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-start space-x-3">
+                      <RadioGroupItem value="project_based" id="project_based" />
+                      <div className="flex-1">
+                        <Label htmlFor="project_based" className="cursor-pointer font-semibold text-base">
+                          Project-Based Learning
+                        </Label>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Build hands-on projects while learning new concepts
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className={`cursor-pointer transition-all ${studyMethod === 'custom' ? 'border-blue-500 border-2' : 'border'}`}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-start space-x-3">
+                      <RadioGroupItem value="custom" id="custom" />
+                      <div className="flex-1">
+                        <Label htmlFor="custom" className="cursor-pointer font-semibold text-base">
+                          Custom Approach
+                        </Label>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Describe your preferred learning style
+                        </p>
+                        {studyMethod === 'custom' && (
+                          <Input
+                            placeholder="e.g., Focus on accessibility and responsive design patterns"
+                            className="mt-3"
+                            value={customStudyMethod}
+                            onChange={(e) => setCustomStudyMethod(e.target.value)}
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </RadioGroup>
+            </div>
+
+            <div className="flex justify-end pt-4 border-t">
+              <Button
+                onClick={() => setStep('questions')}
+                disabled={studyMethod === 'custom' && !customStudyMethod.trim()}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6"
+              >
+                Continue to Assessment
+              </Button>
+            </div>
+          </>
         )}
 
         {step === 'questions' && (
@@ -188,19 +297,16 @@ export default function AssessmentDialog({
                   <CardContent className="pt-6">
                     <div className="mb-4">
                       <Label className="text-base font-semibold text-gray-900">
-                        {index + 1}. {question.question}
+                        {index + 1}. {question.question_text}
                       </Label>
-                      {index < 2 && (
-                        <p className="text-xs text-gray-500 mt-1">
-                          {index === 0 ? 'This helps us deliver content in your preferred format' : 
-                           'This helps us set the right difficulty level'}
-                        </p>
-                      )}
+                      <p className="text-xs text-gray-500 mt-1">
+                        Topic: {question.topic}
+                      </p>
                     </div>
 
                     <RadioGroup
-                      value={answers[index]}
-                      onValueChange={(value) => handleAnswerChange(index, value)}
+                      value={answers[index]?.toString()}
+                      onValueChange={(value) => handleAnswerChange(index, parseInt(value))}
                     >
                       <div className="space-y-3">
                         {(question.options || []).map((option, optionIndex) => (
@@ -208,7 +314,7 @@ export default function AssessmentDialog({
                             key={optionIndex} 
                             className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
                           >
-                            <RadioGroupItem value={option} id={`q${index}-opt${optionIndex}`} />
+                            <RadioGroupItem value={optionIndex.toString()} id={`q${index}-opt${optionIndex}`} />
                             <Label 
                               htmlFor={`q${index}-opt${optionIndex}`}
                               className="cursor-pointer flex-1"
@@ -277,15 +383,57 @@ export default function AssessmentDialog({
                       </p>
                     </div>
                     <div>
-                      <p className="text-sm text-gray-600">Assessment Score</p>
-                      <p className="font-semibold text-gray-900">{evaluation.score}</p>
+                      <p className="text-sm text-gray-600">Knowledge Score</p>
+                      <p className="font-semibold text-gray-900">
+                        {evaluation.knowledge_percentage?.toFixed(1)}%
+                      </p>
                     </div>
-                    {evaluation.weak_areas && evaluation.weak_areas.length > 0 && (
+                    <div>
+                      <p className="text-sm text-gray-600">Correct Answers</p>
+                      <p className="font-semibold text-green-600">
+                        {evaluation.correct_answers} / {evaluation.total_questions}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-600">Learning Style</p>
+                      <p className="font-semibold text-gray-900 capitalize">
+                        {studyMethod.replace('_', ' ')}
+                      </p>
+                    </div>
+                    {evaluation.known_topics && evaluation.known_topics.length > 0 && (
                       <div className="col-span-2">
-                        <p className="text-sm text-gray-600">Focus Areas</p>
-                        <p className="font-semibold text-gray-900">
-                          {evaluation.weak_areas.join(', ')}
-                        </p>
+                        <p className="text-sm text-gray-600 mb-1">Strong Topics</p>
+                        <div className="flex flex-wrap gap-1">
+                          {evaluation.known_topics.map((topic: string, idx: number) => (
+                            <span key={idx} className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                              {topic}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {evaluation.weak_topics && evaluation.weak_topics.length > 0 && (
+                      <div className="col-span-2">
+                        <p className="text-sm text-gray-600 mb-1">Focus Areas</p>
+                        <div className="flex flex-wrap gap-1">
+                          {evaluation.weak_topics.map((topic: string, idx: number) => (
+                            <span key={idx} className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">
+                              {topic}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {evaluation.unknown_topics && evaluation.unknown_topics.length > 0 && (
+                      <div className="col-span-2">
+                        <p className="text-sm text-gray-600 mb-1">New Topics to Learn</p>
+                        <div className="flex flex-wrap gap-1">
+                          {evaluation.unknown_topics.map((topic: string, idx: number) => (
+                            <span key={idx} className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                              {topic}
+                            </span>
+                          ))}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -297,42 +445,30 @@ export default function AssessmentDialog({
                 <CardContent className="pt-6">
                   <h3 className="font-semibold text-lg mb-1">Your Personalized Syllabus</h3>
                   <p className="text-sm text-gray-500 mb-4">
-                    {syllabus.total_modules} modules tailored to your level
+                    {syllabus.total_modules} modules • {syllabus.total_estimated_hours?.toFixed(1)} hours
                   </p>
                   <div className="space-y-4">
-                    {syllabus.modules.map((mod, modIndex) => (
+                    {syllabus.modules.slice(0, 3).map((mod: any, modIndex: number) => (
                       <div key={modIndex} className="border rounded-lg overflow-hidden">
                         {/* Module header */}
                         <div className="flex items-center gap-3 p-3 bg-gray-50">
                           <div className="flex-shrink-0 w-8 h-8 bg-blue-600 text-white rounded-full flex items-center justify-center font-semibold text-sm">
-                            {mod.order}
+                            {modIndex + 1}
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-gray-900 truncate">{mod.module_name}</p>
-                            <div className="flex items-center gap-2 text-xs text-gray-500">
-                              <span className="capitalize">{mod.difficulty_level}</span>
-                              {mod.estimated_duration_minutes && (
-                                <>
-                                  <span>&middot;</span>
-                                  <span>{mod.estimated_duration_minutes} min</span>
-                                </>
-                              )}
-                            </div>
+                            <p className="font-medium text-gray-900">{mod.module_name}</p>
+                            <p className="text-xs text-gray-500">
+                              {mod.estimated_hours} hours • {mod.topics?.length || 0} topics
+                            </p>
                           </div>
-                        </div>
-                        {/* Topics */}
-                        <div className="divide-y">
-                          {mod.topics.map((topic, topicIndex) => (
-                            <div key={topicIndex} className="px-4 py-2 pl-14 text-sm">
-                              <p className="font-medium text-gray-800">{topic.topic_name}</p>
-                              {topic.description && (
-                                <p className="text-gray-500 text-xs">{topic.description}</p>
-                              )}
-                            </div>
-                          ))}
                         </div>
                       </div>
                     ))}
+                    {syllabus.total_modules > 3 && (
+                      <p className="text-sm text-gray-500 text-center">
+                        + {syllabus.total_modules - 3} more modules
+                      </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
