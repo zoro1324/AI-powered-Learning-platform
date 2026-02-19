@@ -220,3 +220,30 @@ export interface PaginatedResponse<T> {
   previous: string | null;
   results: T[];
 }
+
+// Course Planning Task
+export interface CoursePlanningTask {
+  id: string;
+  course_title: string;
+  course_description: string;
+  category: Course['category'];
+  difficulty_level: Course['difficulty_level'];
+  estimated_duration: number;
+  thumbnail: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  progress_message: string;
+  result_data: {
+    is_broad: boolean;
+    total_courses: number;
+    courses: Array<{
+      course_name: string;
+      description: string;
+      difficulty: string;
+      prerequisites: string[];
+    }>;
+  } | null;
+  created_courses: string[] | null;
+  error_message: string;
+  created_at: string;
+  completed_at: string | null;
+}

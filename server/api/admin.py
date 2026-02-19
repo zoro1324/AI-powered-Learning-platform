@@ -5,6 +5,7 @@ from .models import (
     Achievement,
     ActivityLog,
     Course,
+    CoursePlanningTask,
     Enrollment,
     Lesson,
     LearningProfile,
@@ -137,3 +138,11 @@ class VideoTaskAdmin(admin.ModelAdmin):
     list_filter = ('status',)
     search_fields = ('topic',)
     readonly_fields = ('id',)
+
+
+@admin.register(CoursePlanningTask)
+class CoursePlanningTaskAdmin(admin.ModelAdmin):
+    list_display = ('course_title', 'status', 'category', 'difficulty_level', 'created_at', 'completed_at')
+    list_filter = ('status', 'category', 'difficulty_level')
+    search_fields = ('course_title', 'course_description')
+    readonly_fields = ('id', 'created_at')
