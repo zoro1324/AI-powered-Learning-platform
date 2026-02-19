@@ -8,30 +8,42 @@ import {
   TrendingUp,
   Calendar,
   Loader2,
-  AlertCircle
+  AlertCircle,
+  PlusCircle
 } from 'lucide-react';
 import { Sidebar } from '../components/Sidebar';
-import { enrollmentAPI } from '../../services/api';
-import type { Enrollment } from '../../types/api';
+import { enrollmentAPI, courseAPI } from '../../services/api';
+import type { Enrollment, Course } from '../../types/api';
+
+type TabType = 'enrolled' | 'created';
 
 export default function MyCoursesPage() {
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<TabType>('enrolled');
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [createdCourses, setCreatedCourses] = useState<Course[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadEnrollments();
+    loadData();
   }, []);
 
-  const loadEnrollments = async () => {
+  const loadData = async () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await enrollmentAPI.list();
-      setEnrollments(response.results || []);
+      
+      // Load both enrolled courses and created courses
+      const [enrollmentsRes, createdRes] = await Promise.all([
+        enrollmentAPI.list(),
+        courseAPI.getMyCreated()
+      ]);
+      
+      setEnrollments(enrollmentsRes.results || []);
+      setCreatedCourses(createdRes || []);
     } catch (err: any) {
-      console.error('Failed to load enrollments:', err);
+      console.error('Failed to load courses:', err);
       setError(err.response?.data?.error || 'Failed to load your courses');
     } finally {
       setLoading(false);
@@ -72,7 +84,35 @@ export default function MyCoursesPage() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">My Courses</h1>
-          <p className="text-gray-600">Continue your learning journey</p>
+          <p className="text-gray-600">Continue your learning journey and manage your created courses</p>
+        </div>
+
+        {/* Tabs */}
+        <div className="mb-6 border-b border-gray-200">
+          <nav className="flex gap-8">
+            <button
+              onClick={() => setActiveTab('enrolled')}
+              className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'enrolled'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <PlayCircle className="w-4 h-4 inline mr-2" />
+              Enrolled Courses ({enrollments.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('created')}
+              className={`pb-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'created'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              <PlusCircle className="w-4 h-4 inline mr-2" />
+              Created Courses ({createdCourses.length})
+            </button>
+          </nav>
         </div>
 
         {/* Loading State */}
@@ -90,7 +130,7 @@ export default function MyCoursesPage() {
               <h3 className="font-semibold text-red-900 mb-1">Failed to load courses</h3>
               <p className="text-sm text-red-700">{error}</p>
               <button
-                onClick={loadEnrollments}
+                onClick={loadData}
                 className="mt-3 text-sm font-medium text-red-700 hover:text-red-800 underline"
               >
                 Try again
@@ -99,27 +139,26 @@ export default function MyCoursesPage() {
           </div>
         )}
 
-        {/* Empty State */}
-        {!loading && !error && enrollments.length === 0 && (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <BookOpen className="w-8 h-8 text-gray-400" />
-            </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No courses yet</h3>
-            <p className="text-gray-600 mb-6">Start your learning journey by enrolling in a course</p>
-            <button
-              onClick={() => navigate('/courses/popular')}
-              className="px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors"
-            >
-              Browse Popular Courses
-            </button>
-          </div>
-        )}
-
-        {/* Courses Grid */}
-        {!loading && !error && enrollments.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {enrollments.map((enrollment) => (
+        {/* Enrolled Courses Tab */}
+        {!loading && !error && activeTab === 'enrolled' && (
+          <>
+            {enrollments.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <BookOpen className="w-8 h-8 text-gray-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">No courses yet</h3>
+                <p className="text-gray-600 mb-6">Start your learning journey by enrolling in a course</p>
+                <button
+                  onClick={() => navigate('/courses/popular')}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors"
+                >
+                  Browse Popular Courses
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {enrollments.map((enrollment) => (
               <div
                 key={enrollment.id}
                 className="bg-white rounded-xl border border-gray-200 hover:shadow-lg transition-all cursor-pointer group"
@@ -180,10 +219,99 @@ export default function MyCoursesPage() {
               </div>
             ))}
           </div>
+            )}
+          </>
+        )}
+
+        {/* Created Courses Tab */}
+        {!loading && !error && activeTab === 'created' && (
+          <>
+            {createdCourses.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <PlusCircle className="w-8 h-8 text-gray-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 mb-2">No courses created yet</h3>
+                <p className="text-gray-600 mb-6">Create your first AI-powered course</p>
+                <button
+                  onClick={() => navigate('/courses/popular')}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-xl font-medium hover:bg-blue-700 transition-colors"
+                >
+                  Create a Course
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {createdCourses.map((course) => (
+                  <div
+                    key={course.id}
+                    className="bg-white rounded-xl border border-gray-200 hover:shadow-lg transition-all cursor-pointer group"
+                    onClick={() => navigate(`/course/${course.id}`)}
+                  >
+                    {/* Course Image/Header */}
+                    <div className="h-40 bg-gradient-to-br from-green-500 to-teal-600 rounded-t-xl p-6 relative overflow-hidden">
+                      <div className="absolute inset-0 bg-black/10 group-hover:bg-black/5 transition-colors"></div>
+                      <div className="relative z-10">
+                        <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-xl flex items-center justify-center mb-3">
+                          <BookOpen className="w-6 h-6 text-white" />
+                        </div>
+                        <h3 className="text-white font-semibold text-lg line-clamp-2">
+                          {course.title || course.name}
+                        </h3>
+                      </div>
+                    </div>
+
+                    {/* Course Info */}
+                    <div className="p-6">
+                      {/* Metadata */}
+                      <div className="mb-4">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                          <PlusCircle className="w-3.5 h-3.5" />
+                          Creator
+                        </div>
+                      </div>
+
+                      {/* Description */}
+                      <p className="text-sm text-gray-600 mb-4 line-clamp-2">
+                        {course.description || 'No description available'}
+                      </p>
+
+                      {/* Stats */}
+                      <div className="flex items-center gap-4 text-xs text-gray-500 mb-4">
+                        <div className="flex items-center gap-1">
+                          <BookOpen className="w-3.5 h-3.5" />
+                          <span>{course.modules_count || 0} modules</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <PlayCircle className="w-3.5 h-3.5" />
+                          <span>{course.enrolled_count || 0} enrolled</span>
+                        </div>
+                      </div>
+
+                      {/* Category & Difficulty */}
+                      <div className="flex items-center gap-2 mb-4">
+                        <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-md">
+                          {course.category?.replace('_', ' ')}
+                        </span>
+                        <span className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded-md capitalize">
+                          {course.difficulty_level}
+                        </span>
+                      </div>
+
+                      {/* Action Button */}
+                      <button className="w-full px-4 py-2.5 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-colors group-hover:shadow-md">
+                        Manage Course
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
         )}
 
         {/* Stats Summary */}
-        {!loading && !error && enrollments.length > 0 && (
+        {!loading && !error && activeTab === 'enrolled' && enrollments.length > 0 && (
           <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <div className="flex items-center gap-3">

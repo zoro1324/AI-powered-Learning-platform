@@ -181,10 +181,11 @@ SIMPLE_JWT = {
 }
 
 # Celery (optional - set to None to disable async tasks)
-# To use async video generation, install and start Redis:
+# Note: Celery disabled - using background threads for course planning
+# To enable Celery for video generation, install and start Redis:
 #   Download: https://github.com/microsoftarchive/redis/releases
 #   Run: redis-server
-USE_CELERY = False  # Set to True when Redis is available
+USE_CELERY = False  # Disabled - using threading instead
 CELERY_BROKER_URL = 'redis://localhost:6379/0'
 CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']

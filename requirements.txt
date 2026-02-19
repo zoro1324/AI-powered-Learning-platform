@@ -22,6 +22,12 @@ django-cors-headers
 djangorestframework-simplejwt
 django-filter
 
-# Async task queue
-celery
-redis
+# Async task queue (optional - currently using threading)
+# celery
+# redis
+
+# LangChain for AI course planning
+langchain>=0.3.0
+langchain-ollama>=0.2.0
+langchain-core>=0.3.0
+pydantic>=2.0.0

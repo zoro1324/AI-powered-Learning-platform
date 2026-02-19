@@ -20,6 +20,7 @@ import {
   RegisterData,
   AuthResponse,
   PaginatedResponse,
+  CoursePlanningTask,
 } from '../types/api';
 
 // Create axios instance
@@ -157,6 +158,11 @@ export const courseAPI = {
     return response.data;
   },
 
+  getMyCreated: async (): Promise<Course[]> => {
+    const response = await api.get<Course[]>('/courses/my_created/');
+    return response.data;
+  },
+
   create: async (data: Partial<Course>): Promise<Course> => {
     const response = await api.post<Course>('/courses/', data);
     return response.data;
@@ -169,6 +175,37 @@ export const courseAPI = {
 
   delete: async (id: number): Promise<void> => {
     await api.delete(`/courses/${id}/`);
+  },
+};
+
+// ============================================================================
+// COURSE PLANNING API
+// ============================================================================
+
+export const coursePlanningAPI = {
+  /**
+   * Create a new course planning task
+   * The backend will analyze if the topic is broad/narrow and create appropriate courses
+   */
+  create: async (data: {
+    course_title: string;
+    course_description: string;
+    category: Course['category'];
+    difficulty_level: Course['difficulty_level'];
+    estimated_duration: number;
+    thumbnail?: string;
+  }): Promise<CoursePlanningTask> => {
+    const response = await api.post<CoursePlanningTask>('/courses/plan/', data);
+    return response.data;
+  },
+
+  /**
+   * Check the status of a course planning task
+   * Poll this endpoint to track progress
+   */
+  getStatus: async (taskId: string): Promise<CoursePlanningTask> => {
+    const response = await api.get<CoursePlanningTask>(`/courses/plan/status/${taskId}/`);
+    return response.data;
   },
 };
 

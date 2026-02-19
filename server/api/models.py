@@ -186,6 +186,15 @@ class Course(models.Model):
         help_text='List of specific learning objectives for this sub-topic'
     )
     
+    created_by = models.ForeignKey(
+        User, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='created_courses',
+        help_text='User who created this course'
+    )
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -237,6 +246,12 @@ class Enrollment(models.Model):
         ACTIVE = 'active', 'Active'
         COMPLETED = 'completed', 'Completed'
         PAUSED = 'paused', 'Paused'
+    
+    class StudyMethod(models.TextChoices):
+        REAL_WORLD = 'real_world', 'Real-world Examples'
+        THEORY_DEPTH = 'theory_depth', 'Theory Depth'
+        PROJECT_BASED = 'project_based', 'Project-Based'
+        CUSTOM = 'custom', 'Custom'
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='enrollments')
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='enrollments')
@@ -252,6 +267,22 @@ class Enrollment(models.Model):
         choices=KnowledgeLevel.choices,
         default=KnowledgeLevel.BEGINNER,
         help_text='Level determined by diagnostic assessment',
+    )
+    study_method_preference = models.CharField(
+        max_length=20,
+        choices=StudyMethod.choices,
+        default=StudyMethod.REAL_WORLD,
+        help_text='How the student prefers to learn (affects syllabus generation)',
+    )
+    custom_study_method = models.TextField(
+        blank=True,
+        default='',
+        help_text='Custom study method description when study_method_preference is "custom"',
+    )
+    assessment_questions_count = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text='Number of questions in the pre-knowledge assessment (determined by LLM based on complexity)',
     )
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.ACTIVE)
     overall_progress = models.DecimalField(
@@ -704,3 +735,55 @@ class VideoTask(models.Model):
 
     def __str__(self):
         return f'{self.topic} ({self.status})'
+
+
+# ===========================================================================
+# 18. CoursePlanningTask
+# ===========================================================================
+
+class CoursePlanningTask(models.Model):
+    """
+    Tracks AI-powered course planning tasks.
+    Analyzes whether a topic is broad/narrow and generates appropriate course structure.
+    """
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        PROCESSING = 'processing', 'Processing'
+        COMPLETED = 'completed', 'Completed'
+        FAILED = 'failed', 'Failed'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    course_title = models.CharField(max_length=255, help_text='Title of the course/topic to plan')
+    course_description = models.TextField(help_text='Description of what should be covered')
+    category = models.CharField(
+        max_length=50, choices=Course.CATEGORY_CHOICES, default='other',
+    )
+    difficulty_level = models.CharField(
+        max_length=20, choices=Course.DIFFICULTY_CHOICES, default='beginner',
+    )
+    estimated_duration = models.PositiveIntegerField(
+        default=60, help_text='Estimated duration in minutes',
+    )
+    thumbnail = models.URLField(blank=True, default='', help_text='URL to course thumbnail')
+    status = models.CharField(
+        max_length=15, choices=Status.choices, default=Status.PENDING,
+    )
+    progress_message = models.TextField(blank=True, default='')
+    result_data = models.JSONField(
+        null=True, blank=True, 
+        help_text='Complete course plan result from LLM (is_broad, courses, etc.)',
+    )
+    created_courses = models.JSONField(
+        null=True, blank=True,
+        help_text='IDs of courses created from this plan',
+    )
+    error_message = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'course_planning_tasks'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.course_title} ({self.status})'
