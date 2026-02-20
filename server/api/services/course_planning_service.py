@@ -13,9 +13,9 @@ import logging
 from typing import List, Optional
 
 from pydantic import BaseModel, Field, field_validator
-from langchain_ollama import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate
 from django.conf import settings
+from api.services.ai_client import get_langchain_llm
 
 logger = logging.getLogger(__name__)
 
@@ -69,27 +69,22 @@ class CoursePlanningService:
     def __init__(self, model_name: str = None, temperature: float = 0.7):
         """
         Initialize the course planning service.
-        
-        Args:
-            model_name: Name of the Ollama model to use (defaults to settings.OLLAMA_MODEL or "llama3:8b")
-            temperature: Temperature for response generation (0.0-1.0)
+
+        In production (IS_PRODUCTION=True), uses Gemini via LangChain.
+        In development, uses Ollama via LangChain.
+        The model_name parameter is ignored; configure via GEMINI_MODEL / OLLAMA_MODEL env vars.
         """
-        logger.info("=== CoursePlanningService.__init__ CALLED ===")
-        logger.info(f"  model_name parameter: {model_name}")
-        logger.info(f"  temperature: {temperature}")
-        
-        # Use model from settings or default to llama3:8b
-        self.model_name = model_name or getattr(settings, 'OLLAMA_MODEL', 'llama3:8b')
+        backend = "Gemini" if getattr(settings, 'IS_PRODUCTION', False) else "Ollama"
+        logger.info("CoursePlanningService initialising — AI backend: %s", backend)
+
         self.temperature = temperature
-        
-        logger.info(f"  Final model_name: {self.model_name}")
-        
+
         # Initialize LangChain components
-        self.llm = ChatOllama(model=self.model_name, temperature=self.temperature)
+        self.llm = get_langchain_llm(temperature=self.temperature)
         self.structured_llm = self.llm.with_structured_output(CoursePlan)
         self.prompt = self._create_prompt()
         self.chain = self.prompt | self.structured_llm
-        
+
         logger.info("=== CoursePlanningService initialized ===")
     
     def _create_prompt(self) -> ChatPromptTemplate:
