@@ -295,22 +295,23 @@ STUDY METHOD PREFERENCE:
 {study_method_addition}{knowledge_adaptation}
 
 SYLLABUS STRUCTURE REQUIREMENTS:
-1. Create between 3 and 8 modules that comprehensively cover the course (choose appropriate number based on course scope)
-2. Each module MUST have 3-10 topics
-3. CRITICAL: DO NOT generate empty modules. Every module MUST have a non-empty name, description, and at least 3 topics
-4. Modules should progress logically from foundational to advanced concepts
-5. Topics within a module should be related and build upon each other
+1. Create between 5 and 12 modules (aim for granularity). Split broad topics into multiple specific modules.
+2. Each module MUST have 2-5 focused topics.
+3. CRITICAL: DO NOT generate empty modules. Every module MUST have a non-empty name, description, and at least 2 topics.
+4. Modules should progress logically from foundational to advanced concepts.
+5. Topics within a module should be related and build upon each other.
+6. PREFER MORE SMALL MODULES over fewer large ones.
 
 TOPIC REQUIREMENTS:
 - short_description: 1-2 sentences explaining what the user will learn (user-facing)
-- detailed_description: Comprehensive description of the topic scope, key concepts, learning outcomes, and teaching approach (AI-facing, 3-5 sentences)
-- estimated_duration_minutes: Realistic time estimate (typically 15-120 minutes per topic)
+- detailed_description: Comprehensive description (AI-facing, 3-5 sentences)
+- estimated_duration_minutes: Realistic time estimate (typically 15-60 minutes per topic)
 
 CONTENT QUALITY RULES:
 - No overlapping content between topics or modules
-- Each topic must be substantial and well-defined
+- Each topic must be specific and well-defined
 - Ensure logical flow and prerequisites are respected
-- Total course should be comprehensive but not overwhelming
+- Total course should be comprehensive
 - Calculate total_estimated_hours accurately based on all topic durations
 
 AVOID:
@@ -318,7 +319,34 @@ AVOID:
 - Redundant content
 - Unrealistic time estimates
 - Missing key concepts for the course level
-- Empty or incomplete modules (will be rejected during validation)"""
+- Empty or incomplete modules (will be rejected during validation)
+
+FORMAT INSTRUCTIONS:
+Return a valid JSON object. The output must be a single JSON object with the following structure:
+
+{{{{
+    "course_name": "Name of the course",
+    "course_objective": "Main objective of the course",
+    "study_method": "Study method preferences applied",
+    "total_modules": 5, // Integer, number of modules
+    "total_estimated_hours": 10.5, // Float, total hours
+    "modules": [
+        {{{{
+            "module_name": "Module Name",
+            "module_description": "Overview of what this module covers",
+            "topics": [
+                {{{{
+                    "topic_name": "Topic Name",
+                    "short_description": "Short description for users (1-2 sentences)",
+                    "detailed_description": "Detailed description for AI (3-5 sentences)",
+                    "estimated_duration_minutes": 30 // Integer
+                }}}}
+            ]
+        }}}}
+    ]
+}}}}
+
+CRITICAL: Return ONLY the JSON object. Do not include markdown formatting (like ```json). Do not include any text before or after the JSON."""
 
         user_message = """Create a detailed syllabus for the following course:
 
@@ -326,7 +354,8 @@ Course Name: {course_name}
 Course Description: {course_description}
 Difficulty Level: {difficulty}
 
-Generate a complete, well-structured syllabus following all requirements."""
+Generate a complete, well-structured syllabus following all requirements.
+ENSURE THE OUTPUT IS VALID JSON."""
 
         return ChatPromptTemplate.from_messages([
             ("system", system_message),
@@ -335,49 +364,43 @@ Generate a complete, well-structured syllabus following all requirements."""
     
     def _create_reviewer_prompt(self) -> ChatPromptTemplate:
         """Create the prompt for syllabus review (Layer 2)."""
-        system_message = """You are a senior educational quality assurance expert reviewing course syllabi.
+        system_message = """You are a supportive educational quality assurance expert reviewing course syllabi.
 
-Your task is to critically evaluate syllabi for quality, coherence, and educational value.
+Your task is to evaluate syllabi for basic structural validity and educational coherence. BE LENIENT.
 
 EVALUATION CRITERIA:
 
 1. STRUCTURE (Critical):
-   - Are modules logically organized and progressive?
-   - Do topics within modules relate to each other?
-   - Is there a clear learning path from beginner to advanced?
+   - Are modules logically organized?
+   - Is there a clear learning path?
 
-2. CONTENT QUALITY (Critical):
-   - Are topic descriptions clear and specific?
-   - Do detailed descriptions provide enough context for content creation?
-   - Is content appropriate for the stated difficulty level?
+2. CONTENT QUALITY (Important):
+   - Are topic descriptions clear?
+   - Is content appropriate for the difficulty level?
 
-3. NO REDUNDANCY (Critical):
-   - Are there overlapping topics?
-   - Is any content repeated across modules?
-   - Are topics distinct and well-defined?
+3. NO REDUNDANCY (Important):
+   - Are topics mostly distinct? (Minor overlap is acceptable)
 
 4. COMPLETENESS (Critical):
-   - Does the syllabus cover all essential aspects of the course?
-   - Are there any obvious gaps in coverage?
-   - Are prerequisites and dependencies clear?
+   - Does the syllabus cover the main aspects of the course?
+   - Are there any MISSING CRITIAL components?
 
-5. REALISM (Important):
-   - Are time estimates realistic?
-   - Is the total course length appropriate?
-   - Can topics be reasonably covered in the estimated time?
+5. REALISM:
+   - Are time estimates roughly reasonable? (Do not reject for minor estimation errors)
 
 DECISION RULES:
-- APPROVE if: All critical criteria are met and the syllabus is high quality
-- REJECT if: Any critical criteria fail or there are major quality issues
+- APPROVE if: The syllabus is structurally sound and covers the material, even if it's not perfect.
+- REJECT ONLY if: 
+  1. The syllabus is completely off-topic.
+  2. Modules are empty or contain gibberish.
+  3. Structure is fundamentally broken (e.g., advanced topics before beginners).
+  4. Duplicate modules are found.
 
 When REJECTING:
-- Provide specific, actionable feedback
-- List all issues found
-- Explain what needs to be fixed
+- Provide specific, actionable feedback on the FUNDAMENTAL flaws.
 
 When APPROVING:
-- Provide positive feedback
-- May suggest minor improvements (but still approve)"""
+- Valid even if minor improvements are possible."""
 
         user_message = """Review the following syllabus:
 

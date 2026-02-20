@@ -29,6 +29,8 @@ export interface Course {
   name: string;  // Backward compatibility
   title: string;
   description: string;
+  is_sub_topic?: boolean;
+  parent_topic_name?: string | null;
   category: 'web_dev' | 'data_science' | 'ai_ml' | 'mobile_dev' | 'cloud' | 'design' | 'devops' | 'cybersecurity' | 'blockchain' | 'other';
   difficulty_level: 'beginner' | 'intermediate' | 'advanced';
   estimated_duration: number;

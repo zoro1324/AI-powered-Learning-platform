@@ -194,5 +194,5 @@ CELERY_RESULT_SERIALIZER = 'json'
 
 # Video generation
 OLLAMA_API_URL = 'http://localhost:11434/api/generate'
-OLLAMA_MODEL = 'phi3:mini'
+OLLAMA_MODEL = 'llama3:8b'
 OLLAMA_TIMEOUT = 600  # Timeout in seconds (10 minutes)

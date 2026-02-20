@@ -73,8 +73,10 @@ export default function AssessmentDialog({
     } catch (err: any) {
       console.error('🔴 Error loading assessment:', err);
       console.error('🔴 Error details:', err.response?.data);
-      setError(err.response?.data?.error || 'Failed to load assessment');
-      setStep('study-method');
+      const backendMessage = err.response?.data?.message;
+      const backendError = err.response?.data?.error;
+      setError(backendMessage || backendError || 'Failed to load assessment');
+      setStep('questions');
     }
   };
 

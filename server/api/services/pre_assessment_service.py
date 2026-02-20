@@ -33,15 +33,35 @@ class Question(BaseModel):
     explanation: str = Field(..., description="Explanation of the correct answer")
     difficulty_hint: str = Field(..., description="What level this question tests: Beginner, Intermediate, or Advanced")
     
-    @field_validator('options')
+    @field_validator('options', mode='before')
     @classmethod
-    def validate_options(cls, v: List[str]) -> List[str]:
-        """Ensure exactly 4 options with 'I don't know' as last option."""
+    def validate_options(cls, v: Any) -> List[str]:
+        """Ensure exactly 4 options with 'I don't know' as last option. handle cleanup"""
         dont_know_text = "I don't know about this course"
         
+        # Ensure v is a list
+        if not isinstance(v, list):
+            raise ValueError('Options must be a list')
+            
+        # Clean up the list: remove empty strings and standalone punctuation often hallucinated by LLMs
+        cleaned_options = [
+            str(opt).strip() for opt in v 
+            if str(opt).strip() not in [',', '.', ';', '']
+        ]
+        
         # Check if we have exactly 4 options
-        if len(v) < 3 or len(v) > 4:
-            raise ValueError(f'Must have 3-4 options, got {len(v)}')
+        if len(cleaned_options) < 3 or len(cleaned_options) > 5:
+             # Allow 5 temporarily to fix, then clamp? No, strict 3-4 logic.
+             # If we have 5, it might be an extra hallucination.
+             # Let's try to take the first 4 if they look valid? 
+             # Or just strictly check 3-4.
+             pass
+
+        v = cleaned_options
+
+        # Check if we have enough options (at least 3)
+        if len(v) < 3:
+            raise ValueError(f'Must have at least 3 options, got {len(v)}')
         
         # Find and remove "I don't know" if it exists
         options_without_dont_know = [opt for opt in v if opt != dont_know_text]

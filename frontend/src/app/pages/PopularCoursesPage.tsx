@@ -188,6 +188,11 @@ export default function PopularCoursesPage() {
       navigate('/login');
       return;
     }
+    if (course.is_sub_topic === false) {
+      alert(`Please choose a learnable sub-topic for "${course.title}" from the course details page.`);
+      navigate(`/courses/${course.id}`);
+      return;
+    }
     setSelectedCourse(course);
     setAssessmentDialogOpen(true);
   };
@@ -491,9 +496,10 @@ export default function PopularCoursesPage() {
                         <Button 
                           className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
                           onClick={(e) => handleEnrollClick(e, course)}
+                          disabled={course.is_sub_topic === false}
                         >
                           <GraduationCap className="w-4 h-4 mr-2" />
-                          Enroll Now
+                          {course.is_sub_topic === false ? 'Choose Sub-topic' : 'Enroll Now'}
                         </Button>
                         <Button 
                           variant="outline"
