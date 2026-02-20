@@ -21,6 +21,7 @@ interface PodcastDialogProps {
   content: string;
   topicName: string;
   lessonId?: number;
+  enrollmentId?: number;
   onPodcastGenerated?: (data: { audioUrl: string; personas: PersonaOption; scenario: string; generatedAt: string }) => void;
   onComplete?: () => void; // Callback to refresh resources
 }
@@ -33,6 +34,7 @@ export function PodcastDialog({
   content,
   topicName,
   lessonId,
+  enrollmentId,
   onPodcastGenerated,
   onComplete,
 }: PodcastDialogProps) {
@@ -96,11 +98,12 @@ export function PodcastDialog({
         person2: selectedPersonas?.person2,
         lesson_id: lessonId,
         topic_name: topicName,
+        enrollment_id: enrollmentId,
       });
 
       setAudioUrl(response.audio_url);
       setCurrentStep('complete');
-      
+
       // Notify parent component
       if (onPodcastGenerated && selectedPersonas) {
         onPodcastGenerated({
@@ -110,7 +113,7 @@ export function PodcastDialog({
           generatedAt: new Date().toISOString(),
         });
       }
-      
+
       // Trigger refresh callback if lesson is linked
       if (onComplete && lessonId) {
         onComplete();
@@ -137,8 +140,8 @@ export function PodcastDialog({
 
   const getAudioUrl = () => {
     if (!audioUrl) return '';
-    return audioUrl.startsWith('http') 
-      ? audioUrl 
+    return audioUrl.startsWith('http')
+      ? audioUrl
       : `${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:8000'}${audioUrl}`;
   };
 

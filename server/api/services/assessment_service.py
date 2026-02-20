@@ -686,7 +686,8 @@ Generate the full syllabus JSON now with varied topic counts per module:"""
         course_name: str,
         topic_name: str,
         study_method: str,
-        topic_description: str = ""
+        topic_description: str = "",
+        system_prompt: str = None
     ) -> str:
         """
         Generate detailed educational content for a specific topic.
@@ -696,6 +697,7 @@ Generate the full syllabus JSON now with varied topic counts per module:"""
             topic_name: Name of the topic
             study_method: User's preferred study method
             topic_description: Optional description of the topic to guide content generation
+            system_prompt: Optional personalized system prompt from enrollment learning style
             
         Returns:
             Generated content as markdown text
@@ -706,6 +708,7 @@ Generate the full syllabus JSON now with varied topic counts per module:"""
         print(f"  Topic: {topic_name}")
         print(f"  Topic Description: {topic_description}")
         print(f"  Study method: {study_method}")
+        print(f"  Has personalized system prompt: {bool(system_prompt)}")
         print("========================================")
         
         # Build the description context if available
@@ -740,7 +743,8 @@ Requirements:
 Generate the detailed content now:
 """
         
-        response = self._call_ollama(prompt)
+        # Use personalized system prompt if available, otherwise no system prompt
+        response = self._call_ollama(prompt, system_prompt=system_prompt or None)
         print(f"  Generated content length: {len(response)} chars")
         print("=== generate_topic_content SUCCESS ===")
         return response
@@ -856,7 +860,8 @@ Return strictly JSON:
         course_name: str,
         topic_name: str,
         weak_areas: List[str],
-        original_content: str
+        original_content: str,
+        system_prompt: str = None
     ) -> Dict[str, Any]:
         """
         Generate focused remediation content for sub-topics the user got wrong.
@@ -866,6 +871,7 @@ Return strictly JSON:
             topic_name: Name of the parent topic
             weak_areas: List of question texts / sub-topics the user struggled on
             original_content: The original lesson content for context
+            system_prompt: Optional personalized system prompt from enrollment learning style
             
         Returns:
             Dictionary with 'remediation_notes' list
@@ -913,7 +919,7 @@ Return strictly JSON:
 }}
 """
 
-        response = self._call_ollama(prompt)
+        response = self._call_ollama(prompt, system_prompt=system_prompt or None)
         result = self._extract_json(response)
         
         # Ensure we have the right structure

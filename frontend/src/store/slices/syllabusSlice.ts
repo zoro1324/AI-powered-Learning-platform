@@ -140,6 +140,7 @@ export const generateTopicContent = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
+      console.log('🚀 generateTopicContent thunk called with:', data);
       const response = await assessmentAPI.generateTopicContent({
         enrollment_id: data.enrollmentId,
         module_id: data.moduleId,

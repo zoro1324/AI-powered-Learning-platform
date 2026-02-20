@@ -179,7 +179,8 @@ class PodcastService:
         instruction: Optional[str] = None,
         person1: Optional[str] = None,
         person2: Optional[str] = None,
-        output_dir: Optional[str] = None
+        output_dir: Optional[str] = None,
+        system_prompt: Optional[str] = None
     ) -> Optional[str]:
         """
         Main method to generate an audio overview from text.
@@ -190,6 +191,7 @@ class PodcastService:
             person1: Optional persona 1 name/role
             person2: Optional persona 2 name/role
             output_dir: Optional output directory path
+            system_prompt: Optional personalized system prompt from enrollment learning style
             
         Returns:
             Path to the generated audio file or None on failure
@@ -199,8 +201,8 @@ class PodcastService:
             roles = self._determine_roles(text, instruction, person1, person2)
             logger.info(f"Selected Roles: {roles}")
             
-            # 2. Generate Script
-            script = self._generate_script(text, roles, instruction)
+            # 2. Generate Script (with personalized system prompt if available)
+            script = self._generate_script(text, roles, instruction, system_prompt=system_prompt)
             logger.info(f"Generated Script with {len(script)} turns")
             
             if not script:
@@ -271,17 +273,23 @@ class PodcastService:
         self,
         text: str,
         roles: Dict[str, str],
-        instruction: Optional[str] = None
+        instruction: Optional[str] = None,
+        system_prompt: Optional[str] = None
     ) -> List[Dict[str, str]]:
         """Generate the podcast script"""
         
         instruction_text = f"Focus on this specific theme/format: {instruction}" if instruction else "Cover the key points naturally."
         
+        # Prepend personalized system prompt context if available
+        style_context = ""
+        if system_prompt:
+            style_context = f"\n\nIMPORTANT - Presentation style guidance:\n{system_prompt}\n"
+        
         podcast_prompt = f"""
         Generate a natural conversation between {roles.get('person1', 'Speaker 1')} and {roles.get('person2', 'Speaker 2')} based on the following content.
         Make it engaging, authentic, and easy to follow.
         Make it a comprehensive deep dive. Do not limit the conversation length. 
-        {instruction_text}
+        {instruction_text}{style_context}
 
         Content:
         {text[:12000]}... (truncated if too long)

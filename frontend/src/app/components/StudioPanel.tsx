@@ -613,6 +613,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
           content={content.content}
           topicName={currentTopic.topic_name}
           lessonId={content.lessonId}
+          enrollmentId={eId ?? undefined}
           onPodcastGenerated={(data) => setGeneratedPodcast(data)}
           onComplete={() => {
             // Refetch resources after podcast generation
