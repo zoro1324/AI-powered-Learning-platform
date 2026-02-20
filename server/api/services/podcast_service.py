@@ -15,8 +15,8 @@ import os
 import asyncio
 from typing import Dict, List, Any, Optional
 
-import requests
 from django.conf import settings
+from api.services.ai_client import generate_text
 import edge_tts
 
 logger = logging.getLogger(__name__)
@@ -28,14 +28,11 @@ class PodcastService:
     def __init__(self, ollama_url: str = None, ollama_model: str = None):
         """
         Initialize the podcast service.
-        
-        Args:
-            ollama_url: Ollama API URL (defaults to settings.OLLAMA_API_URL)
-            ollama_model: Ollama model name (defaults to settings.OLLAMA_MODEL)
+
+        The ollama_url / ollama_model parameters are kept for backwards
+        compatibility but are ignored when IS_PRODUCTION=True.
         """
-        base_url = ollama_url or settings.OLLAMA_API_URL
-        self.ollama_url = base_url.replace('/api/generate', '/api/chat')
-        self.ollama_model = ollama_model or settings.OLLAMA_MODEL
+        backend = "Gemini" if getattr(settings, 'IS_PRODUCTION', False) else "Ollama"
         
         # Voice mapping for personas
         self.voice_map = {
@@ -43,41 +40,7 @@ class PodcastService:
             "person2": "en-US-JennyNeural"  # Female voice
         }
         
-        logger.info(f"PodcastService initialized with model: {self.ollama_model}")
-    
-    def _call_ollama(self, prompt: str, system_prompt: str = None) -> str:
-        """
-        Make a request to Ollama API.
-        
-        Args:
-            prompt: The user prompt
-            system_prompt: Optional system prompt
-            
-        Returns:
-            The response content as string
-        """
-        messages = []
-        if system_prompt:
-            messages.append({'role': 'system', 'content': system_prompt})
-        messages.append({'role': 'user', 'content': prompt})
-        
-        try:
-            response = requests.post(
-                self.ollama_url,
-                json={
-                    'model': self.ollama_model,
-                    'messages': messages,
-                    'format': 'json',
-                    'stream': False
-                },
-                timeout=300
-            )
-            response.raise_for_status()
-            data = response.json()
-            return data['message']['content']
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Ollama API error: {e}")
-            raise Exception(f"Failed to call Ollama API: {str(e)}")
+        logger.info("PodcastService initialized — AI backend: %s", backend)
     
     def generate_persona_options(self, text: str) -> List[Dict[str, str]]:
         """
@@ -109,7 +72,7 @@ class PodcastService:
         """
         
         try:
-            response = self._call_ollama(prompt)
+            response = generate_text(prompt, json_mode=True)
             data = json.loads(response)
             options = data.get('options', [])
             
@@ -160,7 +123,7 @@ class PodcastService:
         """
         
         try:
-            response = self._call_ollama(prompt)
+            response = generate_text(prompt, json_mode=True)
             data = json.loads(response)
             options = data.get('options', [])
             

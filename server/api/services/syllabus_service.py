@@ -14,11 +14,11 @@ import json
 from typing import List, Optional, Dict, Any
 
 from pydantic import BaseModel, Field, field_validator
-from langchain_ollama import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.exceptions import OutputParserException
 from langchain_core.output_parsers import PydanticOutputParser
 from django.conf import settings
+from api.services.ai_client import get_langchain_llm
 
 logger = logging.getLogger(__name__)
 
@@ -197,23 +197,23 @@ class SyllabusGenerator:
     def __init__(self, model_name: str = None, temperature: float = 0.7):
         """
         Initialize the syllabus generator with two layers.
-        
-        Args:
-            model_name: Name of the Ollama model to use (defaults to settings.OLLAMA_MODEL or "llama3:8b")
-            temperature: Temperature for response generation (0.0-1.0)
+
+        In production (IS_PRODUCTION=True), uses Gemini via LangChain.
+        In development, uses Ollama via LangChain.
+        The model_name parameter is ignored; configure via GEMINI_MODEL / OLLAMA_MODEL env vars.
         """
-        self.model_name = model_name or getattr(settings, 'OLLAMA_MODEL', 'llama3:8b')
+        backend = "Gemini" if getattr(settings, 'IS_PRODUCTION', False) else "Ollama"
         self.temperature = temperature
-        
+
         # Layer 1: Syllabus Generator with custom parser
-        self.generator_llm = ChatOllama(model=self.model_name, temperature=temperature)
+        self.generator_llm = get_langchain_llm(temperature=temperature)
         self.syllabus_parser = CustomSyllabusParser(pydantic_object=Syllabus)
-        
+
         # Layer 2: Syllabus Reviewer (lower temperature for consistency)
-        self.reviewer_llm = ChatOllama(model=self.model_name, temperature=0.3)
+        self.reviewer_llm = get_langchain_llm(temperature=0.3)
         self.structured_reviewer = self.reviewer_llm.with_structured_output(SyllabusReview)
-        
-        logger.info(f"SyllabusGenerator initialized with model: {self.model_name}")
+
+        logger.info("SyllabusGenerator initialized — AI backend: %s", backend)
     
     def _create_generator_prompt(
         self, 

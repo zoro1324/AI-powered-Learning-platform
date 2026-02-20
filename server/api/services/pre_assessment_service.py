@@ -13,9 +13,9 @@ import logging
 from typing import List, Optional, Dict, Any
 
 from pydantic import BaseModel, Field, field_validator
-from langchain_ollama import ChatOllama
 from langchain_core.prompts import ChatPromptTemplate
 from django.conf import settings
+from api.services.ai_client import get_langchain_llm
 
 logger = logging.getLogger(__name__)
 
@@ -127,15 +127,15 @@ class PreKnowledgeAssessment:
     def __init__(self, model_name: str = None, temperature: float = 0.7):
         """
         Initialize the assessment generator.
-        
-        Args:
-            model_name: Name of the Ollama model to use (defaults to settings.OLLAMA_MODEL or "llama3:8b")
-            temperature: Temperature for response generation (0.0-1.0)
+
+        In production (IS_PRODUCTION=True), uses Gemini via LangChain.
+        In development, uses Ollama via LangChain.
+        The model_name parameter is ignored; configure via GEMINI_MODEL / OLLAMA_MODEL env vars.
         """
-        self.model_name = model_name or getattr(settings, 'OLLAMA_MODEL', 'llama3:8b')
+        backend = "Gemini" if getattr(settings, 'IS_PRODUCTION', False) else "Ollama"
         self.temperature = temperature
-        self.llm = ChatOllama(model=self.model_name, temperature=self.temperature)
-        logger.info(f"PreKnowledgeAssessment initialized with model: {self.model_name}")
+        self.llm = get_langchain_llm(temperature=self.temperature)
+        logger.info("PreKnowledgeAssessment initialized — AI backend: %s", backend)
     
     def determine_question_count(self, course_name: str, course_description: str, difficulty: str) -> Dict[str, Any]:
         """
