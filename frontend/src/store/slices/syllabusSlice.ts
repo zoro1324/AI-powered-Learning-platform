@@ -79,6 +79,7 @@ export interface SyllabusState {
 
   // Loading state per operation
   contentLoading: Record<string, boolean>;
+  contentErrors: Record<string, string>;
   quizLoading: Record<string, boolean>;
   quizEvaluating: Record<string, boolean>;
   videoLoading: Record<string, boolean>;
@@ -102,6 +103,7 @@ const initialState: SyllabusState = {
   remediationContent: {},
   activeResourceView: {},
   contentLoading: {},
+  contentErrors: {},
   quizLoading: {},
   quizEvaluating: {},
   videoLoading: {},
@@ -438,6 +440,7 @@ const syllabusSlice = createSlice({
       .addCase(generateTopicContent.rejected, (state, action) => {
         const key = topicId(state.enrollmentId, action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
         state.contentLoading[key] = false;
+        state.contentErrors[key] = action.payload as string;
       });
 
     // generateTopicQuiz
@@ -507,11 +510,11 @@ const syllabusSlice = createSlice({
       console.log('🔄 Updating video task for key:', key);
       console.log('📦 Payload:', action.payload);
       console.log('🎯 Current task:', existing);
-      
+
       if (existing) {
         existing.status = action.payload.status;
         console.log('📝 Updated status to:', action.payload.status);
-        
+
         if (action.payload.status === 'completed') {
           existing.videoUrl = action.payload.video_url;
           console.log('✅ Video completed! URL:', action.payload.video_url);
@@ -621,6 +624,12 @@ export const selectRemediationContent = (
   moduleIndex: number,
   topicIndex: number
 ) => state.syllabus.remediationContent[topicId(state.syllabus.enrollmentId, moduleIndex, topicIndex)] || [];
+
+export const selectTopicContentError = (
+  state: { syllabus: SyllabusState },
+  moduleIndex: number,
+  topicIndex: number
+) => state.syllabus.contentErrors[topicId(state.syllabus.enrollmentId, moduleIndex, topicIndex)];
 
 export const selectRemediationLoading = (
   state: { syllabus: SyllabusState },

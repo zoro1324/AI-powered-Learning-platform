@@ -93,10 +93,10 @@ export default function CoursePage() {
           <Badge
             className={cn(
               'text-xs capitalize',
-              difficultyColor(syllabus.knowledge_level)
+              difficultyColor(syllabus.difficulty_level || syllabus.knowledge_level || 'Beginner')
             )}
           >
-            {syllabus.knowledge_level}
+            {syllabus.difficulty_level || syllabus.knowledge_level}
           </Badge>
           <span className="flex items-center gap-1">
             <Layers className="w-4 h-4" />
@@ -153,10 +153,10 @@ export default function CoursePage() {
                         !unlocked
                           ? 'bg-gray-100'
                           : progress === 100
-                          ? 'bg-green-100'
-                          : progress > 0
-                          ? 'bg-blue-100'
-                          : 'bg-gray-100'
+                            ? 'bg-green-100'
+                            : progress > 0
+                              ? 'bg-blue-100'
+                              : 'bg-gray-100'
                       )}
                     >
                       {!unlocked ? (
@@ -201,10 +201,10 @@ export default function CoursePage() {
                 <Badge
                   className={cn(
                     'text-[10px] capitalize',
-                    difficultyColor(mod.difficulty_level)
+                    difficultyColor(mod.difficulty_level || syllabus.difficulty_level || 'Beginner')
                   )}
                 >
-                  {mod.difficulty_level}
+                  {mod.difficulty_level || syllabus.difficulty_level || 'Beginner'}
                 </Badge>
                 <span className="text-xs text-gray-400 flex items-center gap-1">
                   <BookOpen className="w-3 h-3" />
