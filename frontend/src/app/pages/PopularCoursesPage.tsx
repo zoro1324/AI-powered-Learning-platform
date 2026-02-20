@@ -13,8 +13,8 @@ import {
   GraduationCap
 } from 'lucide-react';
 import { useAppSelector } from '../../store';
-import { courseAPI } from '../../services/api';
-import { Course } from '../../types/api';
+import { courseAPI, coursePlanningAPI } from '../../services/api';
+import { Course, CoursePlanningTask } from '../../types/api';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
@@ -66,6 +66,8 @@ export default function PopularCoursesPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [planningTaskId, setPlanningTaskId] = useState<string | null>(null);
+  const [planningStatus, setPlanningStatus] = useState<string>('');
   
   // Assessment dialog state
   const [assessmentDialogOpen, setAssessmentDialogOpen] = useState(false);
@@ -110,26 +112,73 @@ export default function PopularCoursesPage() {
     e.preventDefault();
     try {
       setCreating(true);
-      const newCourse = await courseAPI.create({
-        ...formData,
-        name: formData.title, // For backward compatibility
-        is_popular: false, // New courses are not popular by default
+      setPlanningStatus('Analyzing topic and creating course plan...');
+      
+      // Create course planning task
+      const planningTask = await coursePlanningAPI.create({
+        course_title: formData.title,
+        course_description: formData.description,
+        category: formData.category,
+        difficulty_level: formData.difficulty_level,
+        estimated_duration: formData.estimated_duration,
+        thumbnail: formData.thumbnail,
       });
-      setCourses([newCourse, ...courses]);
-      setDialogOpen(false);
-      setFormData({
-        title: '',
-        description: '',
-        category: 'web_dev',
-        difficulty_level: 'beginner',
-        estimated_duration: 60,
-        thumbnail: '',
-      });
+      
+      setPlanningTaskId(planningTask.id);
+      
+      // Poll for task completion
+      const pollInterval = setInterval(async () => {
+        try {
+          const status = await coursePlanningAPI.getStatus(planningTask.id);
+          setPlanningStatus(status.progress_message || 'Processing...');
+          
+          if (status.status === 'completed') {
+            clearInterval(pollInterval);
+            setCreating(false);
+            setPlanningStatus('');
+            setPlanningTaskId(null);
+            
+            // Show success message
+            const coursesCreated = status.created_courses?.length || 0;
+            const message = status.result_data?.is_broad
+              ? `Successfully created ${coursesCreated} courses! The topic was broad and has been split into a structured learning path.`
+              : 'Successfully created course!';
+            alert(message);
+            
+            // Close dialog and refresh courses
+            setDialogOpen(false);
+            setFormData({
+              title: '',
+              description: '',
+              category: 'web_dev',
+              difficulty_level: 'beginner',
+              estimated_duration: 60,
+              thumbnail: '',
+            });
+            fetchCourses();
+          } else if (status.status === 'failed') {
+            clearInterval(pollInterval);
+            setCreating(false);
+            setPlanningStatus('');
+            setPlanningTaskId(null);
+            alert('Failed to create course: ' + (status.error_message || 'Unknown error'));
+          }
+        } catch (err: any) {
+          clearInterval(pollInterval);
+          setCreating(false);
+          setPlanningStatus('');
+          setPlanningTaskId(null);
+          console.error('Error checking task status:', err);
+          alert('Failed to check course planning status');
+        }
+      }, 2000); // Poll every 2 seconds
+      
     } catch (err: any) {
+      setCreating(false);
+      setPlanningStatus('');
+      setPlanningTaskId(null);
       console.error('Error creating course:', err);
       alert('Failed to create course: ' + (err.message || 'Unknown error'));
-    } finally {
-      setCreating(false);
     }
   };
 
@@ -137,6 +186,11 @@ export default function PopularCoursesPage() {
     e.stopPropagation();
     if (!isAuthenticated) {
       navigate('/login');
+      return;
+    }
+    if (course.is_sub_topic === false) {
+      alert(`Please choose a learnable sub-topic for "${course.title}" from the course details page.`);
+      navigate(`/courses/${course.id}`);
       return;
     }
     setSelectedCourse(course);
@@ -301,6 +355,15 @@ export default function PopularCoursesPage() {
                         />
                       </div>
                     </div>
+                    
+                    {/* Show planning status when creating */}
+                    {creating && planningStatus && (
+                      <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 p-3 rounded-md">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>{planningStatus}</span>
+                      </div>
+                    )}
+                    
                     <DialogFooter>
                       <Button
                         type="button"
@@ -314,7 +377,7 @@ export default function PopularCoursesPage() {
                         {creating ? (
                           <>
                             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Creating...
+                            Planning Course...
                           </>
                         ) : (
                           'Create Course'
@@ -433,9 +496,10 @@ export default function PopularCoursesPage() {
                         <Button 
                           className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
                           onClick={(e) => handleEnrollClick(e, course)}
+                          disabled={course.is_sub_topic === false}
                         >
                           <GraduationCap className="w-4 h-4 mr-2" />
-                          Enroll Now
+                          {course.is_sub_topic === false ? 'Choose Sub-topic' : 'Enroll Now'}
                         </Button>
                         <Button 
                           variant="outline"

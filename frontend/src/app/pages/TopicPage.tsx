@@ -15,6 +15,7 @@ import {
   Save,
   X,
   ListTree,
+  AlertCircle,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store';
 import {
@@ -25,6 +26,7 @@ import {
   selectActiveResourceView,
   setActiveResourceView,
   createNote,
+  selectTopicContentError,
 } from '../../store/slices/syllabusSlice';
 import { Button } from '../components/ui/button';
 import {
@@ -72,6 +74,9 @@ export default function TopicPage() {
   );
   const activeView = useAppSelector((state) =>
     selectActiveResourceView(state, mIdx, tIdx)
+  );
+  const error = useAppSelector((state) =>
+    selectTopicContentError(state, mIdx, tIdx)
   );
 
   // Fetch resources when content is loaded
@@ -191,7 +196,7 @@ export default function TopicPage() {
     dispatch(
       generateTopicContent({
         enrollmentId: eId,
-        moduleId: currentModule.order,
+        moduleId: mIdx + 1,
         topicName: currentTopic.topic_name,
         moduleIndex: mIdx,
         topicIndex: tIdx,
@@ -203,11 +208,12 @@ export default function TopicPage() {
 
   useEffect(() => {
     // Auto-generate content when the topic page loads if content doesn't exist
-    if (!content && !isLoading && currentTopic && eId && currentModule) {
+    // Stop if there's an error to prevent infinite loops
+    if (!content && !isLoading && !error && currentTopic && eId && currentModule) {
       console.log(`📚 Auto-generating content for: ${currentTopic.topic_name}`);
       handleGenerate();
     }
-  }, [content, isLoading, currentTopic, eId, currentModule, handleGenerate]);
+  }, [content, isLoading, error, currentTopic, eId, currentModule, handleGenerate]);
 
   // ─── Auto-generate video on page load (DISABLED) ──────────────────────────
   // Video generation now only happens when user clicks "Generate Video" button
@@ -219,7 +225,7 @@ export default function TopicPage() {
   //     videoTask,
   //     hasContent: !!content,
   //   });
-    
+
   //   // Don't generate if:
   //   // - No topic info available
   //   // - Video is already generating
@@ -231,18 +237,18 @@ export default function TopicPage() {
   //     });
   //     return;
   //   }
-    
+
   //   const shouldGenerateVideo = 
   //     !videoTask || // No video task exists yet
   //     videoTask.status === 'failed'; // Or previous attempt failed
-    
+
   //   console.log('🎬 Should generate video?', shouldGenerateVideo);
-    
+
   //   if (shouldGenerateVideo) {
   //     // Use topic description for video generation
   //     // Video can be generated even without content
   //     const videoSource = content?.content || currentTopic.description;
-      
+
   //     if (videoSource) {
   //       console.log(`🎬 Auto-generating video for: ${currentTopic.topic_name}`);
   //       dispatch(
@@ -362,7 +368,7 @@ export default function TopicPage() {
             </BreadcrumbItem>
           </BreadcrumbList>
         </Breadcrumb>
-        
+
         {syllabus && eId && (
           <Button
             onClick={() => setStructureDialogOpen(true)}
@@ -395,6 +401,22 @@ export default function TopicPage() {
             <p className="text-gray-400 text-xs mt-1">
               This may take a moment
             </p>
+          </div>
+        ) : error ? (
+          /* Error state */
+          <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
+            <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mb-4">
+              <AlertCircle className="w-8 h-8 text-red-500" />
+            </div>
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">
+              Failed to generate content
+            </h2>
+            <p className="text-gray-500 text-sm mb-6 max-w-md">
+              {error}
+            </p>
+            <Button onClick={handleGenerate} size="lg" variant="outline">
+              Try Again
+            </Button>
           </div>
         ) : content ? (
           <>
@@ -692,7 +714,7 @@ export default function TopicPage() {
               className={cn(
                 'gap-2',
                 isComplete &&
-                  'border-green-300 text-green-700 hover:bg-green-50'
+                'border-green-300 text-green-700 hover:bg-green-50'
               )}
             >
               {isComplete ? (

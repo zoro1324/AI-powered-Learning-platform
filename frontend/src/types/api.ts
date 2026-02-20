@@ -29,6 +29,8 @@ export interface Course {
   name: string;  // Backward compatibility
   title: string;
   description: string;
+  is_sub_topic?: boolean;
+  parent_topic_name?: string | null;
   category: 'web_dev' | 'data_science' | 'ai_ml' | 'mobile_dev' | 'cloud' | 'design' | 'devops' | 'cybersecurity' | 'blockchain' | 'other';
   difficulty_level: 'beginner' | 'intermediate' | 'advanced';
   estimated_duration: number;
@@ -219,4 +221,31 @@ export interface PaginatedResponse<T> {
   next: string | null;
   previous: string | null;
   results: T[];
+}
+
+// Course Planning Task
+export interface CoursePlanningTask {
+  id: string;
+  course_title: string;
+  course_description: string;
+  category: Course['category'];
+  difficulty_level: Course['difficulty_level'];
+  estimated_duration: number;
+  thumbnail: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  progress_message: string;
+  result_data: {
+    is_broad: boolean;
+    total_courses: number;
+    courses: Array<{
+      course_name: string;
+      description: string;
+      difficulty: string;
+      prerequisites: string[];
+    }>;
+  } | null;
+  created_courses: string[] | null;
+  error_message: string;
+  created_at: string;
+  completed_at: string | null;
 }

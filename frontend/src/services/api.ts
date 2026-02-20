@@ -20,6 +20,7 @@ import {
   RegisterData,
   AuthResponse,
   PaginatedResponse,
+  CoursePlanningTask,
 } from '../types/api';
 
 // Create axios instance
@@ -157,6 +158,11 @@ export const courseAPI = {
     return response.data;
   },
 
+  getMyCreated: async (): Promise<Course[]> => {
+    const response = await api.get<Course[]>('/courses/my_created/');
+    return response.data;
+  },
+
   create: async (data: Partial<Course>): Promise<Course> => {
     const response = await api.post<Course>('/courses/', data);
     return response.data;
@@ -169,6 +175,37 @@ export const courseAPI = {
 
   delete: async (id: number): Promise<void> => {
     await api.delete(`/courses/${id}/`);
+  },
+};
+
+// ============================================================================
+// COURSE PLANNING API
+// ============================================================================
+
+export const coursePlanningAPI = {
+  /**
+   * Create a new course planning task
+   * The backend will analyze if the topic is broad/narrow and create appropriate courses
+   */
+  create: async (data: {
+    course_title: string;
+    course_description: string;
+    category: Course['category'];
+    difficulty_level: Course['difficulty_level'];
+    estimated_duration: number;
+    thumbnail?: string;
+  }): Promise<CoursePlanningTask> => {
+    const response = await api.post<CoursePlanningTask>('/courses/plan/', data);
+    return response.data;
+  },
+
+  /**
+   * Check the status of a course planning task
+   * Poll this endpoint to track progress
+   */
+  getStatus: async (taskId: string): Promise<CoursePlanningTask> => {
+    const response = await api.get<CoursePlanningTask>(`/courses/plan/status/${taskId}/`);
+    return response.data;
   },
 };
 
@@ -424,12 +461,17 @@ export const videoAPI = {
 
 export interface AssessmentQuestion {
   id?: number;
-  question: string;
-  options: string[];
-  correct_answer?: string | null;
+  question_text: string;  // Updated to match backend
+  topic: string;  // New field for topic tracking
+  options: string[];  // Array of 4 options, last is "I don't know"
+  correct_answer_index: number;  // Index of correct answer (0-2)
+  explanation: string;  // Explanation of correct answer
+  difficulty_hint: string;  // Beginner/Intermediate/Advanced
 }
 
 export interface InitialAssessmentResponse {
+  question_count: number;  // LLM-determined count (5-15)
+  question_count_reasoning: string;  // Why this count was chosen
   questions: AssessmentQuestion[];
 }
 
@@ -458,23 +500,34 @@ export interface SyllabusTopic {
 export interface SyllabusModule {
   module_name: string;
   description: string;
-  order: number;
-  difficulty_level: string;
-  estimated_duration_minutes: number;
+  order?: number;
+  difficulty_level?: string;
+  estimated_duration_minutes?: number;
   topics: SyllabusTopic[];
 }
 
 export interface Syllabus {
   course_name: string;
-  knowledge_level: string;
+  knowledge_level?: string;
+  difficulty_level: string;
   total_modules: number;
   modules: SyllabusModule[];
 }
 
 export interface EnrollmentResponse {
   enrollment_id: number;
-  evaluation: EvaluationResult;
-  roadmap: Roadmap;
+  assessment_result: {  // Updated from 'evaluation'
+    knowledge_level: string;  // None/Basic/Intermediate/Advanced
+    knowledge_percentage: number;
+    correct_answers: number;
+    incorrect_answers: number;
+    dont_know_answers: number;
+    total_questions: number;
+    known_topics: string[];
+    weak_topics: string[];
+    unknown_topics: string[];
+  };
+  roadmap: Roadmap;  // Kept for backward compatibility
   syllabus: Syllabus;
   message: string;
 }
@@ -516,28 +569,20 @@ export const assessmentAPI = {
     course_id: number;
     course_name: string;
   }): Promise<InitialAssessmentResponse> => {
-    console.log('📡 assessmentAPI.generateInitialAssessment called with:', data);
-    console.log('📡 API baseURL:', api.defaults.baseURL);
-    console.log('📡 Full URL will be:', api.defaults.baseURL + '/assessment/initial/');
-    try {
-      const response = await api.post<InitialAssessmentResponse>(
-        '/assessment/initial/',
-        data
-      );
-      console.log('📡 API Response received:', response.data);
-      return response.data;
-    } catch (error: any) {
-      console.error('📡 API Error:', error);
-      console.error('📡 Error response:', error.response);
-      throw error;
-    }
+    const response = await api.post<InitialAssessmentResponse>(
+      '/assessment/initial/',
+      data
+    );
+    return response.data;
   },
 
   evaluateAssessment: async (data: {
     course_id: number;
     course_name: string;
     questions: AssessmentQuestion[];
-    answers: string[];
+    answers: number[];  // Changed to number[] (indices 0-3)
+    study_method: 'real_world' | 'theory_depth' | 'project_based' | 'custom';
+    custom_study_method?: string;  // Required when study_method is 'custom'
   }): Promise<EnrollmentResponse> => {
     const response = await api.post<EnrollmentResponse>(
       '/assessment/evaluate/',
@@ -677,13 +722,13 @@ export const chatAPI = {
 };
 
 // Re-export types for convenience
-export type { 
-  User, 
-  LearningProfile, 
-  Course, 
-  Module, 
-  Lesson, 
-  Resource, 
+export type {
+  User,
+  LearningProfile,
+  Course,
+  Module,
+  Lesson,
+  Resource,
   Enrollment,
   Question,
   QuizAttempt,

@@ -33,7 +33,7 @@ export default function DashboardPage() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-      
+
       <main className="flex-1 ml-64">
         <div className="p-8">
           {/* Header */}
@@ -128,33 +128,60 @@ export default function DashboardPage() {
           {/* Continue Learning */}
           <div className="bg-white rounded-2xl shadow-lg p-8">
             <h2 className="text-2xl font-semibold text-gray-900 mb-6">Continue Learning</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {[
-                { title: 'Data Structures', progress: 75, color: 'blue' },
-                { title: 'Machine Learning', progress: 40, color: 'purple' },
-                { title: 'Web Development', progress: 20, color: 'green' },
-              ].map((course, idx) => (
-                <div key={idx} className="border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all cursor-pointer">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">{course.title}</h3>
-                  <div className="mb-2">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-gray-600">Progress</span>
-                      <span className="text-sm font-medium text-gray-900">{course.progress}%</span>
+
+            {dashboard?.active_enrollments && dashboard.active_enrollments.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {dashboard.active_enrollments.map((enrollment) => (
+                  <div
+                    key={enrollment.id}
+                    className="border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all cursor-pointer group"
+                    onClick={() => navigate(`/course/${enrollment.id}`)}
+                  >
+                    <div className="flex items-start justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-gray-900 line-clamp-1">
+                        {enrollment.course.title || enrollment.course.name}
+                      </h3>
+                      <BookOpen className="w-5 h-5 text-blue-500" />
                     </div>
-                    <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                      {/* eslint-disable-next-line react/forbid-dom-props */}
-                      <div
-                        className={`h-full bg-gradient-to-r from-${course.color}-500 to-${course.color}-600 transition-all`}
-                        style={{ width: `${course.progress}%` }}
-                      />
+
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm text-gray-600">Progress</span>
+                        <span className="text-sm font-medium text-gray-900">
+                          {enrollment.overall_progress || 0}%
+                        </span>
+                      </div>
+                      <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-blue-500 to-purple-600 transition-all duration-300 group-hover:from-blue-600 group-hover:to-purple-700"
+                          style={{ width: `${enrollment.overall_progress || 0}%` }}
+                        />
+                      </div>
                     </div>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/course/${enrollment.id}`);
+                      }}
+                      className="w-full py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-all text-sm font-medium"
+                    >
+                      Continue Learning
+                    </button>
                   </div>
-                  <button className="mt-4 w-full py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-all">
-                    Continue
-                  </button>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-8 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+                <p className="text-gray-500 mb-4">You haven't enrolled in any courses yet.</p>
+                <button
+                  onClick={() => navigate('/courses/popular')}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                >
+                  Browse Courses
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </main>

@@ -5,12 +5,14 @@ from .models import (
     Achievement,
     ActivityLog,
     Course,
+    CoursePlanningTask,
     Enrollment,
     Lesson,
     LearningProfile,
     LearningRoadmap,
     Module,
     ModuleProgress,
+    PersonalizedSyllabus,
     Question,
     QuizAnswer,
     QuizAttempt,
@@ -137,3 +139,18 @@ class VideoTaskAdmin(admin.ModelAdmin):
     list_filter = ('status',)
     search_fields = ('topic',)
     readonly_fields = ('id',)
+
+
+@admin.register(CoursePlanningTask)
+class CoursePlanningTaskAdmin(admin.ModelAdmin):
+    list_display = ('course_title', 'status', 'category', 'difficulty_level', 'created_at', 'completed_at')
+    list_filter = ('status', 'category', 'difficulty_level')
+    search_fields = ('course_title', 'course_description')
+    readonly_fields = ('id', 'created_at')
+
+
+@admin.register(PersonalizedSyllabus)
+class PersonalizedSyllabusAdmin(admin.ModelAdmin):
+    list_display = ('enrollment', 'generated_by_model', 'created_at')
+    search_fields = ('enrollment__user__email', 'enrollment__course__name')
+

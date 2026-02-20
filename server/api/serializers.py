@@ -7,7 +7,7 @@ from .models import (
     VideoTask, LearningProfile, Course, Module, Lesson, Resource,
     Enrollment, Question, QuizAttempt, QuizAnswer, ModuleProgress,
     LearningRoadmap, Achievement, UserAchievement, ActivityLog,
-    PersonalizedSyllabus
+    PersonalizedSyllabus, CoursePlanningTask
 )
 
 User = get_user_model()
@@ -137,6 +137,7 @@ class CourseSerializer(serializers.ModelSerializer):
     modules = ModuleSerializer(many=True, read_only=True)
     modules_count = serializers.SerializerMethodField()
     enrolled_count = serializers.SerializerMethodField()
+    created_by_username = serializers.CharField(source='created_by.username', read_only=True)
     
     class Meta:
         model = Course
@@ -161,7 +162,13 @@ class EnrollmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Enrollment
         fields = '__all__'
-        read_only_fields = ('user', 'enrolled_at', 'completed_at', 'overall_progress')
+        read_only_fields = (
+            'user', 
+            'enrolled_at', 
+            'completed_at', 
+            'overall_progress',
+            'assessment_questions_count'  # Set by system during enrollment
+        )
 
 
 # ============================================================================
@@ -309,3 +316,28 @@ class VideoTaskStatusSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(obj.video_file.url)
             return obj.video_file.url
         return None
+
+
+class CoursePlanningTaskSerializer(serializers.ModelSerializer):
+    """Serializer for course planning tasks"""
+    
+    class Meta:
+        model = CoursePlanningTask
+        fields = [
+            "id",
+            "course_title",
+            "course_description",
+            "category",
+            "difficulty_level",
+            "estimated_duration",
+            "thumbnail",
+            "status",
+            "progress_message",
+            "result_data",
+            "created_courses",
+            "error_message",
+            "created_at",
+            "completed_at",
+        ]
+        read_only_fields = ["id", "status", "progress_message", "result_data", 
+                           "created_courses", "error_message", "created_at", "completed_at"]

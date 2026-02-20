@@ -74,7 +74,8 @@ export function CourseStructureDialog({
     return count;
   };
 
-  const difficultyColor = (level: string) => {
+  const difficultyColor = (level?: string) => {
+    if (!level) return 'bg-gray-100 text-gray-700 border-gray-200';
     switch (level.toLowerCase()) {
       case 'beginner':
         return 'bg-green-100 text-green-700 border-green-200';
@@ -106,7 +107,7 @@ export function CourseStructureDialog({
               </DialogDescription>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-4 pt-3">
             <div className="flex items-center gap-2 text-sm text-gray-600">
               <BookOpen className="w-4 h-4" />
@@ -149,8 +150,8 @@ export function CourseStructureDialog({
               const isExpanded = expandedModules.has(moduleIndex);
               const completedCount = getModuleCompletionCount(moduleIndex);
               const totalTopics = module.topics.length;
-              const progressPercent = totalTopics > 0 
-                ? Math.round((completedCount / totalTopics) * 100) 
+              const progressPercent = totalTopics > 0
+                ? Math.round((completedCount / totalTopics) * 100)
                 : 0;
 
               return (
@@ -166,20 +167,20 @@ export function CourseStructureDialog({
                     <div className="flex-shrink-0 w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-lg flex items-center justify-center font-bold text-lg shadow-sm">
                       {module.order}
                     </div>
-                    
+
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="font-semibold text-gray-900 text-base">
                           {module.module_name}
                         </h3>
-                        <Badge 
-                          variant="outline" 
+                        <Badge
+                          variant="outline"
                           className={cn('text-xs capitalize', difficultyColor(module.difficulty_level))}
                         >
                           {module.difficulty_level}
                         </Badge>
                       </div>
-                      
+
                       <p className="text-sm text-gray-600 mb-2 line-clamp-2">
                         {module.description}
                       </p>
@@ -203,7 +204,7 @@ export function CourseStructureDialog({
                       <div className="mt-2 h-1.5 bg-gray-200 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-gradient-to-r from-blue-500 to-blue-600 transition-all duration-300"
-                          {...({ style: { width: `${progressPercent}%` }} as any)}
+                          {...({ style: { width: `${progressPercent}%` } } as any)}
                         />
                       </div>
                     </div>
@@ -223,14 +224,14 @@ export function CourseStructureDialog({
                       <div className="p-4 space-y-2">
                         {module.topics.map((topic, topicIndex) => {
                           const completed = isTopicComplete(moduleIndex, topicIndex);
-                          
+
                           return (
                             <div
                               key={topicIndex}
                               className={cn(
                                 'p-3 rounded-lg border transition-all',
-                                completed 
-                                  ? 'bg-green-50 border-green-200' 
+                                completed
+                                  ? 'bg-green-50 border-green-200'
                                   : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow-sm'
                               )}
                             >
@@ -242,7 +243,7 @@ export function CourseStructureDialog({
                                     <Circle className="w-5 h-5 text-gray-400" />
                                   )}
                                 </div>
-                                
+
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 mb-1">
                                     <span className="text-xs font-medium text-gray-500">
@@ -254,11 +255,11 @@ export function CourseStructureDialog({
                                       </Badge>
                                     )}
                                   </div>
-                                  
+
                                   <h4 className="font-medium text-gray-900 text-sm mb-1">
                                     {topic.topic_name}
                                   </h4>
-                                  
+
                                   <p className="text-xs text-gray-600 leading-relaxed">
                                     {topic.description}
                                   </p>

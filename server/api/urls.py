@@ -4,6 +4,7 @@ from rest_framework_simplejwt.views import TokenRefreshView
 
 from .views import (
     GenerateVideoView, VideoTaskStatusView,
+    CoursePlanningView, CoursePlanningStatusView,
     RegisterView, CustomTokenObtainPairView, LogoutView,
     UserProfileView, LearningProfileView,
     CourseViewSet, ModuleViewSet, LessonViewSet, ResourceViewSet,
@@ -50,6 +51,10 @@ urlpatterns = [
     # Video Generation
     path('videos/generate/', GenerateVideoView.as_view(), name='video-generate'),
     path('videos/status/<uuid:task_id>/', VideoTaskStatusView.as_view(), name='video-status'),
+    
+    # Course Planning
+    path('courses/plan/', CoursePlanningView.as_view(), name='course-plan'),
+    path('courses/plan/status/<uuid:task_id>/', CoursePlanningStatusView.as_view(), name='course-plan-status'),
     
     # Assessment & Personalized Learning
     path('assessment/initial/', InitialAssessmentView.as_view(), name='assessment-initial'),
