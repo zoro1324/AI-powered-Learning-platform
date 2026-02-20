@@ -500,15 +500,16 @@ export interface SyllabusTopic {
 export interface SyllabusModule {
   module_name: string;
   description: string;
-  order: number;
-  difficulty_level: string;
-  estimated_duration_minutes: number;
+  order?: number;
+  difficulty_level?: string;
+  estimated_duration_minutes?: number;
   topics: SyllabusTopic[];
 }
 
 export interface Syllabus {
   course_name: string;
-  knowledge_level: string;
+  knowledge_level?: string;
+  difficulty_level: string;
   total_modules: number;
   modules: SyllabusModule[];
 }
@@ -731,13 +732,13 @@ export const chatAPI = {
 };
 
 // Re-export types for convenience
-export type { 
-  User, 
-  LearningProfile, 
-  Course, 
-  Module, 
-  Lesson, 
-  Resource, 
+export type {
+  User,
+  LearningProfile,
+  Course,
+  Module,
+  Lesson,
+  Resource,
   Enrollment,
   Question,
   QuizAttempt,

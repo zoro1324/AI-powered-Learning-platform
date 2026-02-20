@@ -55,6 +55,7 @@ class Syllabus(BaseModel):
     course_name: str = Field(..., description="Name of the course")
     course_objective: str = Field(..., description="Main objective of the course")
     study_method: str = Field(..., description="Study method preferences applied")
+    difficulty_level: str = Field(default="Beginner", description="Difficulty level of the course")
     total_modules: int = Field(..., description="Total number of modules")
     modules: List[Module] = Field(..., description="List of modules in the syllabus")
     total_estimated_hours: float = Field(..., description="Total estimated hours to complete the course")
@@ -464,6 +465,8 @@ Evaluate based on all criteria and decide whether to approve or reject."""
                     "course_description": course_description,
                     "difficulty": difficulty
                 })
+                # Inject knowledge level from input since it's not in the LLM JSON
+                syllabus.difficulty_level = difficulty
             except OutputParserException as e:
                 logger.warning(f"Parser error on attempt {attempt}: {str(e)[:100]}...")
                 if attempt < max_attempts:

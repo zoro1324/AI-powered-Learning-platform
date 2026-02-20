@@ -1562,7 +1562,7 @@ class GenerateTopicContentView(APIView):
         module_id = request.data.get('module_id')
         topic_name = request.data.get('topic_name')
         
-        if not all([enrollment_id, module_id, topic_name]):
+        if enrollment_id is None or module_id is None or not topic_name:
             return Response(
                 {'error': 'enrollment_id, module_id, and topic_name are required'},
                 status=status.HTTP_400_BAD_REQUEST

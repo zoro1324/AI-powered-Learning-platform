@@ -12,6 +12,7 @@ from .models import (
     LearningRoadmap,
     Module,
     ModuleProgress,
+    PersonalizedSyllabus,
     Question,
     QuizAnswer,
     QuizAttempt,
@@ -146,3 +147,10 @@ class CoursePlanningTaskAdmin(admin.ModelAdmin):
     list_filter = ('status', 'category', 'difficulty_level')
     search_fields = ('course_title', 'course_description')
     readonly_fields = ('id', 'created_at')
+
+
+@admin.register(PersonalizedSyllabus)
+class PersonalizedSyllabusAdmin(admin.ModelAdmin):
+    list_display = ('enrollment', 'generated_by_model', 'created_at')
+    search_fields = ('enrollment__user__email', 'enrollment__course__name')
+
