@@ -6,6 +6,7 @@ import {
   LoginCredentials,
   RegisterData,
   AuthResponse,
+  ApiError,
 } from '../../types/api';
 
 interface AuthState {
@@ -14,7 +15,7 @@ interface AuthState {
   refreshToken: string | null;
   isAuthenticated: boolean;
   loading: boolean;
-  error: string | null;
+  error: string | ApiError | null;
 }
 
 const initialState: AuthState = {
@@ -129,7 +130,7 @@ const authSlice = createSlice({
       })
       .addCase(register.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = action.payload as string | ApiError;
       });
 
     // Login
@@ -150,7 +151,7 @@ const authSlice = createSlice({
       })
       .addCase(login.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = action.payload as string | ApiError;
       });
 
     // Logout
@@ -176,7 +177,7 @@ const authSlice = createSlice({
       })
       .addCase(fetchUserProfile.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = action.payload as string | ApiError;
       });
 
     // Update user profile
@@ -191,7 +192,7 @@ const authSlice = createSlice({
       })
       .addCase(updateUserProfile.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = action.payload as string | ApiError;
       });
 
     // Update learning profile
@@ -208,7 +209,7 @@ const authSlice = createSlice({
       })
       .addCase(updateLearningProfile.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.payload as string;
+        state.error = action.payload as string | ApiError;
       });
   },
 });
