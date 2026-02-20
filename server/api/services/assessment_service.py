@@ -14,8 +14,8 @@ import logging
 import re
 from typing import Dict, List, Any, Optional
 
-import requests
 from django.conf import settings
+from api.services.ai_client import generate_text
 
 logger = logging.getLogger(__name__)
 
@@ -26,77 +26,12 @@ class AssessmentService:
     def __init__(self, ollama_url: str = None, ollama_model: str = None):
         """
         Initialize the assessment service.
-        
-        Args:
-            ollama_url: Ollama API URL (defaults to settings.OLLAMA_API_URL)
-            ollama_model: Ollama model name (defaults to settings.OLLAMA_MODEL)
+
+        The ollama_url / ollama_model parameters are kept for backwards
+        compatibility but are ignored when IS_PRODUCTION=True.
         """
-        print("\n=== AssessmentService.__init__ CALLED ===")
-        print(f"  ollama_url parameter: {ollama_url}")
-        print(f"  ollama_model parameter: {ollama_model}")
-        # Use chat endpoint instead of generate
-        base_url = ollama_url or settings.OLLAMA_API_URL
-        self.ollama_url = base_url.replace('/api/generate', '/api/chat')
-        self.ollama_model = ollama_model or settings.OLLAMA_MODEL
-        print(f"  Final ollama_url: {self.ollama_url}")
-        print(f"  Final ollama_model: {self.ollama_model}")
-        print("=== AssessmentService initialized ===")
-    
-    def _call_ollama(self, prompt: str, system_prompt: str = None) -> str:
-        """
-        Make a request to Ollama API.
-        
-        Args:
-            prompt: The user prompt
-            system_prompt: Optional system prompt
-            
-        Returns:
-            The model's response text
-            
-        Raises:
-            RuntimeError: If the API call fails
-        """
-        print("\n=== _call_ollama CALLED ===")
-        print(f"  URL: {self.ollama_url}")
-        print(f"  Model: {self.ollama_model}")
-        print(f"  Prompt length: {len(prompt)} chars")
-        print(f"  Has system prompt: {system_prompt is not None}")
-        messages = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
-        messages.append({"role": "user", "content": prompt})
-        
-        payload = {
-            "model": self.ollama_model,
-            "messages": messages,
-            "stream": False,
-            "options": {
-                "num_predict": 4096,  # Increased token limit for comprehensive content
-                "temperature": 0.7,
-                "top_p": 0.9
-            }
-        }
-        
-        try:
-            print("  Sending request to Ollama...")
-            response = requests.post(
-                self.ollama_url,
-                json=payload,
-                headers={"Content-Type": "application/json"},
-                timeout=60
-            )
-            print(f"  Response status code: {response.status_code}")
-            response.raise_for_status()
-            data = response.json()
-            content = data.get('message', {}).get('content', '')
-            print(f"  Response content length: {len(content)} chars")
-            print("=== _call_ollama SUCCESS ===")
-            return content
-        except requests.exceptions.RequestException as e:
-            print(f"  ERROR in _call_ollama: {e}")
-            logger.error(f"Ollama API error: {e}")
-            print("=== _call_ollama FAILED ===")
-            raise RuntimeError(f"Failed to get response from Ollama: {e}")
+        backend = "Gemini" if getattr(settings, 'IS_PRODUCTION', False) else "Ollama"
+        logger.info("AssessmentService initialised — AI backend: %s", backend)
     
     def _extract_json(self, text: str) -> Dict[str, Any]:
         """
@@ -373,7 +308,7 @@ Use this EXACT format:
 
 Generate the JSON now:"""
         
-        response = self._call_ollama(prompt, system_prompt)
+        response = generate_text(prompt, system_prompt=system_prompt, json_mode=True)
         result = self._extract_json(response)
         print(f"  Evaluation results: {result}")
         print("=== evaluate_initial_assessment SUCCESS ===")
@@ -686,7 +621,8 @@ Generate the full syllabus JSON now with varied topic counts per module:"""
         course_name: str,
         topic_name: str,
         study_method: str,
-        topic_description: str = ""
+        topic_description: str = "",
+        system_prompt: str = None
     ) -> str:
         """
         Generate detailed educational content for a specific topic.
@@ -696,6 +632,7 @@ Generate the full syllabus JSON now with varied topic counts per module:"""
             topic_name: Name of the topic
             study_method: User's preferred study method
             topic_description: Optional description of the topic to guide content generation
+            system_prompt: Optional personalized system prompt from enrollment learning style
             
         Returns:
             Generated content as markdown text
@@ -706,6 +643,7 @@ Generate the full syllabus JSON now with varied topic counts per module:"""
         print(f"  Topic: {topic_name}")
         print(f"  Topic Description: {topic_description}")
         print(f"  Study method: {study_method}")
+        print(f"  Has personalized system prompt: {bool(system_prompt)}")
         print("========================================")
         
         # Build the description context if available
@@ -740,7 +678,8 @@ Requirements:
 Generate the detailed content now:
 """
         
-        response = self._call_ollama(prompt)
+        # Use personalized system prompt if available, otherwise no system prompt
+        response = generate_text(prompt, system_prompt=system_prompt or None)
         print(f"  Generated content length: {len(response)} chars")
         print("=== generate_topic_content SUCCESS ===")
         return response
@@ -795,7 +734,7 @@ Return strictly JSON:
 }}
 """
         
-        response = self._call_ollama(prompt)
+        response = generate_text(prompt, json_mode=True)
         result = self._extract_json(response)
         print(f"  Generated {len(result.get('questions', []))} quiz questions")
         print("=== generate_topic_quiz SUCCESS ===")
@@ -856,7 +795,8 @@ Return strictly JSON:
         course_name: str,
         topic_name: str,
         weak_areas: List[str],
-        original_content: str
+        original_content: str,
+        system_prompt: str = None
     ) -> Dict[str, Any]:
         """
         Generate focused remediation content for sub-topics the user got wrong.
@@ -866,6 +806,7 @@ Return strictly JSON:
             topic_name: Name of the parent topic
             weak_areas: List of question texts / sub-topics the user struggled on
             original_content: The original lesson content for context
+            system_prompt: Optional personalized system prompt from enrollment learning style
             
         Returns:
             Dictionary with 'remediation_notes' list
@@ -913,7 +854,7 @@ Return strictly JSON:
 }}
 """
 
-        response = self._call_ollama(prompt)
+        response = generate_text(prompt, system_prompt=system_prompt or None, json_mode=True)
         result = self._extract_json(response)
         
         # Ensure we have the right structure
@@ -973,7 +914,7 @@ Return strictly JSON:
 }}
 """
         
-        response = self._call_ollama(prompt)
+        response = generate_text(prompt, json_mode=True)
         return self._extract_json(response)
 
     def chat_with_context(
@@ -1041,33 +982,23 @@ Use examples where helpful. Format your response in markdown for readability.
         # Add current message
         messages.append({"role": "user", "content": message})
         
-        # Call Ollama directly with messages array (bypasses _call_ollama to include history)
-        payload = {
-            "model": self.ollama_model,
-            "messages": messages,
-            "stream": False,
-            "options": {
-                "num_predict": 2048,
-                "temperature": 0.7,
-                "top_p": 0.9
-            }
-        }
-        
+        # Build full prompt string with chat history for ai_client
+        history_text = ""
+        if chat_history:
+            for msg in chat_history[-10:]:
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+                history_text += f"\n[{role.upper()}]: {content}"
+
+        full_prompt = f"{history_text}\n[USER]: {message}" if history_text else message
+
         try:
-            response = requests.post(
-                self.ollama_url,
-                json=payload,
-                headers={"Content-Type": "application/json"},
-                timeout=120
-            )
-            response.raise_for_status()
-            data = response.json()
-            reply = data.get('message', {}).get('content', '')
+            reply = generate_text(full_prompt, system_prompt=system_prompt)
             print(f"  Chat response length: {len(reply)} chars")
             print("=== chat_with_context SUCCESS ===")
             return reply
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Chat Ollama API error: {e}")
+        except Exception as e:
+            logger.error(f"Chat AI error: {e}")
             print(f"  ERROR in chat_with_context: {e}")
             print("=== chat_with_context FAILED ===")
             raise RuntimeError(f"Failed to get chat response: {e}")

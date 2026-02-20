@@ -5,54 +5,14 @@ import os
 import textwrap
 import time
 
-import requests
-import torch
 from django.conf import settings
 from django.core.files import File
 from django.utils import timezone
 from moviepy import AudioFileClip, ImageClip, VideoFileClip, concatenate_videoclips
 from PIL import Image, ImageDraw, ImageFont
+from api.services.ai_client import generate_text, generate_image as ai_generate_image
 
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Stable Diffusion singleton — loaded once, reused across tasks
-# ---------------------------------------------------------------------------
-_sd_pipeline = None
-
-
-def _get_sd_pipeline():
-    """Lazily load and cache the Stable Diffusion pipeline."""
-    global _sd_pipeline
-    if _sd_pipeline is not None:
-        return _sd_pipeline
-
-    from diffusers import StableDiffusionPipeline
-    from diffusers.schedulers import LCMScheduler
-
-    model_id = "runwayml/stable-diffusion-v1-5"
-    lora_id = "latent-consistency/lcm-lora-sdv1-5"
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-
-    logger.info("Loading Stable Diffusion on %s ...", device)
-
-    pipe = StableDiffusionPipeline.from_pretrained(
-        model_id,
-        torch_dtype=torch.float16 if device == "cuda" else torch.float32,
-        safety_checker=None,
-    ).to(device)
-
-    pipe.enable_attention_slicing()
-    pipe.enable_vae_slicing()
-    if device == "cuda":
-        pipe.enable_model_cpu_offload()
-
-    pipe.load_lora_weights(lora_id)
-    pipe.scheduler = LCMScheduler.from_config(pipe.scheduler.config)
-
-    _sd_pipeline = pipe
-    logger.info("Stable Diffusion loaded successfully.")
-    return _sd_pipeline
 
 
 # ---------------------------------------------------------------------------
@@ -92,7 +52,6 @@ class VideoGeneratorService:
         # Build content context if lesson content is available
         content_context = ""
         if content:
-            # Truncate to fit in context window but keep substantial detail
             max_len = 4000
             truncated = content[:max_len] + "..." if len(content) > max_len else content
             content_context = (
@@ -115,7 +74,7 @@ class VideoGeneratorService:
             '    {\n'
             '      "title": "Scene Title",\n'
             '      "bullets": ["Point 1", "Point 2", "Point 3"],\n'
-            '      "narration": "This is the spoken narration for this scene. It should be 2-3 sentences explaining the concept clearly.",\n'
+            '      "narration": "This is the spoken narration for this scene.",\n'
             '      "image_prompt": "visual description for illustration"\n'
             '    }\n'
             '  ]\n'
@@ -123,21 +82,10 @@ class VideoGeneratorService:
         )
 
         try:
-            timeout = getattr(settings, 'OLLAMA_TIMEOUT', 600)
-            logger.info(f"Requesting script from Ollama (timeout: {timeout}s)...")
-            response = requests.post(
-                settings.OLLAMA_API_URL,
-                json={
-                    "model": settings.OLLAMA_MODEL,
-                    "prompt": prompt,
-                    "format": "json",
-                    "stream": False,
-                },
-                timeout=timeout,
-            )
-            response.raise_for_status()
-            script_data = json.loads(response.json()["response"])
-            logger.info("✅ Received script from Ollama successfully")
+            logger.info("Requesting script from AI backend...")
+            response_text = generate_text(prompt, json_mode=True)
+            script_data = json.loads(response_text)
+            logger.info("✅ Received script from AI backend successfully")
 
             # Persist script to disk
             script_path = os.path.join(self.scripts_dir, "script.json")
@@ -146,15 +94,13 @@ class VideoGeneratorService:
 
             return script_data
 
-        except requests.exceptions.RequestException as e:
-            logger.exception("Ollama connection error")
-            logger.error(f"❌ Failed to connect to Ollama at {settings.OLLAMA_API_URL}")
-            logger.error(f"   Make sure Ollama is running: ollama serve")
-            logger.error(f"   And model is available: ollama pull {settings.OLLAMA_MODEL}")
-            return None
         except (json.JSONDecodeError, KeyError) as e:
-            logger.exception("Invalid JSON from Ollama")
-            logger.error(f"❌ Ollama returned invalid JSON: {e}")
+            logger.exception("Invalid JSON from AI backend")
+            logger.error(f"❌ AI backend returned invalid JSON: {e}")
+            return None
+        except Exception as e:
+            logger.exception("AI backend connection error in generate_script")
+            logger.error(f"❌ Failed to get script: {e}")
             return None
 
     # ------------------------------------------------------------------
@@ -162,22 +108,12 @@ class VideoGeneratorService:
     # ------------------------------------------------------------------
 
     def generate_image(self, prompt_text: str, output_path: str) -> str | None:
-        pipe = _get_sd_pipeline()
-        full_prompt = (
-            f"simple flat illustration of {prompt_text}, "
-            "minimal design, clean white background, "
-            "educational graphic, vector style, no text"
-        )
+        """Generate an image using the configured AI backend (Stable Diffusion or Gemini)."""
         try:
-            image = pipe(
-                prompt=full_prompt,
-                num_inference_steps=6,
-                guidance_scale=1.5,
-                height=512,
-                width=512,
-            ).images[0]
-            image.save(output_path)
-            return output_path
+            result = ai_generate_image(prompt_text, output_path=output_path)
+            if result is not None:
+                return output_path
+            return None
         except Exception:
             logger.exception("Image generation failed")
             return None

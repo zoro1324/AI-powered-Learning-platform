@@ -583,6 +583,7 @@ export const assessmentAPI = {
     answers: number[];  // Changed to number[] (indices 0-3)
     study_method: 'real_world' | 'theory_depth' | 'project_based' | 'custom';
     custom_study_method?: string;  // Required when study_method is 'custom'
+    learning_style?: 'mindmap' | 'videos' | 'summary' | 'books' | 'reels';  // User's chosen learning style
   }): Promise<EnrollmentResponse> => {
     const response = await api.post<EnrollmentResponse>(
       '/assessment/evaluate/',
@@ -686,6 +687,7 @@ export const podcastAPI = {
     person2?: string;
     lesson_id?: number;
     topic_name?: string;
+    enrollment_id?: number;  // Pass enrollment to apply personalized system prompt
   }): Promise<{
     audio_url: string;
     message: string;

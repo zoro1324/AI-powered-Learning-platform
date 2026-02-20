@@ -24,8 +24,9 @@ interface AssessmentDialogProps {
   onEnrollmentComplete: (enrollmentId: number) => void;
 }
 
-type AssessmentStep = 'loading' | 'study-method' | 'questions' | 'submitting' | 'complete';
+type AssessmentStep = 'loading' | 'study-method' | 'learning-style' | 'questions' | 'submitting' | 'complete';
 type StudyMethod = 'real_world' | 'theory_depth' | 'project_based' | 'custom';
+type LearningStylePref = 'mindmap' | 'videos' | 'summary' | 'books' | 'reels';
 
 export default function AssessmentDialog({
   open,
@@ -38,6 +39,7 @@ export default function AssessmentDialog({
   const [step, setStep] = useState<AssessmentStep>('loading');
   const [studyMethod, setStudyMethod] = useState<StudyMethod>('real_world');
   const [customStudyMethod, setCustomStudyMethod] = useState<string>('');
+  const [learningStyle, setLearningStyle] = useState<LearningStylePref>('summary');
   const [questions, setQuestions] = useState<AssessmentQuestion[]>([]);
   const [answers, setAnswers] = useState<{ [key: number]: number }>({});  // Changed to store indices
   const [evaluation, setEvaluation] = useState<any>(null);
@@ -57,17 +59,17 @@ export default function AssessmentDialog({
         course_name: courseName,
       });
       console.log('🔵 Assessment API response:', response);
-      
+
       // Validate questions have options
       const validatedQuestions = (response.questions || []).map(q => ({
         ...q,
         options: Array.isArray(q.options) ? q.options : []
       }));
-      
+
       if (validatedQuestions.length === 0) {
         throw new Error('No valid questions received from API');
       }
-      
+
       setQuestions(validatedQuestions);
       setStep('study-method');  // First show study method selection
     } catch (err: any) {
@@ -92,6 +94,7 @@ export default function AssessmentDialog({
       setStep('loading');
       setStudyMethod('real_world');
       setCustomStudyMethod('');
+      setLearningStyle('summary');
       setQuestions([]);
       setAnswers({});
       setEvaluation(null);
@@ -125,6 +128,7 @@ export default function AssessmentDialog({
         answers: answersArray,
         study_method: studyMethod,
         custom_study_method: studyMethod === 'custom' ? customStudyMethod : '',
+        learning_style: learningStyle,
       });
 
       setEvaluation(response.assessment_result);
@@ -152,7 +156,7 @@ export default function AssessmentDialog({
     }
   };
 
-  const allQuestionsAnswered = questions.length > 0 && 
+  const allQuestionsAnswered = questions.length > 0 &&
     questions.every((_, index) => answers[index] !== undefined);
 
   return (
@@ -256,11 +260,60 @@ export default function AssessmentDialog({
 
             <div className="flex justify-end pt-4 border-t">
               <Button
-                onClick={() => setStep('questions')}
+                onClick={() => setStep('learning-style')}
                 disabled={studyMethod === 'custom' && !customStudyMethod.trim()}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-6"
               >
-                Continue to Assessment
+                Continue
+              </Button>
+            </div>
+          </>
+        )}
+
+        {step === 'learning-style' && (
+          <>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-2xl">
+                <Sparkles className="w-6 h-6 text-blue-600" />
+                Content Presentation Style
+              </DialogTitle>
+              <DialogDescription>
+                How would you like AI to present information to you during learning?
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3 py-6">
+              {([
+                { value: 'mindmap', label: '🗺️ Mind Maps', desc: 'Visual hierarchies, connected concepts and diagrams' },
+                { value: 'videos', label: '🎬 Video-Style', desc: 'Narrated scenes, vivid descriptions, dialogue-driven' },
+                { value: 'summary', label: '📝 Summary Notes', desc: 'Bullet points, key takeaways, concise headings' },
+                { value: 'books', label: '📚 Book-Style', desc: 'Rich prose, detailed explanations, full context' },
+                { value: 'reels', label: '⚡ Short Reels', desc: 'Bite-sized punchy insights, casual tone' },
+              ] as { value: LearningStylePref; label: string; desc: string }[]).map(({ value, label, desc }) => (
+                <Card
+                  key={value}
+                  className={`cursor-pointer transition-all ${learningStyle === value ? 'border-blue-500 border-2 bg-blue-50' : 'border hover:border-blue-300'}`}
+                  onClick={() => setLearningStyle(value)}
+                >
+                  <CardContent className="pt-4 pb-4">
+                    <div className="flex items-start space-x-3">
+                      <RadioGroup value={learningStyle} onValueChange={(v) => setLearningStyle(v as LearningStylePref)}>
+                        <RadioGroupItem value={value} id={`ls-${value}`} />
+                      </RadioGroup>
+                      <div className="flex-1">
+                        <Label htmlFor={`ls-${value}`} className="cursor-pointer font-semibold text-base">{label}</Label>
+                        <p className="text-sm text-gray-600 mt-0.5">{desc}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <div className="flex justify-between pt-4 border-t">
+              <Button variant="outline" onClick={() => setStep('study-method')}>Back</Button>
+              <Button onClick={() => setStep('questions')} className="bg-blue-600 hover:bg-blue-700 text-white px-6">
+                Start Assessment
               </Button>
             </div>
           </>
@@ -282,9 +335,9 @@ export default function AssessmentDialog({
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md mb-4">
                 {error}
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   className="ml-2"
                   onClick={loadAssessment}
                 >
@@ -312,12 +365,12 @@ export default function AssessmentDialog({
                     >
                       <div className="space-y-3">
                         {(question.options || []).map((option, optionIndex) => (
-                          <div 
-                            key={optionIndex} 
+                          <div
+                            key={optionIndex}
                             className="flex items-center space-x-3 p-3 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors cursor-pointer"
                           >
                             <RadioGroupItem value={optionIndex.toString()} id={`q${index}-opt${optionIndex}`} />
-                            <Label 
+                            <Label
                               htmlFor={`q${index}-opt${optionIndex}`}
                               className="cursor-pointer flex-1"
                             >

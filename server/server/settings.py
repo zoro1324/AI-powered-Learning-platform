@@ -10,8 +10,16 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 from datetime import timedelta
+
+# Load environment variables from .env file (if present)
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parent.parent / '.env')
+except ImportError:
+    pass  # python-dotenv not installed; rely on shell environment
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -192,7 +200,20 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 
-# Video generation
-OLLAMA_API_URL = 'http://localhost:11434/api/generate'
-OLLAMA_MODEL = 'llama3:8b'
-OLLAMA_TIMEOUT = 600  # Timeout in seconds (10 minutes)
+# ─────────────────────────────────────────────────────────────────────────────
+# AI Backend Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Set IS_PRODUCTION=True in your .env (or shell env) to use Gemini API.
+# Defaults to False so local development uses OLLAMA + Stable Diffusion.
+IS_PRODUCTION = os.environ.get('IS_PRODUCTION', 'False').strip().lower() in ('1', 'true', 'yes')
+
+# --- OLLAMA (development) ---
+OLLAMA_API_URL = os.environ.get('OLLAMA_API_URL', 'http://localhost:11434/api/generate')
+OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'llama3:8b')
+OLLAMA_TIMEOUT = int(os.environ.get('OLLAMA_TIMEOUT', '600'))  # seconds
+
+# --- Gemini (production) ---
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
+GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-2.0-flash')          # text / chat
+GEMINI_IMAGE_MODEL = os.environ.get('GEMINI_IMAGE_MODEL', 'imagen-3.0-generate-002')  # image gen

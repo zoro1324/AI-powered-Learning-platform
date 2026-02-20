@@ -15,8 +15,8 @@ import os
 import asyncio
 from typing import Dict, List, Any, Optional
 
-import requests
 from django.conf import settings
+from api.services.ai_client import generate_text
 import edge_tts
 
 logger = logging.getLogger(__name__)
@@ -28,14 +28,11 @@ class PodcastService:
     def __init__(self, ollama_url: str = None, ollama_model: str = None):
         """
         Initialize the podcast service.
-        
-        Args:
-            ollama_url: Ollama API URL (defaults to settings.OLLAMA_API_URL)
-            ollama_model: Ollama model name (defaults to settings.OLLAMA_MODEL)
+
+        The ollama_url / ollama_model parameters are kept for backwards
+        compatibility but are ignored when IS_PRODUCTION=True.
         """
-        base_url = ollama_url or settings.OLLAMA_API_URL
-        self.ollama_url = base_url.replace('/api/generate', '/api/chat')
-        self.ollama_model = ollama_model or settings.OLLAMA_MODEL
+        backend = "Gemini" if getattr(settings, 'IS_PRODUCTION', False) else "Ollama"
         
         # Voice mapping for personas
         self.voice_map = {
@@ -43,41 +40,7 @@ class PodcastService:
             "person2": "en-US-JennyNeural"  # Female voice
         }
         
-        logger.info(f"PodcastService initialized with model: {self.ollama_model}")
-    
-    def _call_ollama(self, prompt: str, system_prompt: str = None) -> str:
-        """
-        Make a request to Ollama API.
-        
-        Args:
-            prompt: The user prompt
-            system_prompt: Optional system prompt
-            
-        Returns:
-            The response content as string
-        """
-        messages = []
-        if system_prompt:
-            messages.append({'role': 'system', 'content': system_prompt})
-        messages.append({'role': 'user', 'content': prompt})
-        
-        try:
-            response = requests.post(
-                self.ollama_url,
-                json={
-                    'model': self.ollama_model,
-                    'messages': messages,
-                    'format': 'json',
-                    'stream': False
-                },
-                timeout=300
-            )
-            response.raise_for_status()
-            data = response.json()
-            return data['message']['content']
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Ollama API error: {e}")
-            raise Exception(f"Failed to call Ollama API: {str(e)}")
+        logger.info("PodcastService initialized — AI backend: %s", backend)
     
     def generate_persona_options(self, text: str) -> List[Dict[str, str]]:
         """
@@ -109,7 +72,7 @@ class PodcastService:
         """
         
         try:
-            response = self._call_ollama(prompt)
+            response = generate_text(prompt, json_mode=True)
             data = json.loads(response)
             options = data.get('options', [])
             
@@ -160,7 +123,7 @@ class PodcastService:
         """
         
         try:
-            response = self._call_ollama(prompt)
+            response = generate_text(prompt, json_mode=True)
             data = json.loads(response)
             options = data.get('options', [])
             
@@ -179,7 +142,8 @@ class PodcastService:
         instruction: Optional[str] = None,
         person1: Optional[str] = None,
         person2: Optional[str] = None,
-        output_dir: Optional[str] = None
+        output_dir: Optional[str] = None,
+        system_prompt: Optional[str] = None
     ) -> Optional[str]:
         """
         Main method to generate an audio overview from text.
@@ -190,6 +154,7 @@ class PodcastService:
             person1: Optional persona 1 name/role
             person2: Optional persona 2 name/role
             output_dir: Optional output directory path
+            system_prompt: Optional personalized system prompt from enrollment learning style
             
         Returns:
             Path to the generated audio file or None on failure
@@ -199,8 +164,8 @@ class PodcastService:
             roles = self._determine_roles(text, instruction, person1, person2)
             logger.info(f"Selected Roles: {roles}")
             
-            # 2. Generate Script
-            script = self._generate_script(text, roles, instruction)
+            # 2. Generate Script (with personalized system prompt if available)
+            script = self._generate_script(text, roles, instruction, system_prompt=system_prompt)
             logger.info(f"Generated Script with {len(script)} turns")
             
             if not script:
@@ -271,17 +236,23 @@ class PodcastService:
         self,
         text: str,
         roles: Dict[str, str],
-        instruction: Optional[str] = None
+        instruction: Optional[str] = None,
+        system_prompt: Optional[str] = None
     ) -> List[Dict[str, str]]:
         """Generate the podcast script"""
         
         instruction_text = f"Focus on this specific theme/format: {instruction}" if instruction else "Cover the key points naturally."
         
+        # Prepend personalized system prompt context if available
+        style_context = ""
+        if system_prompt:
+            style_context = f"\n\nIMPORTANT - Presentation style guidance:\n{system_prompt}\n"
+        
         podcast_prompt = f"""
         Generate a natural conversation between {roles.get('person1', 'Speaker 1')} and {roles.get('person2', 'Speaker 2')} based on the following content.
         Make it engaging, authentic, and easy to follow.
         Make it a comprehensive deep dive. Do not limit the conversation length. 
-        {instruction_text}
+        {instruction_text}{style_context}
 
         Content:
         {text[:12000]}... (truncated if too long)

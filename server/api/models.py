@@ -279,6 +279,12 @@ class Enrollment(models.Model):
         default='',
         help_text='Custom study method description when study_method_preference is "custom"',
     )
+    ai_system_prompt = models.TextField(
+        blank=True,
+        default='',
+        help_text='AI-generated system prompt personalized to the user\'s learning style for this enrollment. '
+                  'Used as the LLM system instruction for notes and audio generation (not quiz).',
+    )
     assessment_questions_count = models.PositiveIntegerField(
         null=True,
         blank=True,

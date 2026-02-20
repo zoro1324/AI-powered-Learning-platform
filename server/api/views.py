@@ -1288,6 +1288,8 @@ class EvaluateAssessmentView(APIView):
         answers = request.data.get('answers')
         study_method = request.data.get('study_method', 'real_world')
         custom_study_method = request.data.get('custom_study_method', '')
+        # Learning style chosen by the user on the LearningPreferencePage
+        user_learning_style = request.data.get('learning_style', None)
         
         if not all([course_id, course_name, questions, answers]):
             return Response(
@@ -1388,13 +1390,48 @@ class EvaluateAssessmentView(APIView):
             }
             diagnosed_level = knowledge_level_map.get(assessment_result.knowledge_level, 'beginner')
             
-            # Determine learning style based on knowledge level
-            level_to_style = {
-                'beginner': 'videos',
-                'intermediate': 'summary',
-                'advanced': 'mindmap',
+            # Use the user's explicit learning style choice if provided;
+            # otherwise fall back to mapping from knowledge level.
+            if user_learning_style and user_learning_style in ('mindmap', 'videos', 'summary', 'books', 'reels'):
+                learning_style = user_learning_style
+            else:
+                level_to_style = {
+                    'beginner': 'videos',
+                    'intermediate': 'summary',
+                    'advanced': 'mindmap',
+                }
+                learning_style = level_to_style.get(diagnosed_level, 'summary')
+            
+            # ── Generate personalized AI system prompt based on learning style ────
+            style_descriptions = {
+                'mindmap': 'visual mind maps and connected concepts, preferring structured hierarchies and diagrams',
+                'videos': 'video-style narration with vivid scene-setting, dialogue, and visual descriptions',
+                'summary': 'concise summaries with key bullet points, clear headings, and distilled insights',
+                'books': 'detailed book-style prose with rich context, examples, and thorough explanations',
+                'reels': 'short punchy content, quick takes, casual tone, and bite-sized explanations',
             }
-            learning_style = level_to_style.get(diagnosed_level, 'summary')
+            style_desc = style_descriptions.get(learning_style, 'clear, engaging educational content')
+            
+            try:
+                from .services.assessment_service import get_assessment_service as get_ai_service
+                ai_service = get_ai_service()
+                system_prompt_gen_prompt = (
+                    f'You are an expert AI tutor. A student is learning "{course.title}" '
+                    f'at the "{diagnosed_level}" level. Their preferred learning style is "{learning_style}", '
+                    f'which means they learn best through {style_desc}. '
+                    f'Write a concise system prompt (4-6 sentences) that instructs an AI teaching assistant '
+                    f'to teach this student in a way that perfectly matches their learning style. '
+                    f'Include the preferred tone, format, structure, and any special presentation instructions. '
+                    f'Do not include greetings or preamble — just the direct instruction to the AI.'
+                )
+                ai_system_prompt = ai_service._call_ollama(
+                    prompt=system_prompt_gen_prompt,
+                    system_prompt='You are a prompt engineering expert. Output only the system prompt text, no extra commentary.'
+                ).strip()
+                logger.info(f"Generated ai_system_prompt ({len(ai_system_prompt)} chars) for enrollment.")
+            except Exception as sp_err:
+                logger.warning(f"Could not generate ai_system_prompt: {sp_err}")
+                ai_system_prompt = ''
             
             # Create enrollment with new fields
             enrollment = Enrollment.objects.create(
@@ -1404,6 +1441,7 @@ class EvaluateAssessmentView(APIView):
                 learning_style_override=learning_style,
                 study_method_preference=study_method,
                 custom_study_method=custom_study_method,
+                ai_system_prompt=ai_system_prompt,
                 assessment_questions_count=len(questions),
                 status='active'
             )
@@ -1560,11 +1598,11 @@ class GenerateTopicContentView(APIView):
         
         
         
-        # print(f"DEBUG: GenerateTopicContentView POST data: {request.data}")
+        print(f"DEBUG: GenerateTopicContentView POST data: {request.data}")
         enrollment_id = request.data.get('enrollment_id')
         module_id = request.data.get('module_id')
         topic_name = request.data.get('topic_name')
-        # print(f"DEBUG: Extracted -> enrollment_id={enrollment_id}, module_id={module_id}, topic_name={topic_name}")
+        print(f"DEBUG: Extracted -> enrollment_id={enrollment_id}, module_id={module_id}, topic_name={topic_name}")
         
         if enrollment_id is None or module_id is None or not topic_name:
             return Response(
@@ -1665,14 +1703,16 @@ class GenerateTopicContentView(APIView):
             print(f"*** Topic: {topic_name} ***")
             print(f"*** Topic Description: {topic_description} ***")
             print(f"*** Study method: {study_method} ***")
+            print(f"*** Has personalized system prompt: {bool(enrollment.ai_system_prompt)} ***")
             print("**************************************************")
-            # Generate content
+            # Generate content with personalized system prompt
             assessment_service = get_assessment_service()
             content = assessment_service.generate_topic_content(
                 enrollment.course.title,
                 topic_name,
                 study_method,
-                topic_description
+                topic_description,
+                system_prompt=enrollment.ai_system_prompt or None
             )
             print(f"*** Content generated: {len(content)} chars ***")
             print("**************************************************\n")
@@ -2157,7 +2197,8 @@ class GenerateRemediationContentView(APIView):
                 enrollment.course.title,
                 topic_name,
                 weak_areas,
-                original_content
+                original_content,
+                system_prompt=enrollment.ai_system_prompt or None
             )
             
             print(f"*** Remediation notes generated: {len(result.get('remediation_notes', []))} ***")
@@ -2291,6 +2332,17 @@ class GeneratePodcastView(APIView):
             person2 = request.data.get('person2', None)
             lesson_id = request.data.get('lesson_id', None)
             topic_name = request.data.get('topic_name', None)
+            enrollment_id = request.data.get('enrollment_id', None)
+            
+            # Retrieve personalized system prompt from enrollment if enrollment_id is provided
+            podcast_system_prompt = None
+            if enrollment_id:
+                try:
+                    enrollment_obj = Enrollment.objects.get(pk=enrollment_id, user=request.user)
+                    podcast_system_prompt = enrollment_obj.ai_system_prompt or None
+                    logger.info(f"Podcast: using system prompt from enrollment {enrollment_id} ({len(podcast_system_prompt or '')} chars)")
+                except Enrollment.DoesNotExist:
+                    logger.warning(f"Podcast: enrollment {enrollment_id} not found, proceeding without system prompt")
             
             if not text:
                 return Response(
@@ -2303,7 +2355,8 @@ class GeneratePodcastView(APIView):
                 text=text,
                 instruction=instruction,
                 person1=person1,
-                person2=person2
+                person2=person2,
+                system_prompt=podcast_system_prompt
             )
             
             if not audio_file_path:
