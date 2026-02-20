@@ -196,7 +196,7 @@ export default function TopicPage() {
     dispatch(
       generateTopicContent({
         enrollmentId: eId,
-        moduleId: currentModule.order ?? (mIdx + 1),
+        moduleId: mIdx + 1,
         topicName: currentTopic.topic_name,
         moduleIndex: mIdx,
         topicIndex: tIdx,

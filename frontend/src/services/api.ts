@@ -569,21 +569,11 @@ export const assessmentAPI = {
     course_id: number;
     course_name: string;
   }): Promise<InitialAssessmentResponse> => {
-    console.log('📡 assessmentAPI.generateInitialAssessment called with:', data);
-    console.log('📡 API baseURL:', api.defaults.baseURL);
-    console.log('📡 Full URL will be:', api.defaults.baseURL + '/assessment/initial/');
-    try {
-      const response = await api.post<InitialAssessmentResponse>(
-        '/assessment/initial/',
-        data
-      );
-      console.log('📡 API Response received:', response.data);
-      return response.data;
-    } catch (error: any) {
-      console.error('📡 API Error:', error);
-      console.error('📡 Error response:', error.response);
-      throw error;
-    }
+    const response = await api.post<InitialAssessmentResponse>(
+      '/assessment/initial/',
+      data
+    );
+    return response.data;
   },
 
   evaluateAssessment: async (data: {

@@ -1558,9 +1558,13 @@ class GenerateTopicContentView(APIView):
         """
         from .services.assessment_service import get_assessment_service
         
+        
+        
+        # print(f"DEBUG: GenerateTopicContentView POST data: {request.data}")
         enrollment_id = request.data.get('enrollment_id')
         module_id = request.data.get('module_id')
         topic_name = request.data.get('topic_name')
+        # print(f"DEBUG: Extracted -> enrollment_id={enrollment_id}, module_id={module_id}, topic_name={topic_name}")
         
         if enrollment_id is None or module_id is None or not topic_name:
             return Response(
@@ -1580,13 +1584,22 @@ class GenerateTopicContentView(APIView):
                 try:
                     syllabus_obj = PersonalizedSyllabus.objects.get(enrollment=enrollment)
                     syllabus_data = syllabus_obj.syllabus_data
+                    modules_list = syllabus_data.get('modules', [])
                     
-                    # Find the module by order in the syllabus JSON
-                    matching_module = None
-                    for mod in syllabus_data.get('modules', []):
-                        if mod.get('order') == module_id:
-                            matching_module = mod
-                            break
+                    # Treat module_id as 1-based index
+                    try:
+                        # module_id comes as integer from request, but json keys might differ. 
+                        # Ideally rely on list index.
+                        m_idx = int(module_id) - 1
+                        
+                        if 0 <= m_idx < len(modules_list):
+                            matching_module = modules_list[m_idx]
+                            # Inject order if missing so we can save it to DB
+                            matching_module['order'] = int(module_id)
+                        else:
+                            matching_module = None
+                    except (ValueError, TypeError) as e:
+                        matching_module = None
                     
                     if not matching_module:
                         return Response(
@@ -1594,12 +1607,11 @@ class GenerateTopicContentView(APIView):
                             status=status.HTTP_404_NOT_FOUND
                         )
                     
-                    # Create the Module record
                     module = Module.objects.create(
                         course=enrollment.course,
-                        title=matching_module.get('module_name', f'Module {module_id}'),
-                        description=matching_module.get('description', ''),
                         order=module_id,
+                        title=matching_module.get('module_name', f'Module {module_id}'),
+                        description=matching_module.get('module_description', ''),
                         difficulty_level=matching_module.get('difficulty_level', 'beginner'),
                         estimated_duration_minutes=matching_module.get('estimated_duration_minutes', 60),
                         is_generated=True

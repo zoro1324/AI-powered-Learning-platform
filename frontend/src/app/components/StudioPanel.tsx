@@ -122,7 +122,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
     dispatch(
       generateTopicContent({
         enrollmentId: eId,
-        moduleId: currentModule.order,
+        moduleId: mIdx + 1,
         topicName: currentTopic.topic_name,
         moduleIndex: mIdx,
         topicIndex: tIdx,
@@ -147,19 +147,19 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
     console.log('📍 currentTopic:', currentTopic);
     console.log('📍 mIdx:', mIdx, 'tIdx:', tIdx);
     console.log('📍 content:', content);
-    
+
     if (!currentTopic) {
       console.error('❌ currentTopic is undefined, cannot generate video');
       return;
     }
-    
+
     console.log('✅ Dispatching generateVideo with:', {
       topicName: currentTopic.topic_name,
       lessonId: content?.lessonId,
       moduleIndex: mIdx,
       topicIndex: tIdx,
     });
-    
+
     dispatch(
       generateVideo({
         topicName: currentTopic.topic_name,
@@ -262,7 +262,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
             {hasData ? `Generate New ${label}` : `Generate ${label}`}
           </Button>
         )}
-        
+
         {!isLoading && disabled && (
           <Button
             size="sm"
@@ -330,86 +330,106 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
           hasContent={!!content}
         />
       ) : (
-      /* Studio Tab */
-      <ScrollArea className="flex-1 overflow-y-auto">
-        <div className="p-4 space-y-3">
-          {!isTopicView ? (
-            /* Course overview — no tools available */
-            <div className="text-center py-8">
-              <Sparkles className="w-8 h-8 text-gray-600 mx-auto mb-3" />
-              <p className="text-sm text-gray-400">
-                Select a topic to use AI Studio tools
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* Current topic info */}
-              <div className="bg-gray-800 rounded-xl p-3 mb-4">
-                <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">
-                  Current Topic
-                </p>
-                <p className="text-sm text-white font-medium">
-                  {currentTopic?.topic_name || 'Unknown Topic'}
+        /* Studio Tab */
+        <ScrollArea className="flex-1 overflow-y-auto">
+          <div className="p-4 space-y-3">
+            {!isTopicView ? (
+              /* Course overview — no tools available */
+              <div className="text-center py-8">
+                <Sparkles className="w-8 h-8 text-gray-600 mx-auto mb-3" />
+                <p className="text-sm text-gray-400">
+                  Select a topic to use AI Studio tools
                 </p>
               </div>
+            ) : (
+              <>
+                {/* Current topic info */}
+                <div className="bg-gray-800 rounded-xl p-3 mb-4">
+                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">
+                    Current Topic
+                  </p>
+                  <p className="text-sm text-white font-medium">
+                    {currentTopic?.topic_name || 'Unknown Topic'}
+                  </p>
+                </div>
 
-              {/* Tool Cards Grid */}
-              <ToolCard
-                icon={FileText}
-                label="Notes"
-                bgColor="bg-emerald-800/80"
-                hasData={!!content}
-                isLoading={isContentLoading}
-                onGenerate={handleGenerateContent}
-              />
+                {/* Tool Cards Grid */}
+                <ToolCard
+                  icon={FileText}
+                  label="Notes"
+                  bgColor="bg-emerald-800/80"
+                  hasData={!!content}
+                  isLoading={isContentLoading}
+                  onGenerate={handleGenerateContent}
+                />
 
-              <ToolCard
-                icon={ListChecks}
-                label="Quiz"
-                bgColor="bg-amber-800/80"
-                hasData={!!quiz}
-                isLoading={isQuizLoading}
-                onGenerate={handleGenerateQuiz}
-                disabled={!content}
-              />
+                <ToolCard
+                  icon={ListChecks}
+                  label="Quiz"
+                  bgColor="bg-amber-800/80"
+                  hasData={!!quiz}
+                  isLoading={isQuizLoading}
+                  onGenerate={handleGenerateQuiz}
+                  disabled={!content}
+                />
 
-              <ToolCard
-                icon={Video}
-                label="Video"
-                bgColor="bg-purple-800/80"
-                hasData={
-                  videoTask?.status === 'completed' ||
-                  resources.some(r => r.resource_type === 'video')
-                }
-                isLoading={
-                  isVideoLoading ||
-                  videoTask?.status === 'pending' ||
-                  videoTask?.status === 'processing'
-                }
-                onGenerate={handleGenerateVideo}
-              />
+                <ToolCard
+                  icon={Video}
+                  label="Video"
+                  bgColor="bg-purple-800/80"
+                  hasData={
+                    videoTask?.status === 'completed' ||
+                    resources.some(r => r.resource_type === 'video')
+                  }
+                  isLoading={
+                    isVideoLoading ||
+                    videoTask?.status === 'pending' ||
+                    videoTask?.status === 'processing'
+                  }
+                  onGenerate={handleGenerateVideo}
+                />
 
-              <ToolCard
-                icon={Headphones}
-                label="Podcast"
-                bgColor="bg-blue-800/80"
-                hasData={
-                  !!generatedPodcast ||
-                  resources.some(r => r.resource_type === 'audio')
-                }
-                isLoading={false}
-                onGenerate={handleGeneratePodcast}
-                disabled={!content}
-              />
+                <ToolCard
+                  icon={Headphones}
+                  label="Podcast"
+                  bgColor="bg-blue-800/80"
+                  hasData={
+                    !!generatedPodcast ||
+                    resources.some(r => r.resource_type === 'audio')
+                  }
+                  isLoading={false}
+                  onGenerate={handleGeneratePodcast}
+                  disabled={!content}
+                />
 
-              {/* Generated Content list */}
-              {(content || quiz || videoTask || generatedPodcast || resources.length > 0) && (
-                <div className="pt-4 border-t border-gray-700 space-y-2">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs text-gray-500 uppercase tracking-wider">
-                      Generated Resources
-                    </p>
-                    {/* Create Note button */}
+                {/* Generated Content list */}
+                {(content || quiz || videoTask || generatedPodcast || resources.length > 0) && (
+                  <div className="pt-4 border-t border-gray-700 space-y-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs text-gray-500 uppercase tracking-wider">
+                        Generated Resources
+                      </p>
+                      {/* Create Note button */}
+                      {content && (
+                        <button
+                          onClick={() =>
+                            dispatch(
+                              setActiveResourceView({
+                                moduleIndex: mIdx,
+                                topicIndex: tIdx,
+                                view: { type: 'create-note' },
+                              })
+                            )
+                          }
+                          className="flex items-center gap-1 text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors"
+                        >
+                          <Plus className="w-3 h-3" />
+                          New Note
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Notes — click to switch center view to text reading */}
                     {content && (
                       <button
                         onClick={() =>
@@ -417,58 +437,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                             setActiveResourceView({
                               moduleIndex: mIdx,
                               topicIndex: tIdx,
-                              view: { type: 'create-note' },
-                            })
-                          )
-                        }
-                        className="flex items-center gap-1 text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors"
-                      >
-                        <Plus className="w-3 h-3" />
-                        New Note
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Notes — click to switch center view to text reading */}
-                  {content && (
-                    <button
-                      onClick={() =>
-                        dispatch(
-                          setActiveResourceView({
-                            moduleIndex: mIdx,
-                            topicIndex: tIdx,
-                            view: null,
-                          })
-                        )
-                      }
-                      className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
-                    >
-                      <FileText className="w-4 h-4 text-emerald-400 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-300 truncate">
-                          {currentTopic?.topic_name} - Notes
-                        </p>
-                        <p className="text-[10px] text-gray-500">
-                          {content.generatedAt
-                            ? new Date(content.generatedAt).toLocaleDateString()
-                            : ''}
-                        </p>
-                      </div>
-                    </button>
-                  )}
-
-                  {/* All notes (AI-generated and user-created) */}
-                  {resources
-                    .filter((r) => r.resource_type === 'notes')
-                    .map((resource) => (
-                      <button
-                        key={resource.id}
-                        onClick={() =>
-                          dispatch(
-                            setActiveResourceView({
-                              moduleIndex: mIdx,
-                              topicIndex: tIdx,
-                              view: { type: 'notes', resourceId: resource.id },
+                              view: null,
                             })
                           )
                         }
@@ -477,132 +446,163 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                         <FileText className="w-4 h-4 text-emerald-400 shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-gray-300 truncate">
-                            {resource.title}
+                            {currentTopic?.topic_name} - Notes
                           </p>
                           <p className="text-[10px] text-gray-500">
-                            {resource.created_at
-                              ? new Date(resource.created_at).toLocaleDateString()
+                            {content.generatedAt
+                              ? new Date(content.generatedAt).toLocaleDateString()
                               : ''}
                           </p>
                         </div>
                       </button>
-                    ))}
+                    )}
 
-                  {quiz && (
-                    <div className="w-full flex items-center gap-3 p-2 rounded-lg bg-gray-800/50">
-                      <ListChecks className="w-4 h-4 text-amber-400 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-300 truncate">
-                          {currentTopic?.topic_name} - Quiz
-                        </p>
-                        <p className="text-[10px] text-gray-500">
-                          {quiz.generatedAt
-                            ? new Date(quiz.generatedAt).toLocaleDateString()
-                            : ''}
-                        </p>
-                      </div>
-                    </div>
-                  )}
+                    {/* All notes (AI-generated and user-created) */}
+                    {resources
+                      .filter((r) => r.resource_type === 'notes')
+                      .map((resource) => (
+                        <button
+                          key={resource.id}
+                          onClick={() =>
+                            dispatch(
+                              setActiveResourceView({
+                                moduleIndex: mIdx,
+                                topicIndex: tIdx,
+                                view: { type: 'notes', resourceId: resource.id },
+                              })
+                            )
+                          }
+                          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
+                        >
+                          <FileText className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-300 truncate">
+                              {resource.title}
+                            </p>
+                            <p className="text-[10px] text-gray-500">
+                              {resource.created_at
+                                ? new Date(resource.created_at).toLocaleDateString()
+                                : ''}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
 
-                  {/* Video resources — click to switch center to video player */}
-                  {resources
-                    .filter((r) => r.resource_type === 'video')
-                    .map((resource) => (
-                      <button
-                        key={resource.id}
-                        onClick={() =>
-                          dispatch(
-                            setActiveResourceView({
-                              moduleIndex: mIdx,
-                              topicIndex: tIdx,
-                              view: { type: 'video', resourceId: resource.id },
-                            })
-                          )
-                        }
-                        className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
-                      >
-                        <Video className="w-4 h-4 text-purple-400 shrink-0" />
+                    {quiz && (
+                      <div className="w-full flex items-center gap-3 p-2 rounded-lg bg-gray-800/50">
+                        <ListChecks className="w-4 h-4 text-amber-400 shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-gray-300 truncate">
-                            {resource.title}
+                            {currentTopic?.topic_name} - Quiz
                           </p>
                           <p className="text-[10px] text-gray-500">
-                            {resource.created_at
-                              ? new Date(resource.created_at).toLocaleDateString()
-                              : 'Generated'}
+                            {quiz.generatedAt
+                              ? new Date(quiz.generatedAt).toLocaleDateString()
+                              : ''}
                           </p>
-                        </div>
-                      </button>
-                    ))}
-                  {/* Fallback to videoTask for in-progress videos */}
-                  {videoTask?.status === 'completed' &&
-                    resources.filter((r) => r.resource_type === 'video').length === 0 && (
-                      <div className="w-full flex items-center gap-3 p-2 rounded-lg bg-gray-800/50">
-                        <Video className="w-4 h-4 text-purple-400 shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-gray-300 truncate">
-                            {currentTopic?.topic_name} - Video
-                          </p>
-                          <p className="text-[10px] text-gray-500">Generated</p>
                         </div>
                       </div>
                     )}
 
-                  {/* Audio/Podcast resources — click to switch center to audio player */}
-                  {resources
-                    .filter((r) => r.resource_type === 'audio')
-                    .map((resource) => (
-                      <button
-                        key={resource.id}
-                        onClick={() =>
-                          dispatch(
-                            setActiveResourceView({
-                              moduleIndex: mIdx,
-                              topicIndex: tIdx,
-                              view: { type: 'audio', resourceId: resource.id },
-                            })
-                          )
-                        }
-                        className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
-                      >
-                        <Headphones className="w-4 h-4 text-blue-400 shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-gray-300 truncate">
-                            {resource.title}
-                          </p>
-                          <p className="text-[10px] text-gray-500">
-                            {resource.created_at
-                              ? new Date(resource.created_at).toLocaleDateString()
-                              : 'Generated'}
-                          </p>
+                    {/* Video resources — click to switch center to video player */}
+                    {resources
+                      .filter((r) => r.resource_type === 'video')
+                      .map((resource) => (
+                        <button
+                          key={resource.id}
+                          onClick={() =>
+                            dispatch(
+                              setActiveResourceView({
+                                moduleIndex: mIdx,
+                                topicIndex: tIdx,
+                                view: { type: 'video', resourceId: resource.id },
+                              })
+                            )
+                          }
+                          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
+                        >
+                          <Video className="w-4 h-4 text-purple-400 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-300 truncate">
+                              {resource.title}
+                            </p>
+                            <p className="text-[10px] text-gray-500">
+                              {resource.created_at
+                                ? new Date(resource.created_at).toLocaleDateString()
+                                : 'Generated'}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    {/* Fallback to videoTask for in-progress videos */}
+                    {videoTask?.status === 'completed' &&
+                      resources.filter((r) => r.resource_type === 'video').length === 0 && (
+                        <div className="w-full flex items-center gap-3 p-2 rounded-lg bg-gray-800/50">
+                          <Video className="w-4 h-4 text-purple-400 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-300 truncate">
+                              {currentTopic?.topic_name} - Video
+                            </p>
+                            <p className="text-[10px] text-gray-500">Generated</p>
+                          </div>
                         </div>
-                      </button>
-                    ))}
-                  {/* Fallback to generatedPodcast for session state */}
-                  {generatedPodcast &&
-                    resources.filter((r) => r.resource_type === 'audio').length === 0 && (
-                      <div className="w-full flex items-center gap-3 p-2 rounded-lg bg-gray-800/50">
-                        <Headphones className="w-4 h-4 text-blue-400 shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-gray-300 truncate">
-                            {currentTopic?.topic_name} - Podcast
-                          </p>
-                          <p className="text-[10px] text-gray-500">
-                            {generatedPodcast.generatedAt
-                              ? new Date(
+                      )}
+
+                    {/* Audio/Podcast resources — click to switch center to audio player */}
+                    {resources
+                      .filter((r) => r.resource_type === 'audio')
+                      .map((resource) => (
+                        <button
+                          key={resource.id}
+                          onClick={() =>
+                            dispatch(
+                              setActiveResourceView({
+                                moduleIndex: mIdx,
+                                topicIndex: tIdx,
+                                view: { type: 'audio', resourceId: resource.id },
+                              })
+                            )
+                          }
+                          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
+                        >
+                          <Headphones className="w-4 h-4 text-blue-400 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-300 truncate">
+                              {resource.title}
+                            </p>
+                            <p className="text-[10px] text-gray-500">
+                              {resource.created_at
+                                ? new Date(resource.created_at).toLocaleDateString()
+                                : 'Generated'}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
+                    {/* Fallback to generatedPodcast for session state */}
+                    {generatedPodcast &&
+                      resources.filter((r) => r.resource_type === 'audio').length === 0 && (
+                        <div className="w-full flex items-center gap-3 p-2 rounded-lg bg-gray-800/50">
+                          <Headphones className="w-4 h-4 text-blue-400 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-300 truncate">
+                              {currentTopic?.topic_name} - Podcast
+                            </p>
+                            <p className="text-[10px] text-gray-500">
+                              {generatedPodcast.generatedAt
+                                ? new Date(
                                   generatedPodcast.generatedAt
                                 ).toLocaleDateString()
-                              : 'Generated'}
-                          </p>
+                                : 'Generated'}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    )}
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </ScrollArea>
+                      )}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </ScrollArea>
       )}
 
       {/* Podcast Dialog */}
