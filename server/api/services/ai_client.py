@@ -36,9 +36,14 @@ logger = logging.getLogger(__name__)
 # Internal helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _is_production() -> bool:
-    """Return True when the server is configured to use Gemini API."""
-    return getattr(settings, 'IS_PRODUCTION', False)
+def _use_gemini_text() -> bool:
+    """Return True when text / chat generation should use Gemini."""
+    return getattr(settings, 'USE_GEMINI_TEXT', getattr(settings, 'IS_PRODUCTION', False))
+
+
+def _use_gemini_image() -> bool:
+    """Return True when image generation should use Gemini Imagen."""
+    return getattr(settings, 'USE_GEMINI_IMAGE', getattr(settings, 'IS_PRODUCTION', False))
 
 
 # ── Ollama text helper ────────────────────────────────────────────────────────
@@ -103,7 +108,7 @@ def _gemini_generate(prompt: str, system_prompt: Optional[str] = None, json_mode
 
     model = genai.GenerativeModel(
         model_name=model_name,
-        system_instruction=system_prompt or "",
+        system_instruction=system_prompt if system_prompt else None,
         generation_config=generation_config if generation_config else None,
     )
 
@@ -241,7 +246,7 @@ def generate_text(
     Returns:
         The model's response as a string.
     """
-    if _is_production():
+    if _use_gemini_text():
         return _gemini_generate(prompt, system_prompt=system_prompt, json_mode=json_mode)
     return _ollama_generate(prompt, system_prompt=system_prompt, json_mode=json_mode)
 
@@ -257,7 +262,7 @@ def generate_image(prompt_text: str, output_path: Optional[str] = None) -> Optio
     Returns:
         PIL.Image object, or None on failure.
     """
-    if _is_production():
+    if _use_gemini_image():
         return _gemini_generate_image(prompt_text, output_path=output_path)
     return _sd_generate(prompt_text, output_path=output_path)
 
@@ -275,7 +280,7 @@ def get_langchain_llm(temperature: float = 0.7):
     Returns:
         A LangChain BaseChatModel instance.
     """
-    if _is_production():
+    if _use_gemini_text():
         try:
             from langchain_google_genai import ChatGoogleGenerativeAI
         except ImportError as exc:

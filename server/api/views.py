@@ -1402,33 +1402,49 @@ class EvaluateAssessmentView(APIView):
                 }
                 learning_style = level_to_style.get(diagnosed_level, 'summary')
             
-            # ── Generate personalized AI system prompt based on learning style ────
-            style_descriptions = {
-                'mindmap': 'visual mind maps and connected concepts, preferring structured hierarchies and diagrams',
-                'videos': 'video-style narration with vivid scene-setting, dialogue, and visual descriptions',
-                'summary': 'concise summaries with key bullet points, clear headings, and distilled insights',
-                'books': 'detailed book-style prose with rich context, examples, and thorough explanations',
-                'reels': 'short punchy content, quick takes, casual tone, and bite-sized explanations',
+            # ── Generate personalized AI system prompt based on study method (learning style) ────
+            # study_method describes HOW the student prefers to engage with content
+            study_method_descriptions = {
+                'real_world': (
+                    'real-world examples, practical applications, and case studies. '
+                    'They want to see how concepts apply in industry and everyday life. '
+                    'Use analogies, real scenarios, and hands-on examples from the field.'
+                ),
+                'theory_depth': (
+                    'deep theoretical understanding, first principles, and academic rigor. '
+                    'They want to understand the "why" behind every concept. '
+                    'Use precise definitions, formal explanations, proofs where relevant, and build understanding layer by layer.'
+                ),
+                'project_based': (
+                    'building projects and learning by doing. '
+                    'They are motivated by constructing things themselves. '
+                    'Frame concepts around what they can build, provide step-by-step project guidance, and connect theory to implementation.'
+                ),
+                'custom': (
+                    f'a custom learning approach they described as: "{custom_study_method}". '
+                    'Tailor the content strictly to match this preference.'
+                ),
             }
-            style_desc = style_descriptions.get(learning_style, 'clear, engaging educational content')
+            study_desc = study_method_descriptions.get(study_method, 'clear, engaging educational content')
             
             try:
-                from .services.assessment_service import get_assessment_service as get_ai_service
-                ai_service = get_ai_service()
+                from .services.ai_client import generate_text
                 system_prompt_gen_prompt = (
                     f'You are an expert AI tutor. A student is learning "{course.title}" '
-                    f'at the "{diagnosed_level}" level. Their preferred learning style is "{learning_style}", '
-                    f'which means they learn best through {style_desc}. '
-                    f'Write a concise system prompt (4-6 sentences) that instructs an AI teaching assistant '
-                    f'to teach this student in a way that perfectly matches their learning style. '
-                    f'Include the preferred tone, format, structure, and any special presentation instructions. '
-                    f'Do not include greetings or preamble — just the direct instruction to the AI.'
+                    f'at the "{diagnosed_level}" level. '
+                    f'Their chosen learning approach is "{study_method.replace("_", " ")}", '
+                    f'meaning they learn best through {study_desc} '
+                    f'Write a focused system prompt (4-6 sentences) that instructs an AI teaching assistant '
+                    f'how to explain and teach "{course.title}" concepts to this student '
+                    f'in a way that perfectly matches their learning approach. '
+                    f'Be specific: mention the tone, depth, structure, and examples style that suit this student. '
+                    f'Do not include greetings or preamble — output only the direct instruction.'
                 )
-                ai_system_prompt = ai_service._call_ollama(
+                ai_system_prompt = generate_text(
                     prompt=system_prompt_gen_prompt,
                     system_prompt='You are a prompt engineering expert. Output only the system prompt text, no extra commentary.'
                 ).strip()
-                logger.info(f"Generated ai_system_prompt ({len(ai_system_prompt)} chars) for enrollment.")
+                logger.info(f"Generated ai_system_prompt ({len(ai_system_prompt)} chars) for enrollment (study_method={study_method}).")
             except Exception as sp_err:
                 logger.warning(f"Could not generate ai_system_prompt: {sp_err}")
                 ai_system_prompt = ''

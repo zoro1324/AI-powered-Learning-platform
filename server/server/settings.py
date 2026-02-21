@@ -208,6 +208,23 @@ CELERY_RESULT_SERIALIZER = 'json'
 # Defaults to False so local development uses OLLAMA + Stable Diffusion.
 IS_PRODUCTION = os.environ.get('IS_PRODUCTION', 'False').strip().lower() in ('1', 'true', 'yes')
 
+# Fine-grained overrides — USE_GEMINI_TEXT / USE_GEMINI_IMAGE take precedence
+# over IS_PRODUCTION so you can mix backends (e.g. Gemini text + SD images).
+# Leave them unset (or empty) to inherit from IS_PRODUCTION.
+_use_gemini_text_raw = os.environ.get('USE_GEMINI_TEXT', '').strip().lower()
+_use_gemini_image_raw = os.environ.get('USE_GEMINI_IMAGE', '').strip().lower()
+
+USE_GEMINI_TEXT = (
+    _use_gemini_text_raw in ('1', 'true', 'yes')
+    if _use_gemini_text_raw
+    else IS_PRODUCTION
+)
+USE_GEMINI_IMAGE = (
+    _use_gemini_image_raw in ('1', 'true', 'yes')
+    if _use_gemini_image_raw
+    else IS_PRODUCTION
+)
+
 # --- OLLAMA (development) ---
 OLLAMA_API_URL = os.environ.get('OLLAMA_API_URL', 'http://localhost:11434/api/generate')
 OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'llama3:8b')
