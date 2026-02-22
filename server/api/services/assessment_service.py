@@ -16,6 +16,7 @@ from typing import Dict, List, Any, Optional
 
 from django.conf import settings
 from api.services.ai_client import generate_text
+from api.services.content_validator import validate_with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -642,7 +643,6 @@ Generate the full syllabus JSON now with varied topic counts per module:"""
         print(f"  Course: {course_name}")
         print(f"  Topic: {topic_name}")
         print(f"  Topic Description: {topic_description}")
-        print(f"  Study method: {study_method}")
         print(f"  Has personalized system prompt: {bool(system_prompt)}")
         print("========================================")
         
@@ -656,7 +656,6 @@ Generate comprehensive, detailed educational content for:
 
 Course: {course_name}
 Topic: {topic_name}{description_context}
-Study Method: {study_method}
 
 Requirements:
 - Create a thorough, in-depth explanation that covers all major aspects of the topic
@@ -667,7 +666,6 @@ Requirements:
 - Add relevant analogies to make complex concepts easier to grasp
 - If applicable, include code examples or technical demonstrations
 - Use markdown formatting for better readability (headings, bold, italic, code blocks)
-- Adapt the depth and tone based on the study method preference
 - Cover historical context, current applications, and future implications where relevant
 - Include common misconceptions and how to avoid them
 - Provide practical tips and best practices
@@ -678,11 +676,33 @@ Requirements:
 Generate the detailed content now:
 """
         
-        # Use personalized system prompt if available, otherwise no system prompt
-        response = generate_text(prompt, system_prompt=system_prompt or None)
-        print(f"  Generated content length: {len(response)} chars")
+        # Use validate_with_retry so a secondary AI reviewer checks the content
+        # before it is cached and returned to the learner.
+        user_requirements = system_prompt or ""
+
+        def _generate() -> str:
+            return generate_text(prompt, system_prompt=system_prompt or None)
+
+        print(f"  --- Validating generated notes ---")
+        content, validation_result = validate_with_retry(
+            generate_fn=_generate,
+            topic=topic_name,
+            content_type="notes",
+            user_requirements=user_requirements,
+            max_retries=5,
+        )
+
+        if not validation_result.approved:
+            logger.warning(
+                "Notes content for '%s' was not fully approved after 5 attempts. "
+                "Using best-effort result. Feedback: %s",
+                topic_name,
+                validation_result.feedback,
+            )
+
+        print(f"  Generated content length: {len(content)} chars")
         print("=== generate_topic_content SUCCESS ===")
-        return response
+        return content
     
     def generate_topic_quiz(
         self,
@@ -854,13 +874,34 @@ Return strictly JSON:
 }}
 """
 
-        response = generate_text(prompt, system_prompt=system_prompt or None, json_mode=True)
-        result = self._extract_json(response)
-        
+        user_requirements = system_prompt or ""
+
+        def _generate() -> str:
+            return generate_text(prompt, system_prompt=system_prompt or None, json_mode=True)
+
+        print(f"  --- Validating generated remediation ---")
+        raw_response, validation_result = validate_with_retry(
+            generate_fn=_generate,
+            topic=topic_name,
+            content_type="remediation",
+            user_requirements=user_requirements,
+            max_retries=5,
+        )
+
+        if not validation_result.approved:
+            logger.warning(
+                "Remediation content for '%s' was not fully approved after 5 attempts. "
+                "Using best-effort result. Feedback: %s",
+                topic_name,
+                validation_result.feedback,
+            )
+
+        result = self._extract_json(raw_response)
+
         # Ensure we have the right structure
         if 'remediation_notes' not in result:
             result = {"remediation_notes": []}
-        
+
         print(f"  Generated {len(result.get('remediation_notes', []))} remediation notes")
         print("=== generate_remediation_content SUCCESS ===")
         return result
