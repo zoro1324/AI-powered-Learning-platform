@@ -117,7 +117,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
 
   // ─── Handler Functions ─────────────────────────────────────────────────────
 
-  const handleGenerateContent = useCallback(() => {
+  const handleGenerateContent = useCallback((regenerate: boolean = false) => {
     if (!eId || !currentModule || !currentTopic) return;
     dispatch(
       generateTopicContent({
@@ -126,6 +126,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
         topicName: currentTopic.topic_name,
         moduleIndex: mIdx,
         topicIndex: tIdx,
+        regenerate,
       })
     );
   }, [dispatch, eId, currentModule, currentTopic, mIdx, tIdx]);
@@ -360,7 +361,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                   bgColor="bg-emerald-800/80"
                   hasData={!!content}
                   isLoading={isContentLoading}
-                  onGenerate={handleGenerateContent}
+                  onGenerate={() => handleGenerateContent(!!content)}
                 />
 
                 <ToolCard

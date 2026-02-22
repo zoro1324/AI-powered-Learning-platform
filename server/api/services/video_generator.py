@@ -11,6 +11,7 @@ from django.utils import timezone
 from moviepy import AudioFileClip, ImageClip, VideoFileClip, concatenate_videoclips
 from PIL import Image, ImageDraw, ImageFont
 from api.services.ai_client import generate_text, generate_image as ai_generate_image
+from api.services.content_validator import validate_with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -81,11 +82,29 @@ class VideoGeneratorService:
             '}\n'
         )
 
-        try:
+        def _generate() -> str:
             logger.info("Requesting script from AI backend...")
-            response_text = generate_text(prompt, json_mode=True)
-            script_data = json.loads(response_text)
-            logger.info("✅ Received script from AI backend successfully")
+            return generate_text(prompt, json_mode=True)
+
+        try:
+            print(f"\n--- VideoGenerator: Generating script for '{topic}' ---")
+            raw_script, validation_result = validate_with_retry(
+                generate_fn=_generate,
+                topic=topic,
+                content_type="video_script",
+                max_retries=5,
+            )
+
+            if not validation_result.approved:
+                logger.warning(
+                    "Video script for topic=%r was not fully approved after 5 attempts. "
+                    "Using best-effort result. Feedback: %s",
+                    topic, validation_result.feedback,
+                )
+
+            script_data = json.loads(raw_script)
+            print(f"✅ Video script generated successfully. {len(script_data.get('scenes', []))} scenes found.")
+            logger.info("✅ Received validated script from AI backend successfully")
 
             # Persist script to disk
             script_path = os.path.join(self.scripts_dir, "script.json")
@@ -95,6 +114,7 @@ class VideoGeneratorService:
             return script_data
 
         except (json.JSONDecodeError, KeyError) as e:
+            print(f"❌ Video script JSON error: {e}")
             logger.exception("Invalid JSON from AI backend")
             logger.error(f"❌ AI backend returned invalid JSON: {e}")
             return None
@@ -110,9 +130,12 @@ class VideoGeneratorService:
     def generate_image(self, prompt_text: str, output_path: str) -> str | None:
         """Generate an image using the configured AI backend (Stable Diffusion or Gemini)."""
         try:
+            print(f"  [VideoGenerator] Generating image: {prompt_text[:60]}...")
             result = ai_generate_image(prompt_text, output_path=output_path)
             if result is not None:
+                print(f"  [VideoGenerator] ✓ Image saved: {output_path}")
                 return output_path
+            print(f"  [VideoGenerator] ✗ Image generation returned None")
             return None
         except Exception:
             logger.exception("Image generation failed")
@@ -169,6 +192,7 @@ class VideoGeneratorService:
 
         filename = os.path.join(self.scene_dir, f"scene_{index}.png")
         img.save(filename)
+        print(f"  [VideoGenerator] ✓ Slide {index} created: {filename}")
         return filename
 
     # ------------------------------------------------------------------
