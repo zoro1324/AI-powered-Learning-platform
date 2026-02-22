@@ -170,7 +170,7 @@ def _sd_generate(prompt_text: str, output_path: Optional[str] = None) -> Optiona
     try:
         image: Image.Image = pipe(
             prompt=full_prompt,
-            num_inference_steps=6,
+            num_inference_steps=50,
             guidance_scale=1.5,
             height=512,
             width=512,

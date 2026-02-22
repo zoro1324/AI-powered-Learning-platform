@@ -6,7 +6,6 @@ import {
   Syllabus,
   AssessmentQuestion,
   Resource,
-  RemediationNote,
 } from '../../services/api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -136,6 +135,7 @@ export const generateTopicContent = createAsyncThunk(
       topicName: string;
       moduleIndex: number;
       topicIndex: number;
+      regenerate?: boolean;
     },
     { rejectWithValue }
   ) => {
@@ -145,6 +145,7 @@ export const generateTopicContent = createAsyncThunk(
         enrollment_id: data.enrollmentId,
         module_id: data.moduleId,
         topic_name: data.topicName,
+        regenerate: data.regenerate,
       });
       return {
         ...response,
