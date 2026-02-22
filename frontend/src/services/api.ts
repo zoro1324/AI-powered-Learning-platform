@@ -596,6 +596,7 @@ export const assessmentAPI = {
     enrollment_id: number;
     module_id: number;
     topic_name: string;
+    regenerate?: boolean;
   }): Promise<TopicContentResponse> => {
     const response = await api.post<TopicContentResponse>(
       '/assessment/topic/content/',

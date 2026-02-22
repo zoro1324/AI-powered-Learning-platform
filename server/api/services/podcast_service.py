@@ -17,6 +17,7 @@ from typing import Dict, List, Any, Optional
 
 from django.conf import settings
 from api.services.ai_client import generate_text
+from api.services.content_validator import validate_with_retry
 import edge_tts
 
 logger = logging.getLogger(__name__)
@@ -72,11 +73,13 @@ class PodcastService:
         """
         
         try:
+            print(f"--- PodcastService: Generating persona options ---")
             response = generate_text(prompt, json_mode=True)
             data = json.loads(response)
             options = data.get('options', [])
             
             if not options or len(options) == 0:
+                print(f"  PodcastService: No personas returned, using fallback")
                 # Return default options
                 return [
                     {"person1": "Expert", "person2": "Novice"},
@@ -84,6 +87,7 @@ class PodcastService:
                     {"person1": "Host 1", "person2": "Host 2"}
                 ]
             
+            print(f"  PodcastService: Found {len(options)} persona options")
             return options
             
         except Exception as e:
@@ -123,13 +127,16 @@ class PodcastService:
         """
         
         try:
+            print(f"--- PodcastService: Generating scenario options ---")
             response = generate_text(prompt, json_mode=True)
             data = json.loads(response)
             options = data.get('options', [])
             
             if not options or len(options) == 0:
+                print(f"  PodcastService: No scenarios returned, using fallback")
                 return ["Deep Dive", "Critical Analysis", "Casual Overview"]
             
+            print(f"  PodcastService: Found {len(options)} scenario options")
             return options
             
         except Exception as e:
@@ -237,9 +244,13 @@ class PodcastService:
         text: str,
         roles: Dict[str, str],
         instruction: Optional[str] = None,
-        system_prompt: Optional[str] = None
+        system_prompt: Optional[str] = None,
+        topic: Optional[str] = None,
     ) -> List[Dict[str, str]]:
-        """Generate the podcast script"""
+        """Generate the podcast script with AI reviewer validation."""
+        print(f"\n--- PodcastService: Generating script ---")
+        print(f"  Roles: {roles}")
+        print(f"  Instruction: {instruction}")
         
         instruction_text = f"Focus on this specific theme/format: {instruction}" if instruction else "Cover the key points naturally."
         
@@ -268,26 +279,52 @@ class PodcastService:
           ]
         }}
         """
-        
+
+        # Derive a short topic label for the reviewer
+        review_topic = topic or (text[:120].strip() + "..." if len(text) > 120 else text.strip())
+        user_requirements = system_prompt or ""
+        if instruction:
+            user_requirements = f"Scenario: {instruction}. " + user_requirements
+
+        def _generate() -> str:
+            return generate_text(podcast_prompt, json_mode=True)
+
         try:
-            response = self._call_ollama(podcast_prompt)
-            data = json.loads(response)
-            
+            raw_script, validation_result = validate_with_retry(
+                generate_fn=_generate,
+                topic=review_topic,
+                content_type="podcast_script",
+                user_requirements=user_requirements,
+                max_retries=5,
+            )
+
+            if not validation_result.approved:
+                logger.warning(
+                    "Podcast script was not fully approved after 5 attempts. "
+                    "Using best-effort result. Feedback: %s",
+                    validation_result.feedback,
+                )
+
+            data = json.loads(raw_script)
+
             # Extract conversation list safely
+            conversation = []
             if 'conversation' in data:
-                return data['conversation']
+                conversation = data['conversation']
             elif isinstance(data, list):
-                return data
+                conversation = data
             else:
                 # Try to find a list in values
                 for v in data.values():
                     if isinstance(v, list):
-                        return v
-            
-            logger.warning("No conversation found in script response")
-            return []
-            
+                        conversation = v
+                        break
+
+            print(f"✅ Podcast script generated successfully. {len(conversation)} turns found.")
+            return conversation
+
         except Exception as e:
+            print(f"❌ Podcast script generation failed: {e}")
             logger.error(f"Error generating script: {e}")
             return []
     

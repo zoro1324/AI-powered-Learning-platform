@@ -1676,21 +1676,25 @@ class GenerateTopicContentView(APIView):
                         status=status.HTTP_404_NOT_FOUND
                     )
             
-            # ── Check if content already exists in DB ──────────────────────
-            try:
-                existing_lesson = Lesson.objects.filter(
-                    module=module,
-                    title=topic_name,
-                ).exclude(content__isnull=True).exclude(content__exact='').first()
-                
-                if existing_lesson:
-                    print(f"*** Returning cached content for '{topic_name}' ({len(existing_lesson.content)} chars) ***")
-                    return Response({
-                        'lesson_id': existing_lesson.id,
-                        'content': existing_lesson.content
-                    }, status=status.HTTP_200_OK)
-            except Exception:
-                pass  # Fall through to generation if check fails
+            # ── Check if content already exists in DB (unless regenerating) ──
+            regenerate = request.data.get('regenerate', False)
+            if not regenerate:
+                try:
+                    existing_lesson = Lesson.objects.filter(
+                        module=module,
+                        title=topic_name,
+                    ).exclude(content__isnull=True).exclude(content__exact='').first()
+                    
+                    if existing_lesson:
+                        print(f"*** Returning cached content for '{topic_name}' ({len(existing_lesson.content)} chars) ***")
+                        return Response({
+                            'lesson_id': existing_lesson.id,
+                            'content': existing_lesson.content
+                        }, status=status.HTTP_200_OK)
+                except Exception:
+                    pass  # Fall through to generation if check fails
+            else:
+                print(f"*** Force regeneration requested for '{topic_name}' ***")
             
             # ── No cached content – generate with AI ─────────────────────
             # Get study method from enrollment
@@ -1703,13 +1707,23 @@ class GenerateTopicContentView(APIView):
                 syllabus_data = syllabus_obj.syllabus_data
                 
                 # Find the topic in the syllabus JSON
-                for mod in syllabus_data.get('modules', []):
-                    if mod.get('order') == module_id:
+                for idx, mod in enumerate(syllabus_data.get('modules', [])):
+                    # Match by 'order' if present, otherwise fallback to the sequence index (1-based)
+                    mod_order = mod.get('order')
+                    mod_match = (mod_order == module_id) if mod_order is not None else ((idx + 1) == module_id)
+                    
+                    if mod_match:
                         for topic in mod.get('topics', []):
                             if topic.get('topic_name') == topic_name:
-                                topic_description = topic.get('description', '')
+                                # AI-generated syllabi use 'detailed_description' or 'short_description'
+                                topic_description = (
+                                    topic.get('detailed_description') or 
+                                    topic.get('short_description') or 
+                                    topic.get('description', '')
+                                )
                                 break
-                        break
+                        if topic_description:
+                            break
             except PersonalizedSyllabus.DoesNotExist:
                 pass  # Continue without description if not found
             
