@@ -71,6 +71,9 @@ export interface SyllabusState {
   mindMapData: MindMapData | null;
   mindMapLoading: boolean;
 
+  topicMindMapData: Record<string, MindMapData>;
+  topicMindMapLoading: Record<string, boolean>;
+
   // Per-topic state keyed by "enrollmentId-moduleIndex-topicIndex"
   topicCompletion: Record<string, boolean>;
   generatedContent: Record<string, GeneratedContent>;
@@ -100,6 +103,8 @@ const initialState: SyllabusState = {
   error: null,
   mindMapData: null,
   mindMapLoading: false,
+  topicMindMapData: {},
+  topicMindMapLoading: {},
   topicCompletion: {},
   generatedContent: {},
   generatedQuizzes: {},
@@ -142,6 +147,35 @@ export const generateCourseMindMap = createAsyncThunk(
     } catch (error: any) {
       return rejectWithValue(
         error.response?.data?.error || 'Failed to generate mind map'
+      );
+    }
+  }
+);
+
+export const generateTopicMindMap = createAsyncThunk(
+  'syllabus/generateTopicMindMap',
+  async (
+    data: {
+      lessonId: number;
+      topicName: string;
+      moduleIndex: number;
+      topicIndex: number;
+    },
+    { rejectWithValue }
+  ) => {
+    try {
+      const response = await assessmentAPI.generateTopicMindMap({
+        lesson_id: data.lessonId,
+        topic_name: data.topicName,
+      });
+      return {
+        ...response,
+        moduleIndex: data.moduleIndex,
+        topicIndex: data.topicIndex,
+      };
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.error || 'Failed to generate topic mind map'
       );
     }
   }
@@ -608,6 +642,22 @@ const syllabusSlice = createSlice({
         state.mindMapLoading = false;
         state.error = action.payload as string;
       });
+
+    // generateTopicMindMap
+    builder
+      .addCase(generateTopicMindMap.pending, (state, action) => {
+        const key = topicId(state.enrollmentId, action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
+        state.topicMindMapLoading[key] = true;
+      })
+      .addCase(generateTopicMindMap.fulfilled, (state, action) => {
+        const key = topicId(state.enrollmentId, action.payload.moduleIndex, action.payload.topicIndex);
+        state.topicMindMapLoading[key] = false;
+        state.topicMindMapData[key] = action.payload;
+      })
+      .addCase(generateTopicMindMap.rejected, (state, action) => {
+        const key = topicId(state.enrollmentId, action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
+        state.topicMindMapLoading[key] = false;
+      });
   },
 });
 
@@ -743,5 +793,10 @@ export const selectActiveResourceView = (
 
 export const selectMindMapData = (state: { syllabus: SyllabusState }) => state.syllabus.mindMapData;
 export const selectMindMapLoading = (state: { syllabus: SyllabusState }) => state.syllabus.mindMapLoading;
+
+export const selectTopicMindMapData = (state: { syllabus: SyllabusState }, moduleIndex: number, topicIndex: number) =>
+  state.syllabus.topicMindMapData[topicId(state.syllabus.enrollmentId, moduleIndex, topicIndex)] || null;
+export const selectTopicMindMapLoading = (state: { syllabus: SyllabusState }, moduleIndex: number, topicIndex: number) =>
+  !!state.syllabus.topicMindMapLoading[topicId(state.syllabus.enrollmentId, moduleIndex, topicIndex)];
 
 export default syllabusSlice.reducer;

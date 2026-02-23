@@ -95,3 +95,49 @@ Return format EXACTLY like this (ensure it is valid JSON):
         except Exception as e:
             logger.exception("Error generating mind map")
             raise Exception(f"Failed to generate mind map: {str(e)}")
+
+    @staticmethod
+    def generate_topic_mindmap(topic_name: str, content: str) -> Dict[str, Any]:
+        """
+        Generates a detailed mind map structure for a specific topic strictly based on the provided content.
+        """
+        prompt = f"""
+Analyze the following topic content and extract its core concepts to form a hierarchical mind map.
+The mind map MUST be strictly based ONLY on the provided content. Do not add external information.
+
+Topic: {topic_name}
+
+Content:
+{content[:8000]}
+
+Rules:
+- Identify 3–6 main branches representing the core concepts explicitly explained in the content.
+- For each main branch, extract 2–5 subtopics providing finer details actually mentioned in the text.
+- DO NOT INCLUDE ANY EXPLANATION TEXT OR MARKDOWN OUTSIDE THE JSON.
+- ONLY return a valid JSON object.
+
+Return format EXACTLY like this (ensure it is valid JSON):
+{{
+  "title": "{topic_name}",
+  "level": "Content Mind Map",
+  "branches": [
+    {{
+      "name": "Core Concept (from text)",
+      "subtopics": [
+        "Detail 1 (from text)",
+        "Detail 2 (from text)"
+      ]
+    }}
+  ]
+}}
+"""
+        
+        system_prompt = "You are a content analyzer that strictly extracts hierarchical information from text and outputs valid JSON only. Do not use markdown like ```json."
+        
+        try:
+            logger.info(f"Generating strict content mind map for topic: {topic_name}")
+            raw_response = generate_text(prompt, system_prompt=system_prompt, json_mode=True)
+            return MindMapService._extract_json(raw_response)
+        except Exception as e:
+            logger.exception(f"Error generating content mind map for {topic_name}")
+            raise Exception(f"Failed to generate content mind map: {str(e)}")
