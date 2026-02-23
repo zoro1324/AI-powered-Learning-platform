@@ -358,6 +358,34 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
             'questions': QuestionSerializer(questions, many=True).data
         })
 
+    @action(detail=True, methods=['post'])
+    def generate_mindmap(self, request, pk=None):
+        """Generate an AI mind map for the enrolled course"""
+        enrollment = self.get_object()
+        
+        try:
+            from .services.mindmap_service import MindMapService
+            
+            course_title = enrollment.course.title or enrollment.course.name
+            user_level = enrollment.diagnosed_level
+            
+            mindmap_data = MindMapService.generate_course_mindmap(course_title, user_level)
+            
+            # Log activity
+            ActivityLog.objects.create(
+                user=request.user,
+                activity_type='course_started',
+                title=f'Mind Map generated for {course_title}',
+                description=f'Mind map generated for {course_title} at {user_level} level.',
+                metadata={'course_id': enrollment.course.id}
+            )
+            
+            return Response(mindmap_data)
+        except Exception as e:
+            logger.error(f"Generate mindmap failed for enrollment {enrollment.id}: {str(e)}")
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 
 # ============================================================================
 # QUIZ & ASSESSMENT VIEWSETS
