@@ -13,6 +13,7 @@ import {
   MessageSquare,
   Wrench,
   Plus,
+  Network,
 } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store';
 import {
@@ -23,12 +24,17 @@ import {
   fetchResources,
   selectResources,
   setActiveResourceView,
+  generateCourseMindMap,
+  selectMindMapData,
+  selectMindMapLoading,
 } from '../../store/slices/syllabusSlice';
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
 import { cn } from './ui/utils';
 import { PodcastDialog } from './ui/podcast-dialog';
 import { ChatPanel } from './ChatPanel';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { MindMapViewer } from './MindMapViewer';
 
 interface StudioPanelProps {
   collapsed: boolean;
@@ -75,6 +81,15 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
     scenario: string;
     generatedAt: string;
   } | null>(null);
+
+  const mindMapData = useAppSelector(selectMindMapData);
+  const isMindMapLoading = useAppSelector(selectMindMapLoading);
+  const [mindMapDialogOpen, setMindMapDialogOpen] = useState(false);
+
+  const handleGenerateMindMap = useCallback(() => {
+    if (!eId) return;
+    dispatch(generateCourseMindMap(eId));
+  }, [dispatch, eId]);
 
   // Poll video status
   useEffect(() => {
@@ -335,12 +350,43 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
         <ScrollArea className="flex-1 overflow-y-auto">
           <div className="p-4 space-y-3">
             {!isTopicView ? (
-              /* Course overview — no tools available */
-              <div className="text-center py-8">
-                <Sparkles className="w-8 h-8 text-gray-600 mx-auto mb-3" />
-                <p className="text-sm text-gray-400">
-                  Select a topic to use AI Studio tools
-                </p>
+              <div className="space-y-4">
+                <div className="bg-gray-800 rounded-xl p-3 mb-4">
+                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">
+                    Course Overview
+                  </p>
+                  <p className="text-sm text-white font-medium">
+                    {syllabus?.course_name || 'Course Dashboard'}
+                  </p>
+                </div>
+
+                <ToolCard
+                  icon={Network}
+                  label="Course Mind Map"
+                  bgColor="bg-indigo-800/80"
+                  hasData={!!mindMapData}
+                  isLoading={isMindMapLoading}
+                  onGenerate={handleGenerateMindMap}
+                />
+
+                {mindMapData && (
+                  <div className="pt-4 border-t border-gray-700 space-y-2">
+                    <button
+                      onClick={() => setMindMapDialogOpen(true)}
+                      className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
+                    >
+                      <Network className="w-4 h-4 text-indigo-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-gray-300 truncate">
+                          Course Mind Map
+                        </p>
+                        <p className="text-[10px] text-gray-500">
+                          {mindMapData.level}
+                        </p>
+                      </div>
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <>
@@ -624,6 +670,21 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
           }}
         />
       )}
+
+      {/* Mind Map Dialog */}
+      <Dialog open={mindMapDialogOpen} onOpenChange={setMindMapDialogOpen}>
+        <DialogContent className="max-w-[90vw] w-[1200px] h-[85vh] p-0 overflow-hidden flex flex-col bg-gray-900 border-gray-800">
+          <DialogHeader className="p-6 border-b border-gray-800 bg-gray-900/50 flex-shrink-0">
+            <DialogTitle className="text-xl font-bold text-gray-100 flex items-center gap-2">
+              <Network className="w-5 h-5 text-indigo-400" />
+              Course Mind Map
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto relative bg-black/20">
+            {mindMapData && <MindMapViewer data={mindMapData} />}
+          </div>
+        </DialogContent>
+      </Dialog>
     </aside>
   );
 }

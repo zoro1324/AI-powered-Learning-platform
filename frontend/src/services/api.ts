@@ -280,7 +280,13 @@ export const enrollmentAPI = {
     const response = await api.post(`/enrollments/${id}/diagnostic_quiz/`);
     return response.data;
   },
+
+  generateMindMap: async (id: number): Promise<MindMapData> => {
+    const response = await api.post(`/enrollments/${id}/generate_mindmap/`);
+    return response.data;
+  },
 };
+
 
 // ============================================================================
 // QUIZ API
@@ -504,6 +510,17 @@ export interface SyllabusModule {
   difficulty_level?: string;
   estimated_duration_minutes?: number;
   topics: SyllabusTopic[];
+}
+
+export interface MindMapBranch {
+  name: string;
+  subtopics: string[];
+}
+
+export interface MindMapData {
+  title: string;
+  level: string;
+  branches: MindMapBranch[];
 }
 
 export interface Syllabus {
