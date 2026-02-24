@@ -94,16 +94,16 @@ export function ChatPanel({
   // Simple markdown rendering for chat messages
   const renderMarkdown = (text: string) => {
     let html = text
-      .replace(/^### (.+)$/gm, '<h3 class="text-sm font-semibold text-white mt-3 mb-1">$1</h3>')
-      .replace(/^## (.+)$/gm, '<h2 class="text-sm font-bold text-white mt-3 mb-1">$1</h2>')
+      .replace(/^### (.+)$/gm, '<h3 class="text-sm font-semibold text-gray-900 mt-3 mb-1">$1</h3>')
+      .replace(/^## (.+)$/gm, '<h2 class="text-sm font-bold text-gray-900 mt-3 mb-1">$1</h2>')
       .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
       .replace(/\*(.+?)\*/g, '<em>$1</em>')
       .replace(/```(\w*)\n([\s\S]*?)```/g, (_m, _l, code) => {
-        return `<pre class="bg-black/30 rounded-lg p-2 overflow-x-auto my-2 text-xs"><code>${code
+        return `<pre class="bg-gray-200 rounded-lg p-2 overflow-x-auto my-2 text-xs text-gray-900"><code>${code
           .replace(/</g, '&lt;')
           .replace(/>/g, '&gt;')}</code></pre>`;
       })
-      .replace(/`([^`]+)`/g, '<code class="bg-black/20 text-pink-300 px-1 py-0.5 rounded text-xs">$1</code>')
+      .replace(/`([^`]+)`/g, '<code class="bg-gray-100 text-pink-600 px-1 py-0.5 rounded text-xs">$1</code>')
       .replace(/^(?!<[h23pre])(.*\S.*)$/gm, '<p class="mb-1.5">$1</p>');
     return html;
   };
@@ -138,7 +138,7 @@ export function ChatPanel({
               <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center mx-auto mb-3">
                 <Bot className="w-6 h-6 text-white" />
               </div>
-              <p className="text-sm text-gray-300 font-medium mb-1">
+              <p className="text-sm text-gray-900 font-medium mb-1">
                 AI Topic Assistant
               </p>
               <p className="text-xs text-gray-500 mb-4">
@@ -183,9 +183,9 @@ export function ChatPanel({
                           setIsLoading(false);
                         });
                     }}
-                    className="w-full text-left px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-xs text-gray-300 transition-colors flex items-center gap-2"
+                    className="w-full text-left px-3 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 border border-gray-200 text-xs text-gray-700 transition-colors flex items-center gap-2"
                   >
-                    <Sparkles className="w-3 h-3 text-blue-400 shrink-0" />
+                    <Sparkles className="w-3 h-3 text-blue-600 shrink-0" />
                     {suggestion}
                   </button>
                 ))}
@@ -211,7 +211,7 @@ export function ChatPanel({
                   'max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed',
                   msg.role === 'user'
                     ? 'bg-blue-600 text-white'
-                    : 'bg-gray-800 text-gray-200'
+                    : 'bg-gray-100 text-gray-900 border border-gray-200'
                 )}
               >
                 {msg.role === 'assistant' ? (
@@ -238,9 +238,9 @@ export function ChatPanel({
               <div className="w-6 h-6 rounded-md bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center shrink-0 mt-0.5">
                 <Bot className="w-3.5 h-3.5 text-white" />
               </div>
-              <div className="bg-gray-800 rounded-xl px-3 py-2 flex items-center gap-2">
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-400" />
-                <span className="text-xs text-gray-400">Thinking...</span>
+              <div className="bg-gray-100 rounded-xl px-3 py-2 flex items-center gap-2 border border-gray-200">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                <span className="text-xs text-gray-500">Thinking...</span>
               </div>
             </div>
           )}
@@ -250,7 +250,7 @@ export function ChatPanel({
       </ScrollArea>
 
       {/* Input area */}
-      <div className="p-3 border-t border-gray-700">
+      <div className="p-3 border-t border-gray-200">
         <div className="flex items-end gap-2">
           <textarea
             ref={inputRef}
@@ -259,7 +259,7 @@ export function ChatPanel({
             onKeyDown={handleKeyDown}
             placeholder="Ask about this topic..."
             rows={1}
-            className="flex-1 bg-gray-800 text-white text-xs rounded-xl px-3 py-2.5 resize-none outline-none focus:ring-1 focus:ring-blue-500 placeholder-gray-500 max-h-[120px]"
+            className="flex-1 bg-gray-50 text-gray-900 border border-gray-200 text-xs rounded-xl px-3 py-2.5 resize-none outline-none focus:ring-1 focus:ring-blue-500 placeholder-gray-500 max-h-[120px]"
           />
           <Button
             size="icon"
