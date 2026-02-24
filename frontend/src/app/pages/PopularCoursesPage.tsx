@@ -2,15 +2,18 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Sidebar } from '../components/Sidebar';
 import AssessmentDialog from '../components/AssessmentDialog';
-import { 
-  BookOpen, 
-  Clock, 
-  TrendingUp, 
-  Plus, 
+import {
+  BookOpen,
+  Clock,
+  TrendingUp,
+  Plus,
   Loader2,
   Filter,
   Search,
-  GraduationCap
+  GraduationCap,
+  ChevronDown,
+  ChevronRight,
+  Layers,
 } from 'lucide-react';
 import { useAppSelector } from '../../store';
 import { courseAPI, coursePlanningAPI } from '../../services/api';
@@ -56,6 +59,11 @@ const DIFFICULTY_COLORS: Record<string, string> = {
   advanced: 'bg-red-100 text-red-800',
 };
 
+interface CourseGroup {
+  mainCourse: Course;
+  subCourses: Course[];
+}
+
 export default function PopularCoursesPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAppSelector((state) => state.auth);
@@ -68,11 +76,12 @@ export default function PopularCoursesPage() {
   const [creating, setCreating] = useState(false);
   const [planningTaskId, setPlanningTaskId] = useState<string | null>(null);
   const [planningStatus, setPlanningStatus] = useState<string>('');
-  
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+
   // Assessment dialog state
   const [assessmentDialogOpen, setAssessmentDialogOpen] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
-  
+
   // Form state
   const [formData, setFormData] = useState<{
     title: string;
@@ -98,7 +107,13 @@ export default function PopularCoursesPage() {
     try {
       setLoading(true);
       const response = await courseAPI.list({ is_popular: true });
-      setCourses(response.results || []);
+      const allCourses: Course[] = response.results || [];
+      setCourses(allCourses);
+      // Default: expand all groups
+      const mainCourseTitles = allCourses
+        .filter((c) => c.is_sub_topic === false)
+        .map((c) => c.title);
+      setExpandedGroups(new Set(mainCourseTitles));
       setError(null);
     } catch (err: any) {
       setError(err.message || 'Failed to load courses');
@@ -113,8 +128,7 @@ export default function PopularCoursesPage() {
     try {
       setCreating(true);
       setPlanningStatus('Analyzing topic and creating course plan...');
-      
-      // Create course planning task
+
       const planningTask = await coursePlanningAPI.create({
         course_title: formData.title,
         course_description: formData.description,
@@ -123,29 +137,26 @@ export default function PopularCoursesPage() {
         estimated_duration: formData.estimated_duration,
         thumbnail: formData.thumbnail,
       });
-      
+
       setPlanningTaskId(planningTask.id);
-      
-      // Poll for task completion
+
       const pollInterval = setInterval(async () => {
         try {
           const status = await coursePlanningAPI.getStatus(planningTask.id);
           setPlanningStatus(status.progress_message || 'Processing...');
-          
+
           if (status.status === 'completed') {
             clearInterval(pollInterval);
             setCreating(false);
             setPlanningStatus('');
             setPlanningTaskId(null);
-            
-            // Show success message
+
             const coursesCreated = status.created_courses?.length || 0;
             const message = status.result_data?.is_broad
               ? `Successfully created ${coursesCreated} courses! The topic was broad and has been split into a structured learning path.`
               : 'Successfully created course!';
             alert(message);
-            
-            // Close dialog and refresh courses
+
             setDialogOpen(false);
             setFormData({
               title: '',
@@ -171,8 +182,8 @@ export default function PopularCoursesPage() {
           console.error('Error checking task status:', err);
           alert('Failed to check course planning status');
         }
-      }, 2000); // Poll every 2 seconds
-      
+      }, 2000);
+
     } catch (err: any) {
       setCreating(false);
       setPlanningStatus('');
@@ -199,16 +210,244 @@ export default function PopularCoursesPage() {
 
   const handleEnrollmentComplete = (enrollmentId: number) => {
     console.log('Enrollment created:', enrollmentId);
-    // Navigate to the personalized course viewer
     navigate(`/course/${enrollmentId}`);
   };
 
-  const filteredCourses = courses.filter((course) => {
-    const matchesSearch = course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         course.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = categoryFilter === 'all' || course.category === categoryFilter;
-    return matchesSearch && matchesCategory;
-  });
+  const toggleGroup = (mainCourseTitle: string) => {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(mainCourseTitle)) {
+        next.delete(mainCourseTitle);
+      } else {
+        next.add(mainCourseTitle);
+      }
+      return next;
+    });
+  };
+
+  // Group courses: main courses with their sub-courses
+  const buildGroups = (): { groups: CourseGroup[]; orphanSubs: Course[] } => {
+    const mainCourses = courses.filter(
+      (c) => c.is_sub_topic === false
+    );
+    const subCourses = courses.filter(
+      (c) => c.is_sub_topic === true
+    );
+
+    const groups: CourseGroup[] = mainCourses.map((main) => ({
+      mainCourse: main,
+      subCourses: subCourses.filter(
+        (sub) => sub.parent_topic_name?.toLowerCase() === main.title?.toLowerCase()
+      ),
+    }));
+
+    const groupedSubTitles = groups.flatMap((g) => g.subCourses.map((s) => s.id));
+    const orphanSubs = subCourses.filter((s) => !groupedSubTitles.includes(s.id));
+
+    return { groups, orphanSubs };
+  };
+
+  // Apply search/category filters to groups
+  const getFilteredGroups = () => {
+    const { groups, orphanSubs } = buildGroups();
+    const q = searchQuery.toLowerCase();
+
+    const filteredGroups = groups
+      .map((group) => {
+        const mainMatches =
+          (categoryFilter === 'all' || group.mainCourse.category === categoryFilter) &&
+          (q === '' ||
+            group.mainCourse.title.toLowerCase().includes(q) ||
+            group.mainCourse.description.toLowerCase().includes(q));
+
+        const filteredSubs = group.subCourses.filter((sub) => {
+          const catMatch = categoryFilter === 'all' || sub.category === categoryFilter;
+          const searchMatch =
+            q === '' ||
+            sub.title.toLowerCase().includes(q) ||
+            sub.description.toLowerCase().includes(q);
+          return catMatch && searchMatch;
+        });
+
+        // Show the group if main matches (show all its subs) OR any sub matches
+        if (mainMatches) {
+          return {
+            ...group, subCourses: group.subCourses.filter((sub) => {
+              const catMatch = categoryFilter === 'all' || sub.category === categoryFilter;
+              return catMatch;
+            })
+          };
+        }
+        if (filteredSubs.length > 0) {
+          return { ...group, subCourses: filteredSubs };
+        }
+        return null;
+      })
+      .filter(Boolean) as CourseGroup[];
+
+    const filteredOrphans = orphanSubs.filter((sub) => {
+      const catMatch = categoryFilter === 'all' || sub.category === categoryFilter;
+      const searchMatch =
+        q === '' ||
+        sub.title.toLowerCase().includes(q) ||
+        sub.description.toLowerCase().includes(q);
+      return catMatch && searchMatch;
+    });
+
+    const totalLearnable =
+      filteredGroups.reduce((acc, g) => acc + g.subCourses.length, 0) +
+      filteredOrphans.length;
+
+    return { filteredGroups, filteredOrphans, totalLearnable };
+  };
+
+  const renderSubCourseCard = (course: Course) => (
+    <Card
+      key={course.id}
+      className="hover:shadow-xl transition-shadow cursor-pointer"
+      onClick={() => navigate(`/courses/${course.id}`)}
+    >
+      {/* Thumbnail */}
+      {course.thumbnail && (
+        <div className="w-full h-40 overflow-hidden rounded-t-lg">
+          <img
+            src={course.thumbnail}
+            alt={course.title}
+            className="w-full h-full object-cover"
+            onError={(e) => {
+              e.currentTarget.style.display = 'none';
+            }}
+          />
+        </div>
+      )}
+
+      <CardHeader>
+        <div className="flex items-start justify-between gap-2 mb-2">
+          <Badge variant="secondary" className="text-xs">
+            {CATEGORY_LABELS[course.category] || course.category}
+          </Badge>
+          <Badge className={`text-xs ${DIFFICULTY_COLORS[course.difficulty_level]}`}>
+            {course.difficulty_level}
+          </Badge>
+        </div>
+        <CardTitle className="text-lg line-clamp-2">
+          {course.title}
+        </CardTitle>
+      </CardHeader>
+
+      <CardContent>
+        <CardDescription className="line-clamp-3 mb-4">
+          {course.description}
+        </CardDescription>
+
+        <div className="flex items-center gap-4 text-sm text-gray-600">
+          <div className="flex items-center gap-1">
+            <Clock className="w-4 h-4" />
+            <span>{course.estimated_duration} min</span>
+          </div>
+          {course.modules_count !== undefined && (
+            <div className="flex items-center gap-1">
+              <BookOpen className="w-4 h-4" />
+              <span>{course.modules_count} modules</span>
+            </div>
+          )}
+        </div>
+      </CardContent>
+
+      <CardFooter className="flex gap-2">
+        {isAuthenticated ? (
+          <>
+            <Button
+              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+              onClick={(e) => handleEnrollClick(e, course)}
+            >
+              <GraduationCap className="w-4 h-4 mr-2" />
+              Enroll Now
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1"
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/courses/${course.id}`);
+              }}
+            >
+              View Details
+            </Button>
+          </>
+        ) : (
+          <Button
+            className="w-full"
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate('/login');
+            }}
+          >
+            Login to Enroll
+          </Button>
+        )}
+      </CardFooter>
+    </Card>
+  );
+
+  const renderGroup = (group: CourseGroup) => {
+    const isExpanded = expandedGroups.has(group.mainCourse.title);
+    const { mainCourse, subCourses } = group;
+
+    return (
+      <div key={mainCourse.id} className="mb-8">
+        {/* Group Header — Main / Broad Course */}
+        <div
+          className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-5 py-4 cursor-pointer hover:shadow-md transition-shadow mb-1"
+          onClick={() => toggleGroup(mainCourse.title)}
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="flex-shrink-0 w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+              <Layers className="w-5 h-5 text-blue-600" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg font-semibold text-gray-900">{mainCourse.title}</h2>
+                <Badge variant="secondary" className="text-xs">
+                  {CATEGORY_LABELS[mainCourse.category] || mainCourse.category}
+                </Badge>
+                <Badge className={`text-xs ${DIFFICULTY_COLORS[mainCourse.difficulty_level]}`}>
+                  {mainCourse.difficulty_level}
+                </Badge>
+              </div>
+              <p className="text-sm text-gray-500 mt-0.5 line-clamp-1">{mainCourse.description}</p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 ml-4 flex-shrink-0">
+            <span className="text-xs text-gray-500 whitespace-nowrap">
+              {subCourses.length} sub-course{subCourses.length !== 1 ? 's' : ''}
+            </span>
+            {isExpanded ? (
+              <ChevronDown className="w-5 h-5 text-gray-400" />
+            ) : (
+              <ChevronRight className="w-5 h-5 text-gray-400" />
+            )}
+          </div>
+        </div>
+
+        {/* Sub-Courses Grid */}
+        {isExpanded && subCourses.length > 0 && (
+          <div className="pl-4 border-l-2 border-blue-100 ml-5 mt-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {subCourses.map((sub) => renderSubCourseCard(sub))}
+            </div>
+          </div>
+        )}
+
+        {isExpanded && subCourses.length === 0 && (
+          <div className="pl-4 border-l-2 border-blue-100 ml-5 mt-3">
+            <p className="text-sm text-gray-400 italic py-3 px-2">No sub-topics yet for this course.</p>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -235,10 +474,12 @@ export default function PopularCoursesPage() {
     );
   }
 
+  const { filteredGroups, filteredOrphans, totalLearnable } = getFilteredGroups();
+
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-      
+
       <main className="flex-1 ml-64">
         <div className="p-8">
           {/* Header */}
@@ -253,7 +494,7 @@ export default function PopularCoursesPage() {
               </p>
             </div>
 
-            {/* Create Course Button - Only for authenticated users */}
+            {/* Create Course Button */}
             {isAuthenticated && (
               <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogTrigger asChild>
@@ -281,7 +522,7 @@ export default function PopularCoursesPage() {
                           required
                         />
                       </div>
-                      
+
                       <div className="grid gap-2">
                         <Label htmlFor="description">Description *</Label>
                         <textarea
@@ -355,15 +596,14 @@ export default function PopularCoursesPage() {
                         />
                       </div>
                     </div>
-                    
-                    {/* Show planning status when creating */}
+
                     {creating && planningStatus && (
                       <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 p-3 rounded-md">
                         <Loader2 className="w-4 h-4 animate-spin" />
                         <span>{planningStatus}</span>
                       </div>
                     )}
-                    
+
                     <DialogFooter>
                       <Button
                         type="button"
@@ -402,7 +642,7 @@ export default function PopularCoursesPage() {
                 className="pl-10"
               />
             </div>
-            
+
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
               <SelectTrigger className="w-[240px]">
                 <Filter className="w-4 h-4 mr-2" />
@@ -421,112 +661,62 @@ export default function PopularCoursesPage() {
 
           {/* Stats */}
           <div className="mb-6 text-gray-600">
-            Showing {filteredCourses.length} course{filteredCourses.length !== 1 ? 's' : ''}
+            Showing {filteredGroups.length} course group{filteredGroups.length !== 1 ? 's' : ''} &middot; {totalLearnable} learnable topic{totalLearnable !== 1 ? 's' : ''}
           </div>
 
-          {/* Courses Grid */}
-          {filteredCourses.length === 0 ? (
+          {/* Course Groups */}
+          {filteredGroups.length === 0 && filteredOrphans.length === 0 ? (
             <div className="text-center py-12">
               <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-gray-900 mb-2">No courses found</h3>
               <p className="text-gray-600">
-                {searchQuery || categoryFilter !== 'all' 
-                  ? 'Try adjusting your filters' 
+                {searchQuery || categoryFilter !== 'all'
+                  ? 'Try adjusting your filters'
                   : 'Be the first to create a course!'}
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredCourses.map((course) => (
-                <Card 
-                  key={course.id} 
-                  className="hover:shadow-xl transition-shadow cursor-pointer"
-                  onClick={() => navigate(`/courses/${course.id}`)}
-                >
-                  {/* Thumbnail */}
-                  {course.thumbnail && (
-                    <div className="w-full h-48 overflow-hidden rounded-t-lg">
-                      <img
-                        src={course.thumbnail}
-                        alt={course.title}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
-                    </div>
-                  )}
-                  
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <Badge variant="secondary" className="text-xs">
-                        {CATEGORY_LABELS[course.category] || course.category}
-                      </Badge>
-                      <Badge className={`text-xs ${DIFFICULTY_COLORS[course.difficulty_level]}`}>
-                        {course.difficulty_level}
-                      </Badge>
-                    </div>
-                    <CardTitle className="text-xl line-clamp-2">
-                      {course.title}
-                    </CardTitle>
-                  </CardHeader>
-                  
-                  <CardContent>
-                    <CardDescription className="line-clamp-3 mb-4">
-                      {course.description}
-                    </CardDescription>
-                    
-                    <div className="flex items-center gap-4 text-sm text-gray-600">
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-4 h-4" />
-                        <span>{course.estimated_duration} min</span>
+            <>
+              {filteredGroups.map((group) => renderGroup(group))}
+
+              {/* Orphan sub-courses (no matching parent) */}
+              {filteredOrphans.length > 0 && (
+                <div className="mb-8">
+                  <div
+                    className="flex items-center justify-between bg-white border border-gray-200 rounded-xl px-5 py-4 cursor-pointer hover:shadow-md transition-shadow mb-1"
+                    onClick={() => toggleGroup('__orphans__')}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex-shrink-0 w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                        <BookOpen className="w-5 h-5 text-purple-600" />
                       </div>
-                      {course.modules_count !== undefined && (
-                        <div className="flex items-center gap-1">
-                          <BookOpen className="w-4 h-4" />
-                          <span>{course.modules_count} modules</span>
-                        </div>
+                      <div>
+                        <h2 className="text-lg font-semibold text-gray-900">Other Courses</h2>
+                        <p className="text-sm text-gray-500">Standalone learnable topics</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-gray-500">
+                        {filteredOrphans.length} course{filteredOrphans.length !== 1 ? 's' : ''}
+                      </span>
+                      {expandedGroups.has('__orphans__') ? (
+                        <ChevronDown className="w-5 h-5 text-gray-400" />
+                      ) : (
+                        <ChevronRight className="w-5 h-5 text-gray-400" />
                       )}
                     </div>
-                  </CardContent>
-                  
-                  <CardFooter className="flex gap-2">
-                    {isAuthenticated ? (
-                      <>
-                        <Button 
-                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                          onClick={(e) => handleEnrollClick(e, course)}
-                          disabled={course.is_sub_topic === false}
-                        >
-                          <GraduationCap className="w-4 h-4 mr-2" />
-                          {course.is_sub_topic === false ? 'Choose Sub-topic' : 'Enroll Now'}
-                        </Button>
-                        <Button 
-                          variant="outline"
-                          className="flex-1"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/courses/${course.id}`);
-                          }}
-                        >
-                          View Details
-                        </Button>
-                      </>
-                    ) : (
-                      <Button 
-                        className="w-full"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate('/login');
-                        }}
-                      >
-                        Login to Enroll
-                      </Button>
-                    )}
-                  </CardFooter>
-                </Card>
-              ))}
-            </div>
+                  </div>
+
+                  {expandedGroups.has('__orphans__') && (
+                    <div className="pl-4 border-l-2 border-purple-100 ml-5 mt-3">
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {filteredOrphans.map((sub) => renderSubCourseCard(sub))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
           )}
         </div>
       </main>
