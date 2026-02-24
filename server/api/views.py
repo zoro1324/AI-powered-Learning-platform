@@ -1944,6 +1944,56 @@ class GenerateTopicQuizView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+class GenerateTopicMindMapView(APIView):
+    """Generate mind map for a specific topic"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        from .services.mindmap_service import MindMapService
+        
+        lesson_id = request.data.get('lesson_id')
+        topic_name = request.data.get('topic_name')
+        
+        if not all([lesson_id, topic_name]):
+            return Response(
+                {'error': 'lesson_id and topic_name are required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            lesson = Lesson.objects.get(pk=lesson_id)
+            content = lesson.content
+            
+            if not content:
+                return Response(
+                    {'error': 'Lesson content not found. Generate content first.'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            mindmap_data = MindMapService.generate_topic_mindmap(topic_name, content)
+            
+            ActivityLog.objects.create(
+                user=request.user,
+                activity_type='course_started',
+                title=f'Mind Map generated for {topic_name}',
+                description=f'Mind map generated for topic: {topic_name}',
+                metadata={'lesson_id': lesson.id}
+            )
+            
+            return Response(mindmap_data, status=status.HTTP_200_OK)
+            
+        except Lesson.DoesNotExist:
+            return Response(
+                {'error': 'Lesson not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error generating topic mind map: {e}", exc_info=True)
+            return Response(
+                {'error': f'Failed to generate mind map: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
 
 class EvaluateTopicQuizView(APIView):
     """Evaluate topic quiz using server-side answers from the DB"""

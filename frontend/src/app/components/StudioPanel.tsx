@@ -27,6 +27,9 @@ import {
   generateCourseMindMap,
   selectMindMapData,
   selectMindMapLoading,
+  generateTopicMindMap,
+  selectTopicMindMapData,
+  selectTopicMindMapLoading,
 } from '../../store/slices/syllabusSlice';
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
@@ -85,6 +88,12 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
   const mindMapData = useAppSelector(selectMindMapData);
   const isMindMapLoading = useAppSelector(selectMindMapLoading);
   const [mindMapDialogOpen, setMindMapDialogOpen] = useState(false);
+  const [activeMindMapData, setActiveMindMapData] = useState<any>(null); // Course or Topic
+  const [activeMindMapTitle, setActiveMindMapTitle] = useState('Mind Map');
+
+  // Topic specific mind map state
+  const topicMindMapData = useAppSelector(state => isTopicView ? selectTopicMindMapData(state, mIdx, tIdx) : null);
+  const isTopicMindMapLoading = useAppSelector(state => isTopicView ? selectTopicMindMapLoading(state, mIdx, tIdx) : false);
 
   const handleGenerateMindMap = useCallback(() => {
     if (!eId) return;
@@ -190,6 +199,24 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
     if (!content) return;
     setPodcastDialogOpen(true);
   }, [content]);
+
+  const handleGenerateTopicMindMap = useCallback(() => {
+    if (!content || !currentTopic) return;
+    dispatch(
+      generateTopicMindMap({
+        lessonId: content.lessonId,
+        topicName: currentTopic.topic_name,
+        moduleIndex: mIdx,
+        topicIndex: tIdx,
+      })
+    );
+  }, [dispatch, content, currentTopic, mIdx, tIdx]);
+
+  const openMindMapDialog = (data: any, title: string) => {
+    setActiveMindMapData(data);
+    setActiveMindMapTitle(title);
+    setMindMapDialogOpen(true);
+  };
 
   // Reset podcast when topic changes
   useEffect(() => {
@@ -449,6 +476,16 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                   disabled={!content}
                 />
 
+                <ToolCard
+                  icon={Network}
+                  label="Mind Map"
+                  bgColor="bg-indigo-800/80"
+                  hasData={!!topicMindMapData}
+                  isLoading={isTopicMindMapLoading}
+                  onGenerate={handleGenerateTopicMindMap}
+                  disabled={!content}
+                />
+
                 {/* Generated Content list */}
                 {(content || quiz || videoTask || generatedPodcast || resources.length > 0) && (
                   <div className="pt-4 border-t border-gray-100 space-y-2">
@@ -499,6 +536,24 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                             {content.generatedAt
                               ? new Date(content.generatedAt).toLocaleDateString()
                               : ''}
+                          </p>
+                        </div>
+                      </button>
+                    )}
+
+                    {/* Topic Mind Map */}
+                    {topicMindMapData && (
+                      <button
+                        onClick={() => openMindMapDialog(topicMindMapData, `${currentTopic?.topic_name} - Mind Map`)}
+                        className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
+                      >
+                        <Network className="w-4 h-4 text-indigo-400 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-gray-300 truncate">
+                            {currentTopic?.topic_name} - Mind Map
+                          </p>
+                          <p className="text-[10px] text-gray-500">
+                            {topicMindMapData.level}
                           </p>
                         </div>
                       </button>
@@ -673,15 +728,15 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
 
       {/* Mind Map Dialog */}
       <Dialog open={mindMapDialogOpen} onOpenChange={setMindMapDialogOpen}>
-        <DialogContent className="max-w-[90vw] w-[1200px] h-[85vh] p-0 overflow-hidden flex flex-col bg-gray-900 border-gray-800">
-          <DialogHeader className="p-6 border-b border-gray-800 bg-gray-900/50 flex-shrink-0">
-            <DialogTitle className="text-xl font-bold text-gray-100 flex items-center gap-2">
-              <Network className="w-5 h-5 text-indigo-400" />
-              Course Mind Map
+        <DialogContent className="max-w-[90vw] w-[1200px] h-[85vh] p-0 overflow-hidden flex flex-col bg-[#E8EAED] border-gray-300">
+          <DialogHeader className="p-6 border-b border-gray-300 bg-white flex-shrink-0">
+            <DialogTitle className="text-xl font-bold items-center gap-2 flex text-gray-800">
+              <Network className="w-5 h-5 text-indigo-500" />
+              {activeMindMapTitle}
             </DialogTitle>
           </DialogHeader>
-          <div className="flex-1 overflow-auto relative bg-black/20">
-            {mindMapData && <MindMapViewer data={mindMapData} />}
+          <div className="flex-1 overflow-auto relative">
+            {activeMindMapData && <MindMapViewer data={activeMindMapData} />}
           </div>
         </DialogContent>
       </Dialog>

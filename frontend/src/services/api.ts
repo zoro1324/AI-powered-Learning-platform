@@ -646,6 +646,17 @@ export const assessmentAPI = {
     return response.data;
   },
 
+  generateTopicMindMap: async (data: {
+    lesson_id: number;
+    topic_name: string;
+  }): Promise<MindMapData> => {
+    const response = await api.post<MindMapData>(
+      '/assessment/topic/mindmap/',
+      data
+    );
+    return response.data;
+  },
+
   generateRemediationContent: async (data: {
     enrollment_id: number;
     lesson_id: number;
