@@ -142,6 +142,30 @@ export const userAPI = {
 // COURSE API
 // ============================================================================
 
+export interface PublicCurriculumTopic {
+  topic_name: string;
+  description: string;
+}
+
+export interface PublicCurriculumModule {
+  module_name: string;
+  description: string;
+  difficulty_level: string;
+  estimated_duration_minutes: number;
+  topics: PublicCurriculumTopic[];
+}
+
+export interface PublicCurriculum {
+  enrollment_id: number;
+  diagnosed_level: string;
+  study_method: string;
+  knowledge_level: string;
+  total_modules: number;
+  total_topics: number;
+  modules: PublicCurriculumModule[];
+  created_at: string;
+}
+
 export const courseAPI = {
   list: async (params?: any): Promise<PaginatedResponse<Course>> => {
     const response = await api.get<PaginatedResponse<Course>>('/courses/', { params });
@@ -175,6 +199,28 @@ export const courseAPI = {
 
   delete: async (id: number): Promise<void> => {
     await api.delete(`/courses/${id}/`);
+  },
+
+  getPublicSyllabi: async (courseId: number): Promise<{
+    course_id: number;
+    course_title: string;
+    curricula: PublicCurriculum[];
+    total: number;
+  }> => {
+    const response = await api.get(`/courses/${courseId}/public_syllabi/`);
+    return response.data;
+  },
+
+  enrollWithSyllabus: async (
+    courseId: number,
+    sourceEnrollmentId: number,
+    learningStyle?: string,
+  ): Promise<{ enrollment_id: number; message: string; already_enrolled: boolean }> => {
+    const response = await api.post(`/courses/${courseId}/enroll_with_syllabus/`, {
+      source_enrollment_id: sourceEnrollmentId,
+      learning_style: learningStyle || '',
+    });
+    return response.data;
   },
 };
 

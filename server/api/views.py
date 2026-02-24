@@ -244,6 +244,175 @@ class CourseViewSet(viewsets.ModelViewSet):
         serializer = ModuleSerializer(modules, many=True)
         return Response(serializer.data)
 
+    @action(detail=True, methods=['get'], permission_classes=[permissions.AllowAny])
+    def public_syllabi(self, request, pk=None):
+        """
+        Return a list of distinct personalized syllabus previews for a course.
+        User identity (email, name) is never exposed.
+        Results are deduplicated by (diagnosed_level, study_method_preference)
+        so users see meaningfully different curricula, not hundreds of copies.
+        """
+        course = self.get_object()
+        syllabi = PersonalizedSyllabus.objects.filter(
+            enrollment__course=course
+        ).select_related('enrollment').order_by('enrollment__enrolled_at')
+
+        seen_keys = set()
+        results = []
+        for syl in syllabi:
+            enr = syl.enrollment
+            key = (enr.diagnosed_level, enr.study_method_preference)
+            if key in seen_keys:
+                continue
+            seen_keys.add(key)
+
+            syllabus_data = syl.syllabus_data or {}
+            modules = syllabus_data.get('modules', [])
+            results.append({
+                'enrollment_id': enr.id,
+                'diagnosed_level': enr.diagnosed_level,
+                'study_method': enr.study_method_preference,
+                'knowledge_level': syllabus_data.get('knowledge_level', enr.diagnosed_level),
+                'total_modules': len(modules),
+                'total_topics': sum(len(m.get('topics', [])) for m in modules),
+                'modules': [
+                    {
+                        'module_name': m.get('module_name', ''),
+                        'description': m.get('description', ''),
+                        'difficulty_level': m.get('difficulty_level', ''),
+                        'estimated_duration_minutes': m.get('estimated_duration_minutes', 0),
+                        'topics': [
+                            {
+                                'topic_name': t.get('topic_name', ''),
+                                'description': t.get('description', ''),
+                            }
+                            for t in m.get('topics', [])
+                        ],
+                    }
+                    for m in modules
+                ],
+                'created_at': syl.created_at.isoformat(),
+            })
+
+            if len(results) >= 10:
+                break
+
+        return Response({
+            'course_id': course.id,
+            'course_title': course.title,
+            'curricula': results,
+            'total': len(results),
+        })
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def enroll_with_syllabus(self, request, pk=None):
+        """
+        Clone an existing enrollment's personalized syllabus for the current user.
+
+        Payload:
+            {
+                "source_enrollment_id": 123,
+                "learning_style": "summary"   // optional override
+            }
+
+        Creates a new Enrollment (or returns existing) and copies the source
+        PersonalizedSyllabus JSON into a new PersonalizedSyllabus record.
+        """
+        course = self.get_object()
+
+        if not course.is_sub_topic:
+            return Response(
+                {'error': 'Cannot enroll in a broad topic directly. Choose a sub-topic.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        source_enrollment_id = request.data.get('source_enrollment_id')
+        learning_style = request.data.get('learning_style', '')
+
+        # Load source syllabus (public — no ownership check)
+        try:
+            source_syllabus = PersonalizedSyllabus.objects.select_related('enrollment').get(
+                enrollment_id=source_enrollment_id,
+                enrollment__course=course,
+            )
+        except PersonalizedSyllabus.DoesNotExist:
+            return Response(
+                {'error': 'Source curriculum not found for this course.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        source_enr = source_syllabus.enrollment
+
+        # Create or get enrollment for current user
+        enrollment, created = Enrollment.objects.get_or_create(
+            user=request.user,
+            course=course,
+            defaults={
+                'diagnosed_level': source_enr.diagnosed_level,
+                'study_method_preference': source_enr.study_method_preference,
+                'custom_study_method': source_enr.custom_study_method,
+                'learning_style_override': learning_style or source_enr.learning_style_override,
+                'status': Enrollment.Status.ACTIVE,
+            }
+        )
+
+        if not created and hasattr(enrollment, 'syllabus'):
+            # Already enrolled — just return their existing enrollment
+            return Response({
+                'enrollment_id': enrollment.id,
+                'message': 'You are already enrolled in this course.',
+                'already_enrolled': True,
+            })
+
+        # Clone the syllabus
+        PersonalizedSyllabus.objects.update_or_create(
+            enrollment=enrollment,
+            defaults={
+                'syllabus_data': source_syllabus.syllabus_data,
+                'generated_by_model': source_syllabus.generated_by_model,
+            }
+        )
+
+        # Build module structure from syllabus JSON
+        syllabus_data = source_syllabus.syllabus_data or {}
+        for idx, mod_data in enumerate(syllabus_data.get('modules', []), start=1):
+            module, _ = Module.objects.get_or_create(
+                course=course,
+                order=idx,
+                defaults={
+                    'title': mod_data.get('module_name', f'Module {idx}'),
+                    'description': mod_data.get('description', ''),
+                    'difficulty_level': mod_data.get('difficulty_level', 'beginner'),
+                    'estimated_duration_minutes': mod_data.get('estimated_duration_minutes', 60),
+                    'is_generated': True,
+                }
+            )
+            for topic_idx, topic_data in enumerate(mod_data.get('topics', []), start=1):
+                Lesson.objects.get_or_create(
+                    module=module,
+                    order=topic_idx,
+                    defaults={
+                        'title': topic_data.get('topic_name', f'Topic {topic_idx}'),
+                        'content': topic_data.get('description', ''),
+                        'estimated_duration_minutes': 15,
+                    }
+                )
+
+        # Log activity
+        ActivityLog.objects.create(
+            user=request.user,
+            activity_type='course_started',
+            title=f'Enrolled in {course.title}',
+            description=f'Enrolled using a community curriculum for {course.title}',
+            metadata={'course_id': course.id, 'source_enrollment_id': source_enrollment_id}
+        )
+
+        return Response({
+            'enrollment_id': enrollment.id,
+            'message': f'Successfully enrolled in {course.title} using the selected curriculum.',
+            'already_enrolled': False,
+        }, status=status.HTTP_201_CREATED)
+
 
 class ModuleViewSet(viewsets.ModelViewSet):
     """ViewSet for modules"""

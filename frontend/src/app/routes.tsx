@@ -16,6 +16,7 @@ import MyCoursesPage from './pages/MyCoursesPage';
 import CoursePage from './pages/CoursePage';
 import TopicPage from './pages/TopicPage';
 import PodcastPage from './pages/PodcastPage';
+import CourseDetailsPage from './pages/CourseDetailsPage';
 import { CourseLayout } from './components/CourseLayout';
 
 // Note: Protected routes are handled by checking localStorage in each component
@@ -45,6 +46,10 @@ export const router = createBrowserRouter([
   {
     path: '/courses/popular',
     Component: PopularCoursesPage,
+  },
+  {
+    path: '/courses/:courseId',
+    Component: CourseDetailsPage,
   },
   {
     path: '/my-courses',
