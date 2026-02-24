@@ -33,6 +33,19 @@ logger = logging.getLogger(__name__)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Token Tracking — delegates to api.services.token_tracker
+# ─────────────────────────────────────────────────────────────────────────────
+
+try:
+    from api.services.token_tracker import record as _record_tokens, _CALLBACK_INSTANCE as _LC_CALLBACK
+except ImportError:
+    # Fallback if tracker not yet available
+    def _record_tokens(in_tok, out_tok, source="AI"):  # type: ignore
+        pass
+    _LC_CALLBACK = None
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Internal helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -76,7 +89,14 @@ def _ollama_generate(prompt: str, system_prompt: Optional[str] = None, json_mode
         timeout=timeout,
     )
     response.raise_for_status()
-    content = response.json().get('message', {}).get('content', '')
+    data = response.json()
+    content = data.get('message', {}).get('content', '')
+
+    # Track tokens from Ollama response
+    in_toks = data.get('prompt_eval_count', 0)
+    out_toks = data.get('eval_count', 0)
+    _record_tokens(in_toks, out_toks, f"Ollama ({model})")
+
     logger.info("AI Client [DEV] ← Ollama response length=%d", len(content))
     return content
 
@@ -115,6 +135,16 @@ def _gemini_generate(prompt: str, system_prompt: Optional[str] = None, json_mode
     logger.info("AI Client [PROD] → Gemini model=%s json_mode=%s", model_name, json_mode)
     response = model.generate_content(prompt)
     content = response.text or ''
+
+    # Track tokens from Gemini response
+    try:
+        if hasattr(response, 'usage_metadata') and response.usage_metadata:
+            in_toks = response.usage_metadata.prompt_token_count
+            out_toks = response.usage_metadata.candidates_token_count
+            _record_tokens(in_toks, out_toks, f"Gemini ({model_name})")
+    except Exception as exc:
+        logger.warning("Failed to extract Gemini token counts: %s", exc)
+
     logger.info("AI Client [PROD] ← Gemini response length=%d", len(content))
     return content
 
@@ -292,14 +322,21 @@ def get_langchain_llm(temperature: float = 0.7):
         api_key = getattr(settings, 'GEMINI_API_KEY', '')
         model_name = getattr(settings, 'GEMINI_MODEL', 'gemini-2.0-flash')
         logger.info("AI Client [PROD] LangChain LLM → ChatGoogleGenerativeAI model=%s", model_name)
+        callbacks = [_LC_CALLBACK] if _LC_CALLBACK else []
         return ChatGoogleGenerativeAI(
             model=model_name,
             google_api_key=api_key,
             temperature=temperature,
-            convert_system_message_to_human=True,  # Gemini doesn't natively support SystemMessage
+            convert_system_message_to_human=True,
+            callbacks=callbacks,
         )
     else:
         from langchain_ollama import ChatOllama
         model_name = getattr(settings, 'OLLAMA_MODEL', 'llama3:8b')
         logger.info("AI Client [DEV] LangChain LLM → ChatOllama model=%s", model_name)
-        return ChatOllama(model=model_name, temperature=temperature)
+        callbacks = [_LC_CALLBACK] if _LC_CALLBACK else []
+        return ChatOllama(
+            model=model_name,
+            temperature=temperature,
+            callbacks=callbacks,
+        )

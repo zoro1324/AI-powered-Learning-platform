@@ -16,7 +16,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { useAppSelector } from '../../store';
-import { courseAPI, coursePlanningAPI } from '../../services/api';
+import { courseAPI, coursePlanningAPI, enrollmentAPI } from '../../services/api';
 import { Course, CoursePlanningTask } from '../../types/api';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
@@ -77,6 +77,7 @@ export default function PopularCoursesPage() {
   const [planningTaskId, setPlanningTaskId] = useState<string | null>(null);
   const [planningStatus, setPlanningStatus] = useState<string>('');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [enrolledCourseMap, setEnrolledCourseMap] = useState<Record<number, number>>({});
 
   // Assessment dialog state
   const [assessmentDialogOpen, setAssessmentDialogOpen] = useState(false);
@@ -106,9 +107,22 @@ export default function PopularCoursesPage() {
   const fetchCourses = async () => {
     try {
       setLoading(true);
-      const response = await courseAPI.list({ is_popular: true });
-      const allCourses: Course[] = response.results || [];
+      const [coursesRes, enrollmentsRes] = await Promise.all([
+        courseAPI.list({ is_popular: true }),
+        isAuthenticated ? enrollmentAPI.list() : Promise.resolve({ results: [] })
+      ]);
+      const allCourses: Course[] = coursesRes.results || [];
       setCourses(allCourses);
+
+      // Build enrollment map: courseId -> enrollmentId
+      const enrollments = enrollmentsRes.results || [];
+      const enrolledMap: Record<number, number> = {};
+      enrollments.forEach((e: any) => {
+        const courseId = typeof e.course === 'object' ? e.course.id : e.course;
+        enrolledMap[courseId] = e.id;
+      });
+      setEnrolledCourseMap(enrolledMap);
+
       // Default: expand all groups
       const mainCourseTitles = allCourses
         .filter((c) => c.is_sub_topic === false)
@@ -301,94 +315,119 @@ export default function PopularCoursesPage() {
     return { filteredGroups, filteredOrphans, totalLearnable };
   };
 
-  const renderSubCourseCard = (course: Course) => (
-    <Card
-      key={course.id}
-      className="hover:shadow-xl transition-shadow cursor-pointer"
-      onClick={() => navigate(`/courses/${course.id}`)}
-    >
-      {/* Thumbnail */}
-      {course.thumbnail && (
-        <div className="w-full h-40 overflow-hidden rounded-t-lg">
-          <img
-            src={course.thumbnail}
-            alt={course.title}
-            className="w-full h-full object-cover"
-            onError={(e) => {
-              e.currentTarget.style.display = 'none';
-            }}
-          />
-        </div>
-      )}
+  const renderSubCourseCard = (course: Course) => {
+    const isEnrolled = course.id in enrolledCourseMap;
+    const enrollmentId = enrolledCourseMap[course.id];
 
-      <CardHeader>
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <Badge variant="secondary" className="text-xs">
-            {CATEGORY_LABELS[course.category] || course.category}
-          </Badge>
-          <Badge className={`text-xs ${DIFFICULTY_COLORS[course.difficulty_level]}`}>
-            {course.difficulty_level}
-          </Badge>
-        </div>
-        <CardTitle className="text-lg line-clamp-2">
-          {course.title}
-        </CardTitle>
-      </CardHeader>
-
-      <CardContent>
-        <CardDescription className="line-clamp-3 mb-4">
-          {course.description}
-        </CardDescription>
-
-        <div className="flex items-center gap-4 text-sm text-gray-600">
-          <div className="flex items-center gap-1">
-            <Clock className="w-4 h-4" />
-            <span>{course.estimated_duration} min</span>
+    return (
+      <Card
+        key={course.id}
+        className="hover:shadow-xl transition-shadow cursor-pointer"
+        onClick={() => navigate(`/courses/${course.id}`)}
+      >
+        {/* Thumbnail */}
+        {course.thumbnail && (
+          <div className="w-full h-40 overflow-hidden rounded-t-lg">
+            <img
+              src={course.thumbnail}
+              alt={course.title}
+              className="w-full h-full object-cover"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+              }}
+            />
           </div>
-          {course.modules_count !== undefined && (
-            <div className="flex items-center gap-1">
-              <BookOpen className="w-4 h-4" />
-              <span>{course.modules_count} modules</span>
-            </div>
-          )}
-        </div>
-      </CardContent>
+        )}
 
-      <CardFooter className="flex gap-2">
-        {isAuthenticated ? (
-          <>
+        <CardHeader>
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <div className="flex gap-2 flex-wrap">
+              <Badge variant="secondary" className="text-xs">
+                {CATEGORY_LABELS[course.category] || course.category}
+              </Badge>
+              {isEnrolled && (
+                <Badge className="bg-blue-100 text-blue-800 border-blue-200 text-xs hover:bg-blue-100 hover:text-blue-800">
+                  Enrolled
+                </Badge>
+              )}
+            </div>
+            <Badge className={`text-xs ${DIFFICULTY_COLORS[course.difficulty_level]}`}>
+              {course.difficulty_level}
+            </Badge>
+          </div>
+          <CardTitle className="text-lg line-clamp-2">
+            {course.title}
+          </CardTitle>
+        </CardHeader>
+
+        <CardContent>
+          <CardDescription className="line-clamp-3 mb-4">
+            {course.description}
+          </CardDescription>
+
+          <div className="flex items-center gap-4 text-sm text-gray-600">
+            <div className="flex items-center gap-1">
+              <Clock className="w-4 h-4" />
+              <span>{course.estimated_duration} min</span>
+            </div>
+            {course.modules_count !== undefined && (
+              <div className="flex items-center gap-1">
+                <BookOpen className="w-4 h-4" />
+                <span>{course.modules_count} modules</span>
+              </div>
+            )}
+          </div>
+        </CardContent>
+
+        <CardFooter className="flex gap-2">
+          {isAuthenticated ? (
+            <>
+              {isEnrolled ? (
+                <Button
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/course/${enrollmentId}`);
+                  }}
+                >
+                  <BookOpen className="w-4 h-4 mr-2" />
+                  Resume Learning
+                </Button>
+              ) : (
+                <Button
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                  onClick={(e) => handleEnrollClick(e, course)}
+                >
+                  <GraduationCap className="w-4 h-4 mr-2" />
+                  Enroll Now
+                </Button>
+              )}
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  navigate(`/courses/${course.id}`);
+                }}
+              >
+                View Details
+              </Button>
+            </>
+          ) : (
             <Button
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-              onClick={(e) => handleEnrollClick(e, course)}
-            >
-              <GraduationCap className="w-4 h-4 mr-2" />
-              Enroll Now
-            </Button>
-            <Button
-              variant="outline"
-              className="flex-1"
+              className="w-full"
               onClick={(e) => {
                 e.stopPropagation();
-                navigate(`/courses/${course.id}`);
+                navigate('/login');
               }}
             >
-              View Details
+              Login to Enroll
             </Button>
-          </>
-        ) : (
-          <Button
-            className="w-full"
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate('/login');
-            }}
-          >
-            Login to Enroll
-          </Button>
-        )}
-      </CardFooter>
-    </Card>
-  );
+          )}
+        </CardFooter>
+      </Card>
+    );
+  };
 
   const renderGroup = (group: CourseGroup) => {
     const isExpanded = expandedGroups.has(group.mainCourse.title);
