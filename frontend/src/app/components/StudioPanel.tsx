@@ -227,12 +227,12 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
 
   if (collapsed) {
     return (
-      <div className="w-12 bg-gray-900 border-l border-gray-700 flex flex-col items-center pt-4 shrink-0">
+      <div className="w-12 bg-white border-l border-gray-200 flex flex-col items-center pt-4 shrink-0">
         <Button
           variant="ghost"
           size="icon"
           onClick={onToggle}
-          className="text-gray-400 hover:text-white hover:bg-gray-800"
+          className="text-gray-500 hover:text-gray-900 hover:bg-gray-100"
         >
           <PanelRightOpen className="w-5 h-5" />
         </Button>
@@ -323,18 +323,18 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <aside className="w-80 bg-gray-900 border-l border-gray-700 flex flex-col h-full shrink-0">
+    <aside className="w-80 bg-white border-l border-gray-200 flex flex-col h-full shrink-0">
       {/* Header with Tab Toggle */}
-      <div className="p-3 border-b border-gray-700">
+      <div className="p-3 border-b border-gray-200">
         <div className="flex items-center justify-between mb-2">
-          <div className="flex items-center gap-1 bg-gray-800 rounded-lg p-0.5">
+          <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
             <button
               onClick={() => setActiveTab('studio')}
               className={cn(
                 'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all',
                 activeTab === 'studio'
-                  ? 'bg-gray-700 text-white shadow-sm'
-                  : 'text-gray-400 hover:text-gray-300'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-700'
               )}
             >
               <Wrench className="w-3.5 h-3.5" />
@@ -346,7 +346,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                 'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all',
                 activeTab === 'chat'
                   ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-sm'
-                  : 'text-gray-400 hover:text-gray-300'
+                  : 'text-gray-500 hover:text-gray-700'
               )}
             >
               <MessageSquare className="w-3.5 h-3.5" />
@@ -357,7 +357,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
             variant="ghost"
             size="icon"
             onClick={onToggle}
-            className="text-gray-400 hover:text-white hover:bg-gray-800 h-7 w-7"
+            className="text-gray-500 hover:text-gray-900 hover:bg-gray-100 h-7 w-7"
           >
             <PanelRightClose className="w-4 h-4" />
           </Button>
@@ -378,11 +378,11 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
           <div className="p-4 space-y-3">
             {!isTopicView ? (
               <div className="space-y-4">
-                <div className="bg-gray-800 rounded-xl p-3 mb-4">
-                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">
+                <div className="bg-gray-50 rounded-xl p-3 mb-4 border border-gray-100">
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">
                     Course Overview
                   </p>
-                  <p className="text-sm text-white font-medium">
+                  <p className="text-sm text-gray-900 font-medium">
                     {syllabus?.course_name || 'Course Dashboard'}
                   </p>
                 </div>
@@ -397,14 +397,14 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                 />
 
                 {mindMapData && (
-                  <div className="pt-4 border-t border-gray-700 space-y-2">
+                  <div className="pt-4 border-t border-gray-100 space-y-2">
                     <button
-                      onClick={() => openMindMapDialog(mindMapData, 'Course Mind Map')}
-                      className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
+                      onClick={() => setMindMapDialogOpen(true)}
+                      className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
                     >
-                      <Network className="w-4 h-4 text-indigo-400 shrink-0" />
+                      <Network className="w-4 h-4 text-indigo-600 shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-gray-300 truncate">
+                        <p className="text-sm text-gray-700 truncate">
                           Course Mind Map
                         </p>
                         <p className="text-[10px] text-gray-500">
@@ -418,11 +418,11 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
             ) : (
               <>
                 {/* Current topic info */}
-                <div className="bg-gray-800 rounded-xl p-3 mb-4">
-                  <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">
+                <div className="bg-gray-50 rounded-xl p-3 mb-4 border border-gray-100">
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">
                     Current Topic
                   </p>
-                  <p className="text-sm text-white font-medium">
+                  <p className="text-sm text-gray-900 font-medium">
                     {currentTopic?.topic_name || 'Unknown Topic'}
                   </p>
                 </div>
@@ -487,10 +487,10 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                 />
 
                 {/* Generated Content list */}
-                {(content || quiz || videoTask || generatedPodcast || topicMindMapData || resources.length > 0) && (
-                  <div className="pt-4 border-t border-gray-700 space-y-2">
+                {(content || quiz || videoTask || generatedPodcast || resources.length > 0) && (
+                  <div className="pt-4 border-t border-gray-100 space-y-2">
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs text-gray-500 uppercase tracking-wider">
+                      <p className="text-xs text-gray-400 uppercase tracking-wider">
                         Generated Resources
                       </p>
                       {/* Create Note button */}
@@ -505,7 +505,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                               })
                             )
                           }
-                          className="flex items-center gap-1 text-[10px] text-emerald-400 hover:text-emerald-300 transition-colors"
+                          className="flex items-center gap-1 text-[10px] text-emerald-600 hover:text-emerald-500 transition-colors"
                         >
                           <Plus className="w-3 h-3" />
                           New Note
@@ -525,11 +525,11 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                             })
                           )
                         }
-                        className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
+                        className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
                       >
-                        <FileText className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <FileText className="w-4 h-4 text-emerald-600 shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-gray-300 truncate">
+                          <p className="text-sm text-gray-700 truncate">
                             {currentTopic?.topic_name} - Notes
                           </p>
                           <p className="text-[10px] text-gray-500">
@@ -574,11 +574,11 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                               })
                             )
                           }
-                          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
+                          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
                         >
-                          <FileText className="w-4 h-4 text-emerald-400 shrink-0" />
+                          <FileText className="w-4 h-4 text-emerald-600 shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm text-gray-300 truncate">
+                            <p className="text-sm text-gray-700 truncate">
                               {resource.title}
                             </p>
                             <p className="text-[10px] text-gray-500">
@@ -591,10 +591,10 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                       ))}
 
                     {quiz && (
-                      <div className="w-full flex items-center gap-3 p-2 rounded-lg bg-gray-800/50">
-                        <ListChecks className="w-4 h-4 text-amber-400 shrink-0" />
+                      <div className="w-full flex items-center gap-3 p-2 rounded-lg bg-gray-50 border border-gray-100">
+                        <ListChecks className="w-4 h-4 text-amber-600 shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-gray-300 truncate">
+                          <p className="text-sm text-gray-700 truncate">
                             {currentTopic?.topic_name} - Quiz
                           </p>
                           <p className="text-[10px] text-gray-500">
@@ -621,11 +621,11 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                               })
                             )
                           }
-                          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
+                          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
                         >
-                          <Video className="w-4 h-4 text-purple-400 shrink-0" />
+                          <Video className="w-4 h-4 text-purple-600 shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm text-gray-300 truncate">
+                            <p className="text-sm text-gray-700 truncate">
                               {resource.title}
                             </p>
                             <p className="text-[10px] text-gray-500">
@@ -639,10 +639,10 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                     {/* Fallback to videoTask for in-progress videos */}
                     {videoTask?.status === 'completed' &&
                       resources.filter((r) => r.resource_type === 'video').length === 0 && (
-                        <div className="w-full flex items-center gap-3 p-2 rounded-lg bg-gray-800/50">
-                          <Video className="w-4 h-4 text-purple-400 shrink-0" />
+                        <div className="w-full flex items-center gap-3 p-2 rounded-lg bg-gray-50 border border-gray-100">
+                          <Video className="w-4 h-4 text-purple-600 shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm text-gray-300 truncate">
+                            <p className="text-sm text-gray-700 truncate">
                               {currentTopic?.topic_name} - Video
                             </p>
                             <p className="text-[10px] text-gray-500">Generated</p>
@@ -665,11 +665,11 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                               })
                             )
                           }
-                          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
+                          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
                         >
-                          <Headphones className="w-4 h-4 text-blue-400 shrink-0" />
+                          <Headphones className="w-4 h-4 text-blue-600 shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm text-gray-300 truncate">
+                            <p className="text-sm text-gray-700 truncate">
                               {resource.title}
                             </p>
                             <p className="text-[10px] text-gray-500">
@@ -683,10 +683,10 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                     {/* Fallback to generatedPodcast for session state */}
                     {generatedPodcast &&
                       resources.filter((r) => r.resource_type === 'audio').length === 0 && (
-                        <div className="w-full flex items-center gap-3 p-2 rounded-lg bg-gray-800/50">
-                          <Headphones className="w-4 h-4 text-blue-400 shrink-0" />
+                        <div className="w-full flex items-center gap-3 p-2 rounded-lg bg-gray-50 border border-gray-100">
+                          <Headphones className="w-4 h-4 text-blue-600 shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm text-gray-300 truncate">
+                            <p className="text-sm text-gray-700 truncate">
                               {currentTopic?.topic_name} - Podcast
                             </p>
                             <p className="text-[10px] text-gray-500">
