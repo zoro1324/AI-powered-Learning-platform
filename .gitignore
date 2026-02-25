@@ -208,5 +208,6 @@ __marimo__/
 
 
 output/
+output_v3/
 final_video.mp4
 video_plan.json
