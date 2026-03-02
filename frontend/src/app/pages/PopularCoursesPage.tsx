@@ -10,7 +10,9 @@ import {
   Loader2,
   Filter,
   Search,
-  GraduationCap
+  GraduationCap,
+  ChevronDown,
+  ChevronRight
 } from 'lucide-react';
 import { useAppSelector } from '../../store';
 import { courseAPI, coursePlanningAPI } from '../../services/api';
@@ -73,6 +75,9 @@ export default function PopularCoursesPage() {
   const [assessmentDialogOpen, setAssessmentDialogOpen] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   
+  // Grouping state - start with all groups expanded
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  
   // Form state
   const [formData, setFormData] = useState<{
     title: string;
@@ -93,6 +98,21 @@ export default function PopularCoursesPage() {
   useEffect(() => {
     fetchCourses();
   }, []);
+
+  // Expand all groups by default when courses change
+  useEffect(() => {
+    if (courses.length > 0) {
+      const allGroups = new Set<string>();
+      courses.forEach(course => {
+        if (course.is_sub_topic && course.parent_topic_name) {
+          allGroups.add(course.parent_topic_name);
+        } else {
+          allGroups.add(`__broad__${course.title}`);
+        }
+      });
+      setExpandedGroups(allGroups);
+    }
+  }, [courses]);
 
   const fetchCourses = async () => {
     try {
@@ -209,6 +229,32 @@ export default function PopularCoursesPage() {
     const matchesCategory = categoryFilter === 'all' || course.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
+
+  // Group courses by parent topic
+  const groupedCourses = filteredCourses.reduce((groups, course) => {
+    if (course.is_sub_topic && course.parent_topic_name) {
+      // This is a sub-topic, group it under its parent
+      if (!groups[course.parent_topic_name]) {
+        groups[course.parent_topic_name] = [];
+      }
+      groups[course.parent_topic_name].push(course);
+    } else {
+      // This is a broad topic or standalone course
+      const key = `__broad__${course.title}`;
+      groups[key] = [course];
+    }
+    return groups;
+  }, {} as Record<string, Course[]>);
+
+  const toggleGroup = (groupKey: string) => {
+    const newExpanded = new Set(expandedGroups);
+    if (newExpanded.has(groupKey)) {
+      newExpanded.delete(groupKey);
+    } else {
+      newExpanded.add(groupKey);
+    }
+    setExpandedGroups(newExpanded);
+  };
 
   if (loading) {
     return (
@@ -420,12 +466,40 @@ export default function PopularCoursesPage() {
           </div>
 
           {/* Stats */}
-          <div className="mb-6 text-gray-600">
-            Showing {filteredCourses.length} course{filteredCourses.length !== 1 ? 's' : ''}
+          <div className="mb-6 flex items-center justify-between">
+            <div className="text-gray-600">
+              Showing {filteredCourses.length} course{filteredCourses.length !== 1 ? 's' : ''} in {Object.keys(groupedCourses).length} group{Object.keys(groupedCourses).length !== 1 ? 's' : ''}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const allGroups = new Set<string>();
+                  courses.forEach(course => {
+                    if (course.is_sub_topic && course.parent_topic_name) {
+                      allGroups.add(course.parent_topic_name);
+                    } else {
+                      allGroups.add(`__broad__${course.title}`);
+                    }
+                  });
+                  setExpandedGroups(allGroups);
+                }}
+              >
+                Expand All
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setExpandedGroups(new Set())}
+              >
+                Collapse All
+              </Button>
+            </div>
           </div>
 
           {/* Courses Grid */}
-          {filteredCourses.length === 0 ? (
+          {Object.keys(groupedCourses).length === 0 ? (
             <div className="text-center py-12">
               <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-gray-900 mb-2">No courses found</h3>
@@ -436,96 +510,131 @@ export default function PopularCoursesPage() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredCourses.map((course) => (
-                <Card 
-                  key={course.id} 
-                  className="hover:shadow-xl transition-shadow cursor-pointer"
-                  onClick={() => navigate(`/courses/${course.id}`)}
-                >
-                  {/* Thumbnail */}
-                  {course.thumbnail && (
-                    <div className="w-full h-48 overflow-hidden rounded-t-lg">
-                      <img
-                        src={course.thumbnail}
-                        alt={course.title}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.currentTarget.style.display = 'none';
-                        }}
-                      />
-                    </div>
-                  )}
-                  
-                  <CardHeader>
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <Badge variant="secondary" className="text-xs">
-                        {CATEGORY_LABELS[course.category] || course.category}
-                      </Badge>
-                      <Badge className={`text-xs ${DIFFICULTY_COLORS[course.difficulty_level]}`}>
-                        {course.difficulty_level}
-                      </Badge>
-                    </div>
-                    <CardTitle className="text-xl line-clamp-2">
-                      {course.title}
-                    </CardTitle>
-                  </CardHeader>
-                  
-                  <CardContent>
-                    <CardDescription className="line-clamp-3 mb-4">
-                      {course.description}
-                    </CardDescription>
-                    
-                    <div className="flex items-center gap-4 text-sm text-gray-600">
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-4 h-4" />
-                        <span>{course.estimated_duration} min</span>
+            <div className="space-y-6">
+              {Object.entries(groupedCourses).map(([groupKey, groupCourses]) => {
+                const isBroadTopic = groupKey.startsWith('__broad__');
+                const displayName = isBroadTopic ? groupKey.replace('__broad__', '') : groupKey;
+                const isExpanded = expandedGroups.has(groupKey);
+                
+                return (
+                  <div key={groupKey} className="bg-white rounded-lg shadow-sm border border-gray-200">
+                    {/* Group Header */}
+                    <div 
+                      className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                      onClick={() => toggleGroup(groupKey)}
+                    >
+                      <div className="flex items-center gap-3">
+                        {isExpanded ? (
+                          <ChevronDown className="w-5 h-5 text-gray-600" />
+                        ) : (
+                          <ChevronRight className="w-5 h-5 text-gray-600" />
+                        )}
+                        <h2 className="text-xl font-semibold text-gray-900">{displayName}</h2>
+                        <Badge variant="secondary" className="ml-2">
+                          {groupCourses.length} {groupCourses.length === 1 ? 'course' : 'courses'}
+                        </Badge>
                       </div>
-                      {course.modules_count !== undefined && (
-                        <div className="flex items-center gap-1">
-                          <BookOpen className="w-4 h-4" />
-                          <span>{course.modules_count} modules</span>
-                        </div>
-                      )}
                     </div>
-                  </CardContent>
-                  
-                  <CardFooter className="flex gap-2">
-                    {isAuthenticated ? (
-                      <>
-                        <Button 
-                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                          onClick={(e) => handleEnrollClick(e, course)}
-                          disabled={course.is_sub_topic === false}
-                        >
-                          <GraduationCap className="w-4 h-4 mr-2" />
-                          {course.is_sub_topic === false ? 'Choose Sub-topic' : 'Enroll Now'}
-                        </Button>
-                        <Button 
-                          variant="outline"
-                          className="flex-1"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/courses/${course.id}`);
-                          }}
-                        >
-                          View Details
-                        </Button>
-                      </>
-                    ) : (
-                      <Button 
-                        className="w-full"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate('/login');
-                        }}
-                      >
-                        Login to Enroll
-                      </Button>
+
+                    {/* Group Courses */}
+                    {isExpanded && (
+                      <div className="p-4 pt-0">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                          {groupCourses.map((course) => (
+                            <Card 
+                              key={course.id} 
+                              className="hover:shadow-xl transition-shadow cursor-pointer"
+                              onClick={() => navigate(`/courses/${course.id}`)}
+                            >
+                              {/* Thumbnail */}
+                              {course.thumbnail && (
+                                <div className="w-full h-48 overflow-hidden rounded-t-lg">
+                                  <img
+                                    src={course.thumbnail}
+                                    alt={course.title}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                    }}
+                                  />
+                                </div>
+                              )}
+                              
+                              <CardHeader>
+                                <div className="flex items-start justify-between gap-2 mb-2">
+                                  <Badge variant="secondary" className="text-xs">
+                                    {CATEGORY_LABELS[course.category] || course.category}
+                                  </Badge>
+                                  <Badge className={`text-xs ${DIFFICULTY_COLORS[course.difficulty_level]}`}>
+                                    {course.difficulty_level}
+                                  </Badge>
+                                </div>
+                                <CardTitle className="text-xl line-clamp-2">
+                                  {course.title}
+                                </CardTitle>
+                              </CardHeader>
+                              
+                              <CardContent>
+                                <CardDescription className="line-clamp-3 mb-4">
+                                  {course.description}
+                                </CardDescription>
+                                
+                                <div className="flex items-center gap-4 text-sm text-gray-600">
+                                  <div className="flex items-center gap-1">
+                                    <Clock className="w-4 h-4" />
+                                    <span>{course.estimated_duration} min</span>
+                                  </div>
+                                  {course.modules_count !== undefined && (
+                                    <div className="flex items-center gap-1">
+                                      <BookOpen className="w-4 h-4" />
+                                      <span>{course.modules_count} modules</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </CardContent>
+                              
+                              <CardFooter className="flex gap-2">
+                                {isAuthenticated ? (
+                                  <>
+                                    <Button 
+                                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                                      onClick={(e) => handleEnrollClick(e, course)}
+                                      disabled={course.is_sub_topic === false}
+                                    >
+                                      <GraduationCap className="w-4 h-4 mr-2" />
+                                      {course.is_sub_topic === false ? 'Choose Sub-topic' : 'Enroll Now'}
+                                    </Button>
+                                    <Button 
+                                      variant="outline"
+                                      className="flex-1"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        navigate(`/courses/${course.id}`);
+                                      }}
+                                    >
+                                      View Details
+                                    </Button>
+                                  </>
+                                ) : (
+                                  <Button 
+                                    className="w-full"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigate('/login');
+                                    }}
+                                  >
+                                    Login to Enroll
+                                  </Button>
+                                )}
+                              </CardFooter>
+                            </Card>
+                          ))}
+                        </div>
+                      </div>
                     )}
-                  </CardFooter>
-                </Card>
-              ))}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

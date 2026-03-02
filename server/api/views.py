@@ -243,6 +243,43 @@ class CourseViewSet(viewsets.ModelViewSet):
         modules = course.modules.all().order_by('order')
         serializer = ModuleSerializer(modules, many=True)
         return Response(serializer.data)
+    
+    @action(detail=True, methods=['get'])
+    def enrollments_with_curricula(self, request, pk=None):
+        """Get all enrollments for a course with their personalized curricula"""
+        course = self.get_object()
+        
+        # Get all enrollments for this course that have a personalized syllabus
+        enrollments = Enrollment.objects.filter(
+            course=course,
+            syllabus__isnull=False
+        ).select_related('user', 'syllabus').order_by('-enrolled_at')
+        
+        curricula_data = []
+        for idx, enrollment in enumerate(enrollments, 1):
+            # Anonymize user identifier for privacy
+            user_identifier = f"Student #{idx}"
+            
+            # Get syllabus data from the related PersonalizedSyllabus model
+            syllabus_data = enrollment.syllabus.syllabus_data
+            
+            curriculum = {
+                'id': enrollment.id,
+                'user_identifier': user_identifier,
+                'enrolled_at': enrollment.enrolled_at,
+                'knowledge_level': enrollment.diagnosed_level or 'Not assessed',
+                'study_method': enrollment.study_method_preference or 'real_world',
+                'difficulty': syllabus_data.get('knowledge_level', 'beginner'),
+                'syllabus': syllabus_data
+            }
+            curricula_data.append(curriculum)
+        
+        return Response({
+            'course_id': course.id,
+            'course_title': course.title,
+            'total_enrollments': len(curricula_data),
+            'curricula': curricula_data
+        })
 
 
 class ModuleViewSet(viewsets.ModelViewSet):
