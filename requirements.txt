@@ -1,14 +1,14 @@
 --extra-index-url https://download.pytorch.org/whl/cu121
-torch
-torchvision
-torchaudio
+torch==2.5.1
+torchvision==0.20.1
+torchaudio==2.5.1
 
-diffusers
-transformers
-accelerate
-safetensors
-huggingface-hub
-peft
+diffusers==0.32.0
+transformers==4.46.0
+accelerate==1.2.0
+safetensors==0.4.5
+huggingface-hub==0.26.2
+peft==0.13.2
 
 moviepy
 pillow
@@ -21,3 +21,7 @@ djangorestframework
 django-cors-headers
 djangorestframework-simplejwt
 django-filter
+
+# Async task queue
+celery
+redis

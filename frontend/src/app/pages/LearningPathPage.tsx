@@ -185,6 +185,7 @@ export default function LearningPathPage() {
                 </span>
               </div>
               <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                {/* eslint-disable-next-line react/forbid-dom-props */}
                 <div
                   className="h-full bg-gradient-to-r from-blue-500 to-purple-600 transition-all duration-300"
                   style={{ width: `${overallProgress}%` }}

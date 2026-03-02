@@ -17,6 +17,7 @@ from .models import (
     Resource,
     User,
     UserAchievement,
+    VideoTask,
 )
 
 
@@ -128,3 +129,11 @@ class ActivityLogAdmin(admin.ModelAdmin):
     list_display = ('user', 'activity_type', 'title', 'created_at')
     list_filter = ('activity_type',)
     search_fields = ('user__email', 'title')
+
+
+@admin.register(VideoTask)
+class VideoTaskAdmin(admin.ModelAdmin):
+    list_display = ('topic', 'status', 'created_at', 'completed_at')
+    list_filter = ('status',)
+    search_fields = ('topic',)
+    readonly_fields = ('id',)

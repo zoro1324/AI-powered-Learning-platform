@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router';
+import { createBrowserRouter, Navigate } from 'react-router';
 import LoginPage from './pages/LoginPage';
 import SignUpPage from './pages/SignUpPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
@@ -11,10 +11,21 @@ import LearningPreferencePage from './pages/LearningPreferencePage';
 import AssessmentPage from './pages/AssessmentPage';
 import LearningPathPage from './pages/LearningPathPage';
 import FinalQuizPage from './pages/FinalQuizPage';
+import PopularCoursesPage from './pages/PopularCoursesPage';
+import CoursePage from './pages/CoursePage';
+import TopicPage from './pages/TopicPage';
+import { CourseLayout } from './components/CourseLayout';
+
+// Note: Protected routes are handled by checking localStorage in each component
+// Alternatively, use a layout wrapper with auth checking
 
 export const router = createBrowserRouter([
   {
     path: '/',
+    element: <Navigate to="/login" replace />,
+  },
+  {
+    path: '/login',
     Component: LoginPage,
   },
   {
@@ -28,6 +39,10 @@ export const router = createBrowserRouter([
   {
     path: '/dashboard',
     Component: DashboardPage,
+  },
+  {
+    path: '/courses/popular',
+    Component: PopularCoursesPage,
   },
   {
     path: '/course-entry',
@@ -60,5 +75,20 @@ export const router = createBrowserRouter([
   {
     path: '/final-quiz',
     Component: FinalQuizPage,
+  },
+  // ─── Coursera + NotebookLM style course viewer ─────────────────────────────
+  {
+    path: '/course/:enrollmentId',
+    Component: CourseLayout,
+    children: [
+      {
+        index: true,
+        Component: CoursePage,
+      },
+      {
+        path: 'module/:moduleIndex/topic/:topicIndex',
+        Component: TopicPage,
+      },
+    ],
   },
 ]);

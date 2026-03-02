@@ -1,0 +1,56 @@
+{
+  "scenes": [
+    {
+      "title": "Introduction to DevOps Engineering",
+      "bullets": [
+        "Defining the role of a DevOps Engineer.",
+        "Understanding why organizations need specialized personnel for implementing and maintaining efficient software development pipelines."
+      ],
+      "narration": "DevOps engineering is an interdisciplinary field that combines software development (Dev) with operations management (Ops). A DevOps Engineer ensures smooth collaboration between teams, automates processes to speed up the delivery of high-quality products.",
+      "image_prompt": "A diverse group of people working together in a modern office setting. The background should depict computers and software development tools."
+    },
+    {
+      "title": "What is DevOps Engineering",
+      "bullets": [
+        "Defining the term 'DevOps' itself.",
+        "Understanding how it integrates both aspects of Software Development (like Agile methodologies) and Operations Management."
+      ],
+      "narration": "The DevOps Engineering Bootcamp will introduce attendees to what exactly is meant by the term 'DevOps'. It aims to provide insights into how it can bring together software development's agility with operations management, resulting in faster and more reliable delivery of high-quality products.",
+      "image_prompt": "A slide presentation that contrasts traditional waterfall methodologies vs Agile approaches."
+    },
+    {
+      "title": "Why DevOps Engineering Bootcamp?",
+      "bullets": [
+        "Understanding the importance of learning and practicing with up-to-date tools, techniques.",
+        "Recognizing how a career in this field can be both financially rewarding."
+      ],
+      "narration": "The DevOps Engineering Bootcamp is designed to equip attendees with essential skills needed for the job market. It provides hands-on experience on cutting-edge tools and techniques used by industry professionals, while also offering financial benefits.",
+      "image_prompt": "A poster depicting people holding certificates of successful bootcamps."
+    },
+    {
+      "title": "Curriculum Overview",
+      "bullets": [
+        "Breaking down the different modules that will be covered in this Bootcamp.",
+        "Narration: An overview of what learners can expect to gain by attending our DevOps Engineering bootcamp."
+      ],
+      "image_prompt": "A detailed syllabus or curriculum chart with all the modules outlined on it, accompanied by icons and brief descriptions for each module."
+    },
+    {
+      "title": "Course Details",
+      "bullets": [
+        "Duration of bootcamp.",
+        "Narration: Detailed information about the course duration, start date/end date, and what will be covered throughout this learning journey."
+      ],
+      "image_prompt": "A calendar indicating a timeline from start to finish with highlighted dates for important milestones or checkpoints in each week of bootcamp training.",
+      "": "Call-to-Action Scene"
+    },
+    {
+      "title": "Enroll Today",
+      "bullets": [
+        "How and where to sign up."
+      ],
+      "narration": "Join us today, secure your spot in the DevOps Engineering Bootcamp by signing up at our website or calling customer service.",
+      "image_prompt": "A button with a vibrant background color saying 'Sign Up' and an image of person holding hands on sign-up form."
+    }
+  ]
+}

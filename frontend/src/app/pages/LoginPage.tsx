@@ -1,17 +1,37 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router';
-import { Eye, EyeOff, BookOpen } from 'lucide-react';
+import { Eye, EyeOff, BookOpen, AlertCircle } from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { handleLogin, isAuthenticated, loading, error, clearAuthError } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
-  const handleLogin = (e: React.FormEvent) => {
+  useEffect(() => {
+    // Redirect if already authenticated
+    if (isAuthenticated) {
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, navigate]);
+
+  useEffect(() => {
+    // Clear error when component unmounts
+    return () => {
+      clearAuthError();
+    };
+  }, [clearAuthError]);
+
+  const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Mock login - navigate to course entry
-    navigate('/course-entry');
+    clearAuthError();
+    
+    const result = await handleLogin({ email, password });
+    if (result.meta.requestStatus === 'fulfilled') {
+      navigate('/dashboard');
+    }
   };
 
   return (
@@ -32,7 +52,17 @@ export default function LoginPage() {
             <p className="text-gray-600">Login to continue your personalized learning journey</p>
           </div>
 
-          <form onSubmit={handleLogin} className="space-y-5">
+          {/* Error Message */}
+          {error && (
+            <div className="mb-5 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-red-800">
+                {typeof error === 'string' ? error : error.detail || 'Login failed. Please check your credentials.'}
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={onSubmit} className="space-y-5">
             {/* Email Input */}
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
@@ -84,9 +114,10 @@ export default function LoginPage() {
             {/* Login Button */}
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-xl font-medium hover:from-blue-600 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
+              disabled={loading}
+              className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-xl font-medium hover:from-blue-600 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Login
+              {loading ? 'Logging in...' : 'Login'}
             </button>
           </form>
 
