@@ -128,11 +128,11 @@ class PreKnowledgeAssessment:
         """
         Initialize the assessment generator.
 
-        In production (IS_PRODUCTION=True), uses Gemini via LangChain.
+        In production (IS_PRODUCTION=True), uses Featherless via LangChain.
         In development, uses Ollama via LangChain.
-        The model_name parameter is ignored; configure via GEMINI_MODEL / OLLAMA_MODEL env vars.
+        The model_name parameter is ignored; configure via FEATHERLESS_MODEL / OLLAMA_MODEL env vars.
         """
-        backend = "Gemini" if getattr(settings, 'IS_PRODUCTION', False) else "Ollama"
+        backend = "Featherless" if getattr(settings, 'IS_PRODUCTION', False) else "Ollama"
         self.temperature = temperature
         self.llm = get_langchain_llm(temperature=self.temperature)
         logger.info("PreKnowledgeAssessment initialized — AI backend: %s", backend)

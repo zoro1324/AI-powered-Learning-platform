@@ -204,24 +204,24 @@ CELERY_RESULT_SERIALIZER = 'json'
 # AI Backend Configuration
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Set IS_PRODUCTION=True in your .env (or shell env) to use Gemini API.
+# Set IS_PRODUCTION=True in your .env (or shell env) to use Featherless API.
 # Defaults to False so local development uses OLLAMA + Stable Diffusion.
 IS_PRODUCTION = os.environ.get('IS_PRODUCTION', 'False').strip().lower() in ('1', 'true', 'yes')
 
-# Fine-grained overrides — USE_GEMINI_TEXT / USE_GEMINI_IMAGE take precedence
-# over IS_PRODUCTION so you can mix backends (e.g. Gemini text + SD images).
+# Fine-grained overrides — USE_FEATHERLESS_TEXT / USE_FEATHERLESS_IMAGE take precedence
+# over IS_PRODUCTION so you can mix backends (e.g. Featherless text + SD images).
 # Leave them unset (or empty) to inherit from IS_PRODUCTION.
-_use_gemini_text_raw = os.environ.get('USE_GEMINI_TEXT', '').strip().lower()
-_use_gemini_image_raw = os.environ.get('USE_GEMINI_IMAGE', '').strip().lower()
+_use_featherless_text_raw = os.environ.get('USE_FEATHERLESS_TEXT', '').strip().lower()
+_use_featherless_image_raw = os.environ.get('USE_FEATHERLESS_IMAGE', '').strip().lower()
 
-USE_GEMINI_TEXT = (
-    _use_gemini_text_raw in ('1', 'true', 'yes')
-    if _use_gemini_text_raw
+USE_FEATHERLESS_TEXT = (
+    _use_featherless_text_raw in ('1', 'true', 'yes')
+    if _use_featherless_text_raw
     else IS_PRODUCTION
 )
-USE_GEMINI_IMAGE = (
-    _use_gemini_image_raw in ('1', 'true', 'yes')
-    if _use_gemini_image_raw
+USE_FEATHERLESS_IMAGE = (
+    _use_featherless_image_raw in ('1', 'true', 'yes')
+    if _use_featherless_image_raw
     else IS_PRODUCTION
 )
 
@@ -230,7 +230,7 @@ OLLAMA_API_URL = os.environ.get('OLLAMA_API_URL', 'http://localhost:11434/api/ge
 OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'llama3:8b')
 OLLAMA_TIMEOUT = int(os.environ.get('OLLAMA_TIMEOUT', '600'))  # seconds
 
-# --- Gemini (production) ---
-GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '')
-GEMINI_MODEL = os.environ.get('GEMINI_MODEL', 'gemini-2.0-flash')          # text / chat
-GEMINI_IMAGE_MODEL = os.environ.get('GEMINI_IMAGE_MODEL', 'imagen-3.0-generate-002')  # image gen
+# --- Featherless (production) ---
+FEATHERLESS_API_KEY = os.environ.get('FEATHERLESS_API_KEY', '')
+FEATHERLESS_BASE_URL = os.environ.get('FEATHERLESS_BASE_URL', 'https://api.featherless.ai/v1')
+FEATHERLESS_MODEL = os.environ.get('FEATHERLESS_MODEL', 'openai/gpt-oss-120b')  # text / chat

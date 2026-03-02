@@ -198,11 +198,11 @@ class SyllabusGenerator:
         """
         Initialize the syllabus generator with two layers.
 
-        In production (IS_PRODUCTION=True), uses Gemini via LangChain.
+        In production (IS_PRODUCTION=True), uses Featherless via LangChain.
         In development, uses Ollama via LangChain.
-        The model_name parameter is ignored; configure via GEMINI_MODEL / OLLAMA_MODEL env vars.
+        The model_name parameter is ignored; configure via FEATHERLESS_MODEL / OLLAMA_MODEL env vars.
         """
-        backend = "Gemini" if getattr(settings, 'IS_PRODUCTION', False) else "Ollama"
+        backend = "Featherless" if getattr(settings, 'IS_PRODUCTION', False) else "Ollama"
         self.temperature = temperature
 
         # Layer 1: Syllabus Generator with custom parser
