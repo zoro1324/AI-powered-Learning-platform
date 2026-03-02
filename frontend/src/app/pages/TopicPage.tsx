@@ -41,6 +41,8 @@ import { Separator } from '../components/ui/separator';
 import { cn } from '../components/ui/utils';
 import { TopicQuizOverlay } from '../components/TopicQuizOverlay';
 import { CourseStructureDialog } from '../components/CourseStructureDialog';
+import ReactMarkdown from 'react-markdown';
+import rehypeHighlight from 'rehype-highlight';
 
 export default function TopicPage() {
   const dispatch = useAppDispatch();
@@ -316,31 +318,6 @@ export default function TopicPage() {
     );
   }
 
-  // ─── Render Markdown content as HTML ───────────────────────────────────────
-
-  const renderContent = (markdown: string) => {
-    // Simple markdown → HTML conversion for common patterns
-    let html = markdown
-      // Headers
-      .replace(/^### (.+)$/gm, '<h3 class="text-lg font-semibold text-gray-900 mt-6 mb-2">$1</h3>')
-      .replace(/^## (.+)$/gm, '<h2 class="text-xl font-bold text-gray-900 mt-8 mb-3">$1</h2>')
-      .replace(/^# (.+)$/gm, '<h1 class="text-2xl font-bold text-gray-900 mt-8 mb-4">$1</h1>')
-      // Bold and Italic
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      // Code blocks
-      .replace(/```(\w*)\n([\s\S]*?)```/g, (_match, _lang, code) => {
-        return `<pre class="bg-gray-900 text-gray-100 rounded-xl p-4 overflow-x-auto my-4 text-sm"><code>${code
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')}</code></pre>`;
-      })
-      // Inline code
-      .replace(/`([^`]+)`/g, '<code class="bg-gray-100 text-pink-600 px-1.5 py-0.5 rounded text-sm">$1</code>')
-      // Paragraphs — wrap non-tagged lines
-      .replace(/^(?!<[h123pre])(.*\S.*)$/gm, '<p class="text-gray-700 leading-relaxed mb-4">$1</p>');
-
-    return html;
-  };
 
   // ─── Main render ───────────────────────────────────────────────────────────
 
@@ -645,22 +622,66 @@ export default function TopicPage() {
                   <FileText className="w-5 h-5 text-emerald-500" />
                   {activeResource.title}
                 </h2>
-                <article
-                  className="prose prose-gray max-w-none"
-                  dangerouslySetInnerHTML={{
-                    __html: renderContent(activeResource.content_text || ''),
-                  }}
-                />
+                <div className="prose prose-gray max-w-none">
+                  <ReactMarkdown
+                    rehypePlugins={[rehypeHighlight]}
+                    components={{
+                      h1: ({ ...props }) => <h1 className="text-2xl font-bold text-gray-900 mt-8 mb-4" {...props} />,
+                      h2: ({ ...props }) => <h2 className="text-xl font-bold text-gray-900 mt-8 mb-3" {...props} />,
+                      h3: ({ ...props }) => <h3 className="text-lg font-semibold text-gray-900 mt-6 mb-2" {...props} />,
+                      p: ({ ...props }) => <p className="text-gray-700 leading-relaxed mb-4" {...props} />,
+                      code: ({ ...props }) => {
+                        const { className } = props;
+                        const isInline = !className?.includes('language-');
+                        if (isInline) {
+                          return <code className="bg-gray-100 text-pink-600 px-1.5 py-0.5 rounded text-sm" {...props} />;
+                        }
+                        return <code className={cn(className, "font-mono")} {...props} />;
+                      },
+                      pre: ({ ...props }) => (
+                        <pre className="bg-[#1e1e1e] text-[#d4d4d4] rounded-xl p-4 overflow-x-auto my-4 text-sm not-prose border border-gray-800 shadow-lg" {...props} />
+                      ),
+                      ul: ({ ...props }) => <ul className="list-disc ml-6 mb-4 space-y-2 text-gray-700" {...props} />,
+                      ol: ({ ...props }) => <ol className="list-decimal ml-6 mb-4 space-y-2 text-gray-700" {...props} />,
+                      li: ({ ...props }) => <li className="leading-relaxed" {...props} />,
+                      blockquote: ({ ...props }) => <blockquote className="border-l-4 border-gray-200 pl-4 italic my-4 text-gray-600" {...props} />,
+                    }}
+                  >
+                    {activeResource.content_text || ''}
+                  </ReactMarkdown>
+                </div>
               </div>
             ) : (
               /* ── Default: text reading view ────────────────────────── */
               <div className="p-8">
-                <article
-                  className="prose prose-gray max-w-none"
-                  dangerouslySetInnerHTML={{
-                    __html: renderContent(content.content),
-                  }}
-                />
+                <div className="prose prose-gray max-w-none">
+                  <ReactMarkdown
+                    rehypePlugins={[rehypeHighlight]}
+                    components={{
+                      h1: ({ ...props }) => <h1 className="text-2xl font-bold text-gray-900 mt-8 mb-4" {...props} />,
+                      h2: ({ ...props }) => <h2 className="text-xl font-bold text-gray-900 mt-8 mb-3" {...props} />,
+                      h3: ({ ...props }) => <h3 className="text-lg font-semibold text-gray-900 mt-6 mb-2" {...props} />,
+                      p: ({ ...props }) => <p className="text-gray-700 leading-relaxed mb-4" {...props} />,
+                      code: ({ ...props }) => {
+                        const { className } = props;
+                        const isInline = !className?.includes('language-');
+                        if (isInline) {
+                          return <code className="bg-gray-100 text-pink-600 px-1.5 py-0.5 rounded text-sm" {...props} />;
+                        }
+                        return <code className={cn(className, "font-mono")} {...props} />;
+                      },
+                      pre: ({ ...props }) => (
+                        <pre className="bg-[#1e1e1e] text-[#d4d4d4] rounded-xl p-4 overflow-x-auto my-4 text-sm not-prose border border-gray-800 shadow-lg" {...props} />
+                      ),
+                      ul: ({ ...props }) => <ul className="list-disc ml-6 mb-4 space-y-2 text-gray-700" {...props} />,
+                      ol: ({ ...props }) => <ol className="list-decimal ml-6 mb-4 space-y-2 text-gray-700" {...props} />,
+                      li: ({ ...props }) => <li className="leading-relaxed" {...props} />,
+                      blockquote: ({ ...props }) => <blockquote className="border-l-4 border-gray-200 pl-4 italic my-4 text-gray-600" {...props} />,
+                    }}
+                  >
+                    {content.content}
+                  </ReactMarkdown>
+                </div>
               </div>
             )}
           </>

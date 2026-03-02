@@ -23,15 +23,15 @@ export function Sidebar() {
 
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 bg-white border-r border-gray-200 flex flex-col">
-      {/* Logo */}
-      <div className="p-6 border-b border-gray-200">
+      {/* Logo - Clickable to Dashboard */}
+      <Link to="/dashboard" className="p-6 border-b border-gray-200 hover:bg-gray-50 transition-colors">
         <div className="flex items-center gap-2">
           <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
             <BookOpen className="w-6 h-6 text-white" />
           </div>
           <span className="font-semibold text-xl text-gray-900">LearnPath</span>
         </div>
-      </div>
+      </Link>
 
       {/* User Profile Section */}
       {user && (

@@ -26,7 +26,7 @@ interface PodcastDialogProps {
   onComplete?: () => void; // Callback to refresh resources
 }
 
-type Step = 'personas' | 'scenarios' | 'generating' | 'complete';
+type Step = 'personas' | 'custom-personas' | 'scenarios' | 'custom-scenario' | 'generating' | 'complete';
 
 export function PodcastDialog({
   open,
@@ -41,8 +41,11 @@ export function PodcastDialog({
   const [currentStep, setCurrentStep] = useState<Step>('personas');
   const [personaOptions, setPersonaOptions] = useState<PersonaOption[]>([]);
   const [selectedPersonas, setSelectedPersonas] = useState<PersonaOption | null>(null);
+  const [customPerson1, setCustomPerson1] = useState<string>('');
+  const [customPerson2, setCustomPerson2] = useState<string>('');
   const [scenarioOptions, setScenarioOptions] = useState<string[]>([]);
   const [selectedScenario, setSelectedScenario] = useState<string | null>(null);
+  const [customScenario, setCustomScenario] = useState<string>('');
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -79,6 +82,88 @@ export function PodcastDialog({
       setCurrentStep('scenarios');
     } catch (err: any) {
       setError(err.response?.data?.error || 'Failed to generate scenario options');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCustomPersonaClick = () => {
+    setCurrentStep('custom-personas');
+  };
+
+  const handleCustomPersonaSubmit = async () => {
+    if (!customPerson1.trim() || !customPerson2.trim()) {
+      setError('Please enter both persona names');
+      return;
+    }
+
+    const customPersonas = {
+      person1: customPerson1.trim(),
+      person2: customPerson2.trim(),
+    };
+
+    setSelectedPersonas(customPersonas);
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await podcastAPI.generateScenarioOptions(content, customPersonas);
+      setScenarioOptions(response.options);
+      setCurrentStep('scenarios');
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to generate scenario options');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCustomScenarioClick = () => {
+    setCurrentStep('custom-scenario');
+  };
+
+  const handleCustomScenarioSubmit = async () => {
+    if (!customScenario.trim()) {
+      setError('Please enter a scenario description');
+      return;
+    }
+
+    const scenario = customScenario.trim();
+    setSelectedScenario(scenario);
+    setCurrentStep('generating');
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await podcastAPI.generatePodcast({
+        text: content,
+        instruction: scenario,
+        person1: selectedPersonas?.person1,
+        person2: selectedPersonas?.person2,
+        lesson_id: lessonId,
+        topic_name: topicName,
+        enrollment_id: enrollmentId,
+      });
+
+      setAudioUrl(response.audio_url);
+      setCurrentStep('complete');
+
+      // Notify parent component
+      if (onPodcastGenerated && selectedPersonas) {
+        onPodcastGenerated({
+          audioUrl: response.audio_url,
+          personas: selectedPersonas,
+          scenario,
+          generatedAt: new Date().toISOString(),
+        });
+      }
+
+      // Trigger refresh callback if lesson is linked
+      if (onComplete && lessonId) {
+        onComplete();
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.error || 'Failed to generate podcast');
+      setCurrentStep('custom-scenario');
     } finally {
       setLoading(false);
     }
@@ -131,8 +216,11 @@ export function PodcastDialog({
     setCurrentStep('personas');
     setPersonaOptions([]);
     setSelectedPersonas(null);
+    setCustomPerson1('');
+    setCustomPerson2('');
     setScenarioOptions([]);
     setSelectedScenario(null);
+    setCustomScenario('');
     setAudioUrl(null);
     setError(null);
     onOpenChange(false);
@@ -201,8 +289,102 @@ export function PodcastDialog({
                     <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
                   </button>
                 ))}
+                
+                {/* Custom Personas Option */}
+                <button
+                  className="w-full p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors text-left flex items-center justify-between group"
+                  onClick={handleCustomPersonaClick}
+                  disabled={loading}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-pink-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                      +
+                    </div>
+                    <span className="font-medium text-gray-900">
+                      Enter Custom Personas
+                    </span>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
+                </button>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Step: Custom Personas Input */}
+        {currentStep === 'custom-personas' && (
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-2">
+                Enter Custom Personas
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Define your own pair of personas for the conversation
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="person1" className="block text-sm font-medium text-gray-700 mb-2">
+                  First Speaker / Character
+                </label>
+                <input
+                  id="person1"
+                  type="text"
+                  value={customPerson1}
+                  onChange={(e) => setCustomPerson1(e.target.value)}
+                  placeholder="e.g., Data Scientist, Tech Enthusiast, Professor"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={loading}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="person2" className="block text-sm font-medium text-gray-700 mb-2">
+                  Second Speaker / Character
+                </label>
+                <input
+                  id="person2"
+                  type="text"
+                  value={customPerson2}
+                  onChange={(e) => setCustomPerson2(e.target.value)}
+                  placeholder="e.g., Curious Student, Skeptic, Industry Expert"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  disabled={loading}
+                />
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <p className="text-sm text-blue-800">
+                  <strong>Tip:</strong> Be specific with roles or viewpoints (e.g., "AI Ethics Researcher" instead of just "Researcher") for more engaging conversations.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setCurrentStep('personas')}
+                className="flex-1"
+                disabled={loading}
+              >
+                Back
+              </Button>
+              <Button
+                onClick={handleCustomPersonaSubmit}
+                className="flex-1"
+                disabled={loading || !customPerson1.trim() || !customPerson2.trim()}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  'Continue'
+                )}
+              </Button>
+            </div>
           </div>
         )}
 
@@ -239,6 +421,23 @@ export function PodcastDialog({
                   <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
                 </button>
               ))}
+              
+              {/* Custom Scenario Option */}
+              <button
+                className="w-full p-3 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors text-left flex items-center justify-between group"
+                onClick={handleCustomScenarioClick}
+                disabled={loading}
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                    +
+                  </div>
+                  <span className="font-medium text-gray-900">
+                    Enter Custom Scenario
+                  </span>
+                </div>
+                <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600" />
+              </button>
             </div>
 
             <Button
@@ -248,6 +447,72 @@ export function PodcastDialog({
             >
               Back to Personas
             </Button>
+          </div>
+        )}
+
+        {/* Step: Custom Scenario Input */}
+        {currentStep === 'custom-scenario' && (
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-2">
+                Enter Custom Scenario
+              </h3>
+              <p className="text-sm text-gray-600 mb-1">
+                Selected: <span className="font-medium">{selectedPersonas?.person1}</span> and{' '}
+                <span className="font-medium">{selectedPersonas?.person2}</span>
+              </p>
+              <p className="text-sm text-gray-500 mb-4">
+                Define your own discussion focus or approach
+              </p>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="customScenario" className="block text-sm font-medium text-gray-700 mb-2">
+                  Scenario Description
+                </label>
+                <textarea
+                  id="customScenario"
+                  value={customScenario}
+                  onChange={(e) => setCustomScenario(e.target.value)}
+                  placeholder="e.g., Debate the ethical implications, Explain like I'm 5, Compare and contrast different approaches, Discuss real-world applications"
+                  rows={4}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                  disabled={loading}
+                />
+              </div>
+
+              <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+                <p className="text-sm text-purple-800">
+                  <strong>Tip:</strong> Be specific about the angle, depth, or style of discussion you want. Examples: "Deep technical analysis", "Beginner-friendly overview", "Critical debate of pros and cons", "Practical implementation guide"
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setCurrentStep('scenarios')}
+                className="flex-1"
+                disabled={loading}
+              >
+                Back
+              </Button>
+              <Button
+                onClick={handleCustomScenarioSubmit}
+                className="flex-1"
+                disabled={loading || !customScenario.trim()}
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Generating...
+                  </>
+                ) : (
+                  'Generate Podcast'
+                )}
+              </Button>
+            </div>
           </div>
         )}
 

@@ -4,6 +4,8 @@ import { chatAPI, ChatMessage } from '../../services/api';
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
 import { cn } from './ui/utils';
+import ReactMarkdown from 'react-markdown';
+import rehypeHighlight from 'rehype-highlight';
 
 interface ChatPanelProps {
   context: string;
@@ -91,22 +93,6 @@ export function ChatPanel({
     }
   };
 
-  // Simple markdown rendering for chat messages
-  const renderMarkdown = (text: string) => {
-    let html = text
-      .replace(/^### (.+)$/gm, '<h3 class="text-sm font-semibold text-gray-900 mt-3 mb-1">$1</h3>')
-      .replace(/^## (.+)$/gm, '<h2 class="text-sm font-bold text-gray-900 mt-3 mb-1">$1</h2>')
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.+?)\*/g, '<em>$1</em>')
-      .replace(/```(\w*)\n([\s\S]*?)```/g, (_m, _l, code) => {
-        return `<pre class="bg-gray-200 rounded-lg p-2 overflow-x-auto my-2 text-xs text-gray-900"><code>${code
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;')}</code></pre>`;
-      })
-      .replace(/`([^`]+)`/g, '<code class="bg-gray-100 text-pink-600 px-1 py-0.5 rounded text-xs">$1</code>')
-      .replace(/^(?!<[h23pre])(.*\S.*)$/gm, '<p class="mb-1.5">$1</p>');
-    return html;
-  };
 
   // ─── No content state ────────────────────────────────────────────────────
 
@@ -215,12 +201,33 @@ export function ChatPanel({
                 )}
               >
                 {msg.role === 'assistant' ? (
-                  <div
-                    className="chat-markdown"
-                    dangerouslySetInnerHTML={{
-                      __html: renderMarkdown(msg.content),
-                    }}
-                  />
+                  <div className="chat-markdown prose prose-sm prose-gray max-w-none">
+                    <ReactMarkdown
+                      rehypePlugins={[rehypeHighlight]}
+                      components={{
+                        h1: ({ ...props }) => <h1 className="text-sm font-bold text-gray-900 mt-3 mb-1" {...props} />,
+                        h2: ({ ...props }) => <h2 className="text-sm font-bold text-gray-900 mt-3 mb-1" {...props} />,
+                        h3: ({ ...props }) => <h3 className="text-xs font-semibold text-gray-900 mt-2 mb-1" {...props} />,
+                        p: ({ ...props }) => <p className="mb-1.5" {...props} />,
+                        code: ({ ...props }) => {
+                          const { className } = props;
+                          const isInline = !className?.includes('language-');
+                          if (isInline) {
+                            return <code className="bg-gray-200 text-pink-600 px-1 py-0.5 rounded text-[10px]" {...props} />;
+                          }
+                          return <code className={cn(className, "font-mono")} {...props} />;
+                        },
+                        pre: ({ ...props }) => (
+                          <pre className="bg-[#1e1e1e] text-[#d4d4d4] rounded-lg p-3 overflow-x-auto my-2 text-xs border border-gray-800 shadow-md not-prose" {...props} />
+                        ),
+                        ul: ({ ...props }) => <ul className="list-disc ml-4 mb-2 space-y-1" {...props} />,
+                        ol: ({ ...props }) => <ol className="list-decimal ml-4 mb-2 space-y-1" {...props} />,
+                        li: ({ ...props }) => <li className="leading-relaxed" {...props} />,
+                      }}
+                    >
+                      {msg.content}
+                    </ReactMarkdown>
+                  </div>
                 ) : (
                   <p className="whitespace-pre-wrap">{msg.content}</p>
                 )}
