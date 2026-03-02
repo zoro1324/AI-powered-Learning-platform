@@ -112,10 +112,14 @@ export function TopicQuizOverlay({
     if (!currentModule || !quiz) return;
     const answers = quiz.questions.map((_, i) => quizAnswers[i] || '');
     const questionIds = quiz.questions.map((q) => q.id!);
+    
+    // Use module.order if available, otherwise fallback to 1-based moduleIndex
+    const moduleId = currentModule.order ?? (moduleIndex + 1);
+    
     dispatch(
       evaluateTopicQuiz({
         enrollmentId,
-        moduleId: currentModule.order,
+        moduleId,
         questionIds,
         answers,
         moduleIndex,

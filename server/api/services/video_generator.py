@@ -128,7 +128,7 @@ class VideoGeneratorService:
     # ------------------------------------------------------------------
 
     def generate_image(self, prompt_text: str, output_path: str) -> str | None:
-        """Generate an image using the configured AI backend (Stable Diffusion or Gemini)."""
+        """Generate an image using the configured AI backend (Stable Diffusion fallback in production/dev)."""
         try:
             print(f"  [VideoGenerator] Generating image: {prompt_text[:60]}...")
             result = ai_generate_image(prompt_text, output_path=output_path)

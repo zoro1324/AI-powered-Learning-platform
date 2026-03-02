@@ -4,7 +4,7 @@ Unified AI Client
 This module is the single source of truth for all AI calls in the server.
 
 IS_PRODUCTION=False  → OLLAMA (text/chat)  + Stable Diffusion (images)
-IS_PRODUCTION=True   → Gemini API  (text/chat)  + Gemini Imagen (images)
+IS_PRODUCTION=True   → Featherless API via LangChain (text/chat)
 
 Usage
 -----
@@ -20,13 +20,12 @@ Usage
     llm  = get_langchain_llm(temperature=0.7)
 """
 
-import io
 import logging
-import os
 from typing import Optional
 
 import requests
 from django.conf import settings
+from langchain_core.messages import HumanMessage, SystemMessage
 from PIL import Image
 
 logger = logging.getLogger(__name__)
@@ -36,14 +35,14 @@ logger = logging.getLogger(__name__)
 # Internal helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _use_gemini_text() -> bool:
-    """Return True when text / chat generation should use Gemini."""
-    return getattr(settings, 'USE_GEMINI_TEXT', getattr(settings, 'IS_PRODUCTION', False))
+def _use_featherless_text() -> bool:
+    """Return True when text / chat generation should use Featherless."""
+    return getattr(settings, 'USE_FEATHERLESS_TEXT', getattr(settings, 'IS_PRODUCTION', False))
 
 
-def _use_gemini_image() -> bool:
-    """Return True when image generation should use Gemini Imagen."""
-    return getattr(settings, 'USE_GEMINI_IMAGE', getattr(settings, 'IS_PRODUCTION', False))
+def _use_featherless_image() -> bool:
+    """Return True when image generation should use Featherless backend."""
+    return getattr(settings, 'USE_FEATHERLESS_IMAGE', getattr(settings, 'IS_PRODUCTION', False))
 
 
 # ── Ollama text helper ────────────────────────────────────────────────────────
@@ -81,41 +80,37 @@ def _ollama_generate(prompt: str, system_prompt: Optional[str] = None, json_mode
     return content
 
 
-# ── Gemini text helper ────────────────────────────────────────────────────────
+# ── Featherless text helper ───────────────────────────────────────────────────
 
-def _gemini_generate(prompt: str, system_prompt: Optional[str] = None, json_mode: bool = False) -> str:
-    """Send a chat request to the Gemini API."""
-    try:
-        import google.generativeai as genai
-    except ImportError as exc:
-        raise RuntimeError(
-            "google-generativeai is not installed. "
-            "Run: pip install google-generativeai"
-        ) from exc
+def _featherless_generate(prompt: str, system_prompt: Optional[str] = None, json_mode: bool = False) -> str:
+    """Send a chat request to the Featherless API via LangChain."""
+    llm = get_langchain_llm(temperature=0.7)
 
-    api_key = getattr(settings, 'GEMINI_API_KEY', '')
-    if not api_key:
-        raise RuntimeError(
-            "GEMINI_API_KEY is not set. Add it to your .env file."
-        )
-    model_name = getattr(settings, 'GEMINI_MODEL', 'gemini-2.0-flash')
-
-    genai.configure(api_key=api_key)
-
-    generation_config = {}
     if json_mode:
-        generation_config['response_mime_type'] = 'application/json'
+        llm = llm.bind(response_format={"type": "json_object"})
 
-    model = genai.GenerativeModel(
-        model_name=model_name,
-        system_instruction=system_prompt if system_prompt else None,
-        generation_config=generation_config if generation_config else None,
-    )
+    messages = []
+    if system_prompt:
+        messages.append(SystemMessage(content=system_prompt))
 
-    logger.info("AI Client [PROD] → Gemini model=%s json_mode=%s", model_name, json_mode)
-    response = model.generate_content(prompt)
-    content = response.text or ''
-    logger.info("AI Client [PROD] ← Gemini response length=%d", len(content))
+    final_prompt = prompt
+    if json_mode:
+        final_prompt = (
+            f"{prompt}\n\n"
+            "Return only valid JSON. Do not add markdown, commentary, or code fences."
+        )
+    messages.append(HumanMessage(content=final_prompt))
+
+    model_name = getattr(settings, 'FEATHERLESS_MODEL', 'openai/gpt-oss-120b')
+    logger.info("AI Client [PROD] → Featherless model=%s json_mode=%s", model_name, json_mode)
+    response = llm.invoke(messages)
+    content = (response.content or '') if hasattr(response, 'content') else str(response)
+    if isinstance(content, list):
+        content = ''.join(
+            chunk.get('text', '') if isinstance(chunk, dict) else str(chunk)
+            for chunk in content
+        )
+    logger.info("AI Client [PROD] ← Featherless response length=%d", len(content))
     return content
 
 
@@ -183,47 +178,17 @@ def _sd_generate(prompt_text: str, output_path: Optional[str] = None) -> Optiona
         return None
 
 
-# ── Gemini Imagen helper ──────────────────────────────────────────────────────
+# ── Featherless image helper ──────────────────────────────────────────────────
 
-def _gemini_generate_image(prompt_text: str, output_path: Optional[str] = None) -> Optional[Image.Image]:
-    """Generate an image using Gemini Imagen API (production)."""
-    try:
-        from google import genai as google_genai
-        from google.genai import types as genai_types
-    except ImportError as exc:
-        raise RuntimeError(
-            "google-genai is not installed. "
-            "Run: pip install google-genai"
-        ) from exc
+def _featherless_generate_image(prompt_text: str, output_path: Optional[str] = None) -> Optional[Image.Image]:
+    """
+    Generate an image for production mode.
 
-    api_key = getattr(settings, 'GEMINI_API_KEY', '')
-    if not api_key:
-        raise RuntimeError("GEMINI_API_KEY is not set.")
-
-    image_model = getattr(settings, 'GEMINI_IMAGE_MODEL', 'imagen-3.0-generate-002')
-
-    client = google_genai.Client(api_key=api_key)
-    logger.info("AI Client [PROD] → Gemini Imagen model=%s", image_model)
-
-    try:
-        response = client.models.generate_images(
-            model=image_model,
-            prompt=(
-                f"simple flat illustration of {prompt_text}, "
-                "minimal design, clean white background, "
-                "educational graphic, vector style, no text"
-            ),
-            config=genai_types.GenerateImagesConfig(number_of_images=1),
-        )
-        img_data = response.generated_images[0].image.image_bytes
-        image = Image.open(io.BytesIO(img_data))
-        if output_path:
-            image.save(output_path)
-        logger.info("AI Client [PROD] ← Gemini Imagen success")
-        return image
-    except Exception:
-        logger.exception("AI Client [PROD] Gemini Imagen image generation failed")
-        return None
+    Featherless is currently wired for text inference in this project,
+    so image generation falls back to Stable Diffusion.
+    """
+    logger.info("AI Client [PROD] Featherless image route → Stable Diffusion fallback")
+    return _sd_generate(prompt_text, output_path=output_path)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -246,8 +211,8 @@ def generate_text(
     Returns:
         The model's response as a string.
     """
-    if _use_gemini_text():
-        return _gemini_generate(prompt, system_prompt=system_prompt, json_mode=json_mode)
+    if _use_featherless_text():
+        return _featherless_generate(prompt, system_prompt=system_prompt, json_mode=json_mode)
     return _ollama_generate(prompt, system_prompt=system_prompt, json_mode=json_mode)
 
 
@@ -262,8 +227,8 @@ def generate_image(prompt_text: str, output_path: Optional[str] = None) -> Optio
     Returns:
         PIL.Image object, or None on failure.
     """
-    if _use_gemini_image():
-        return _gemini_generate_image(prompt_text, output_path=output_path)
+    if _use_featherless_image():
+        return _featherless_generate_image(prompt_text, output_path=output_path)
     return _sd_generate(prompt_text, output_path=output_path)
 
 
@@ -271,7 +236,7 @@ def get_langchain_llm(temperature: float = 0.7):
     """
     Return a LangChain-compatible chat model for the current environment.
 
-    Production → ChatGoogleGenerativeAI (Gemini)
+    Production → ChatOpenAI (Featherless base URL)
     Development → ChatOllama
 
     Args:
@@ -280,23 +245,28 @@ def get_langchain_llm(temperature: float = 0.7):
     Returns:
         A LangChain BaseChatModel instance.
     """
-    if _use_gemini_text():
+    if _use_featherless_text():
         try:
-            from langchain_google_genai import ChatGoogleGenerativeAI
+            from langchain_openai import ChatOpenAI
         except ImportError as exc:
             raise RuntimeError(
-                "langchain-google-genai is not installed. "
-                "Run: pip install langchain-google-genai"
+                "langchain-openai is not installed. "
+                "Run: pip install langchain-openai"
             ) from exc
 
-        api_key = getattr(settings, 'GEMINI_API_KEY', '')
-        model_name = getattr(settings, 'GEMINI_MODEL', 'gemini-2.0-flash')
-        logger.info("AI Client [PROD] LangChain LLM → ChatGoogleGenerativeAI model=%s", model_name)
-        return ChatGoogleGenerativeAI(
+        api_key = getattr(settings, 'FEATHERLESS_API_KEY', '')
+        if not api_key:
+            raise RuntimeError("FEATHERLESS_API_KEY is not set. Add it to your .env file.")
+
+        model_name = getattr(settings, 'FEATHERLESS_MODEL', 'openai/gpt-oss-120b')
+        base_url = getattr(settings, 'FEATHERLESS_BASE_URL', 'https://api.featherless.ai/v1')
+
+        logger.info("AI Client [PROD] LangChain LLM → ChatOpenAI(Featherless) model=%s", model_name)
+        return ChatOpenAI(
             model=model_name,
-            google_api_key=api_key,
+            api_key=api_key,
+            base_url=base_url,
             temperature=temperature,
-            convert_system_message_to_human=True,  # Gemini doesn't natively support SystemMessage
         )
     else:
         from langchain_ollama import ChatOllama

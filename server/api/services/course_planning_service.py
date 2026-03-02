@@ -70,11 +70,11 @@ class CoursePlanningService:
         """
         Initialize the course planning service.
 
-        In production (IS_PRODUCTION=True), uses Gemini via LangChain.
+        In production (IS_PRODUCTION=True), uses Featherless via LangChain.
         In development, uses Ollama via LangChain.
-        The model_name parameter is ignored; configure via GEMINI_MODEL / OLLAMA_MODEL env vars.
+        The model_name parameter is ignored; configure via FEATHERLESS_MODEL / OLLAMA_MODEL env vars.
         """
-        backend = "Gemini" if getattr(settings, 'IS_PRODUCTION', False) else "Ollama"
+        backend = "Featherless" if getattr(settings, 'IS_PRODUCTION', False) else "Ollama"
         logger.info("CoursePlanningService initialising — AI backend: %s", backend)
 
         self.temperature = temperature

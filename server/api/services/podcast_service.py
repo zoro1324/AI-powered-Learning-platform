@@ -33,7 +33,7 @@ class PodcastService:
         The ollama_url / ollama_model parameters are kept for backwards
         compatibility but are ignored when IS_PRODUCTION=True.
         """
-        backend = "Gemini" if getattr(settings, 'IS_PRODUCTION', False) else "Ollama"
+        backend = "Featherless" if getattr(settings, 'IS_PRODUCTION', False) else "Ollama"
         
         # Voice mapping for personas
         self.voice_map = {

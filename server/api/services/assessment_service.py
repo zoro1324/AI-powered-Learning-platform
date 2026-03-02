@@ -31,7 +31,7 @@ class AssessmentService:
         The ollama_url / ollama_model parameters are kept for backwards
         compatibility but are ignored when IS_PRODUCTION=True.
         """
-        backend = "Gemini" if getattr(settings, 'IS_PRODUCTION', False) else "Ollama"
+        backend = "Featherless" if getattr(settings, 'IS_PRODUCTION', False) else "Ollama"
         logger.info("AssessmentService initialised — AI backend: %s", backend)
     
     def _extract_json(self, text: str) -> Dict[str, Any]:

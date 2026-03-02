@@ -163,6 +163,11 @@ export const courseAPI = {
     return response.data;
   },
 
+  getCourseEnrollments: async (courseId: number): Promise<any> => {
+    const response = await api.get(`/courses/${courseId}/enrollments_with_curricula/`);
+    return response.data;
+  },
+
   create: async (data: Partial<Course>): Promise<Course> => {
     const response = await api.post<Course>('/courses/', data);
     return response.data;
