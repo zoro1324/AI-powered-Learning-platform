@@ -3,6 +3,34 @@ import { useNavigate, Link } from 'react-router';
 import { Eye, EyeOff, BookOpen, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
+/**
+ * Parse Django REST Framework field-level validation errors into readable strings.
+ */
+function parseApiErrors(error: any): string[] {
+  if (!error) return [];
+  if (typeof error === 'string') return [error];
+  if (error.detail) return [error.detail];
+
+  const messages: string[] = [];
+  for (const [field, fieldErrors] of Object.entries(error)) {
+    if (field === 'non_field_errors') {
+      if (Array.isArray(fieldErrors)) {
+        messages.push(...fieldErrors.map(String));
+      } else {
+        messages.push(String(fieldErrors));
+      }
+    } else {
+      const label = field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, ' ');
+      if (Array.isArray(fieldErrors)) {
+        fieldErrors.forEach((msg) => messages.push(`${label}: ${msg}`));
+      } else {
+        messages.push(`${label}: ${fieldErrors}`);
+      }
+    }
+  }
+  return messages.length > 0 ? messages : ['Login failed. Please check your credentials.'];
+}
+
 export default function LoginPage() {
   const navigate = useNavigate();
   const { handleLogin, isAuthenticated, loading, error, clearAuthError } = useAuth();
@@ -27,12 +55,14 @@ export default function LoginPage() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     clearAuthError();
-    
+
     const result = await handleLogin({ email, password });
     if (result.meta.requestStatus === 'fulfilled') {
       navigate('/dashboard');
     }
   };
+
+  const errorMessages = error ? parseApiErrors(error) : [];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center p-4">
@@ -52,12 +82,20 @@ export default function LoginPage() {
             <p className="text-gray-600">Login to continue your personalized learning journey</p>
           </div>
 
-          {/* Error Message */}
-          {error && (
+          {/* Error Messages */}
+          {errorMessages.length > 0 && (
             <div className="mb-5 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-red-800">
-                {typeof error === 'string' ? error : error.detail || 'Login failed. Please check your credentials.'}
+                {errorMessages.length === 1 ? (
+                  <p>{errorMessages[0]}</p>
+                ) : (
+                  <ul className="list-disc pl-4 space-y-1">
+                    {errorMessages.map((msg, i) => (
+                      <li key={i}>{msg}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
           )}

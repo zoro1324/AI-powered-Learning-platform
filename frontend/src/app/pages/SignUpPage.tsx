@@ -1,7 +1,37 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router';
-import { Eye, EyeOff, BookOpen, ArrowLeft, AlertCircle, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, BookOpen, ArrowLeft, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+
+/**
+ * Parse Django REST Framework field-level validation errors into readable strings.
+ * Django returns errors like: { email: ["already exists"], password: ["too short", "must contain a number"] }
+ */
+function parseApiErrors(error: any): string[] {
+  if (!error) return [];
+  if (typeof error === 'string') return [error];
+  if (error.detail) return [error.detail];
+
+  const messages: string[] = [];
+  for (const [field, fieldErrors] of Object.entries(error)) {
+    if (field === 'non_field_errors') {
+      // Non-field errors are general errors not tied to a specific field
+      if (Array.isArray(fieldErrors)) {
+        messages.push(...fieldErrors.map(String));
+      } else {
+        messages.push(String(fieldErrors));
+      }
+    } else {
+      const label = field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, ' ');
+      if (Array.isArray(fieldErrors)) {
+        fieldErrors.forEach((msg) => messages.push(`${label}: ${msg}`));
+      } else {
+        messages.push(`${label}: ${fieldErrors}`);
+      }
+    }
+  }
+  return messages.length > 0 ? messages : ['Registration failed. Please try again.'];
+}
 
 export default function SignUpPage() {
   const navigate = useNavigate();
@@ -35,12 +65,12 @@ export default function SignUpPage() {
     e.preventDefault();
     setValidationError('');
     clearAuthError();
-    
+
     if (formData.password !== formData.confirmPassword) {
       setValidationError('Passwords do not match!');
       return;
     }
-    
+
     if (formData.password.length < 8) {
       setValidationError('Password must be at least 8 characters long!');
       return;
@@ -66,6 +96,8 @@ export default function SignUpPage() {
     });
   };
 
+  const errorMessages = error ? parseApiErrors(error) : [];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -90,12 +122,22 @@ export default function SignUpPage() {
             <p className="text-gray-600">Start your personalized learning journey today</p>
           </div>
 
-          {/* Error Message */}
-          {(error || validationError) && (
+          {/* Error Messages */}
+          {(errorMessages.length > 0 || validationError) && (
             <div className="mb-5 p-4 bg-red-50 border border-red-200 rounded-xl flex items-start gap-3">
               <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-red-800">
-                {validationError || (typeof error === 'string' ? error : error.detail || 'Registration failed. Please try again.')}
+                {validationError ? (
+                  <p>{validationError}</p>
+                ) : errorMessages.length === 1 ? (
+                  <p>{errorMessages[0]}</p>
+                ) : (
+                  <ul className="list-disc pl-4 space-y-1">
+                    {errorMessages.map((msg, i) => (
+                      <li key={i}>{msg}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
           )}
