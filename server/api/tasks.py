@@ -40,11 +40,17 @@ def generate_video_task(self, task_id: str):
 
         # Get duration from the generated video
         try:
-            from moviepy import VideoFileClip
-            clip = VideoFileClip(final_path)
-            video_task.duration_seconds = int(clip.duration)
-            clip.close()
-        except Exception:
+            import subprocess
+            cmd = [
+                "ffprobe", "-v", "quiet",
+                "-show_entries", "format=duration",
+                "-of", "csv=p=0",
+                final_path,
+            ]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, check=True)
+            video_task.duration_seconds = int(float(result.stdout.strip()))
+        except Exception as e:
+            logger.warning("Could not get video duration: %s", e)
             pass
 
         video_task.status = "completed"
@@ -75,7 +81,7 @@ def generate_video_task(self, task_id: str):
                         file_size_bytes=file_size,
                         duration_seconds=video_task.duration_seconds,
                         is_generated=True,
-                        generation_model='stable-diffusion + edge-tts'
+                        generation_model='3-stage-pipeline: SD-LCM + Playwright + Edge-TTS + FFmpeg'
                     )
                     logger.info(f"✅ Created Resource record for video: {video_task.topic}")
                 else:

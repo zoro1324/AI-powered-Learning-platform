@@ -745,10 +745,15 @@ class GenerateVideoView(APIView):
                             vt.video_file.save(f"video_{video_task.id}.mp4", File(f), save=False)
                         
                         try:
-                            from moviepy import VideoFileClip
-                            clip = VideoFileClip(final_path)
-                            vt.duration_seconds = int(clip.duration)
-                            clip.close()
+                            import subprocess
+                            cmd = [
+                                "ffprobe", "-v", "quiet",
+                                "-show_entries", "format=duration",
+                                "-of", "csv=p=0",
+                                final_path,
+                            ]
+                            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, check=True)
+                            vt.duration_seconds = int(float(result.stdout.strip()))
                         except Exception:
                             pass
                         
@@ -2545,10 +2550,15 @@ class GeneratePodcastView(APIView):
                     # Get audio duration
                     duration = None
                     try:
-                        from moviepy import AudioFileClip
-                        audio_clip = AudioFileClip(audio_file_path)
-                        duration = int(audio_clip.duration)
-                        audio_clip.close()
+                        import subprocess
+                        cmd = [
+                            "ffprobe", "-v", "quiet",
+                            "-show_entries", "format=duration",
+                            "-of", "csv=p=0",
+                            audio_file_path,
+                        ]
+                        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, check=True)
+                        duration = int(float(result.stdout.strip()))
                     except Exception:
                         pass
                     

@@ -10,10 +10,13 @@ safetensors==0.4.5
 huggingface-hub==0.26.2
 peft==0.13.2
 
-moviepy
+# Video generation dependencies
 pillow
 edge-tts
 requests
+playwright  # Required for HTML slide rendering
+
+# MySQL connector
 mysqlclient
 
 # Django ecosystem
