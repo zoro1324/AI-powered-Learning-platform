@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Sidebar } from '../components/Sidebar';
-import { BookOpen, TrendingUp, Clock, Award, Loader2 } from 'lucide-react';
+import { BookOpen, TrendingUp, Clock, Award, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { fetchDashboard } from '../../store/slices/courseSlice';
 
@@ -10,6 +10,7 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const { dashboard, loading } = useAppSelector((state) => state.course);
   const { user, isAuthenticated } = useAppSelector((state) => state.auth);
+  const [showAllActivities, setShowAllActivities] = useState(false);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -108,17 +109,34 @@ export default function DashboardPage() {
             <h2 className="text-2xl font-semibold text-gray-900 mb-6">Recent Activity</h2>
             <div className="space-y-4">
               {dashboard?.recent_activities && dashboard.recent_activities.length > 0 ? (
-                dashboard.recent_activities.map((activity) => (
-                  <div key={activity.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
-                    <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                    <div className="flex-1">
-                      <p className="text-gray-900 font-medium">{activity.title || activity.description}</p>
-                      <p className="text-sm text-gray-500">
-                        {new Date(activity.created_at ?? activity.timestamp).toLocaleString()}
-                      </p>
+                <>
+                  {(showAllActivities
+                    ? dashboard.recent_activities
+                    : dashboard.recent_activities.slice(0, 3)
+                  ).map((activity) => (
+                    <div key={activity.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
+                      <div className="w-2 h-2 rounded-full bg-blue-500"></div>
+                      <div className="flex-1">
+                        <p className="text-gray-900 font-medium">{activity.title || activity.description}</p>
+                        <p className="text-sm text-gray-500">
+                          {new Date(activity.created_at ?? activity.timestamp).toLocaleString()}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))
+                  ))}
+                  {dashboard.recent_activities.length > 3 && (
+                    <button
+                      onClick={() => setShowAllActivities((prev) => !prev)}
+                      className="flex items-center gap-2 mx-auto mt-2 px-4 py-2 text-sm font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-lg transition-colors"
+                    >
+                      {showAllActivities ? (
+                        <><ChevronUp className="w-4 h-4" /> Show Less</>
+                      ) : (
+                        <><ChevronDown className="w-4 h-4" /> View More ({dashboard.recent_activities.length - 3} more)</>
+                      )}
+                    </button>
+                  )}
+                </>
               ) : (
                 <p className="text-gray-500 text-center py-4">No recent activity</p>
               )}
