@@ -946,7 +946,7 @@ class CoursePlanningView(APIView):
                         difficulty_level=difficulty_map.get(course_model.difficulty, cpt.difficulty_level),
                         estimated_duration=cpt.estimated_duration,
                         thumbnail=cpt.thumbnail,
-                        is_sub_topic=False,
+                        is_sub_topic=True,  # Narrow/standalone course is directly learnable
                         parent_topic_name='',
                         is_popular=True,
                         created_by=creator,
@@ -1125,8 +1125,8 @@ class CoursePlanningStatusView(APIView):
                                 difficulty_level=difficulty_map.get(course_model.difficulty, cpt.difficulty_level),
                                 estimated_duration=cpt.estimated_duration,
                                 thumbnail=cpt.thumbnail,
-                                is_sub_topic=False,
-                                parent_topic_name=None,
+                                is_sub_topic=True,  # Narrow/standalone course is directly learnable
+                                parent_topic_name='',
                                 learning_objectives=[],
                                 prerequisites=[],
                             )
@@ -2067,7 +2067,8 @@ class EvaluateTopicQuizView(APIView):
         question_ids = request.data.get('question_ids')
         answers = request.data.get('answers')
         
-        if not all([enrollment_id, module_id, question_ids, answers]):
+        # Proper validation that handles 0 and empty arrays
+        if enrollment_id is None or module_id is None or question_ids is None or answers is None:
             return Response(
                 {'error': 'enrollment_id, module_id, question_ids, and answers are required'},
                 status=status.HTTP_400_BAD_REQUEST

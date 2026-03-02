@@ -2,11 +2,11 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Sidebar } from '../components/Sidebar';
 import AssessmentDialog from '../components/AssessmentDialog';
-import { 
-  BookOpen, 
-  Clock, 
-  TrendingUp, 
-  Plus, 
+import {
+  BookOpen,
+  Clock,
+  TrendingUp,
+  Plus,
   Loader2,
   Filter,
   Search,
@@ -70,14 +70,14 @@ export default function PopularCoursesPage() {
   const [creating, setCreating] = useState(false);
   const [planningTaskId, setPlanningTaskId] = useState<string | null>(null);
   const [planningStatus, setPlanningStatus] = useState<string>('');
-  
+
   // Assessment dialog state
   const [assessmentDialogOpen, setAssessmentDialogOpen] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
-  
+
   // Grouping state - start with all groups expanded
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  
+
   // Form state
   const [formData, setFormData] = useState<{
     title: string;
@@ -106,8 +106,10 @@ export default function PopularCoursesPage() {
       courses.forEach(course => {
         if (course.is_sub_topic && course.parent_topic_name) {
           allGroups.add(course.parent_topic_name);
-        } else {
+        } else if (!course.is_sub_topic && !course.parent_topic_name) {
           allGroups.add(`__broad__${course.title}`);
+        } else {
+          allGroups.add(`__standalone__${course.id}`);
         }
       });
       setExpandedGroups(allGroups);
@@ -133,7 +135,7 @@ export default function PopularCoursesPage() {
     try {
       setCreating(true);
       setPlanningStatus('Analyzing topic and creating course plan...');
-      
+
       // Create course planning task
       const planningTask = await coursePlanningAPI.create({
         course_title: formData.title,
@@ -143,28 +145,28 @@ export default function PopularCoursesPage() {
         estimated_duration: formData.estimated_duration,
         thumbnail: formData.thumbnail,
       });
-      
+
       setPlanningTaskId(planningTask.id);
-      
+
       // Poll for task completion
       const pollInterval = setInterval(async () => {
         try {
           const status = await coursePlanningAPI.getStatus(planningTask.id);
           setPlanningStatus(status.progress_message || 'Processing...');
-          
+
           if (status.status === 'completed') {
             clearInterval(pollInterval);
             setCreating(false);
             setPlanningStatus('');
             setPlanningTaskId(null);
-            
+
             // Show success message
             const coursesCreated = status.created_courses?.length || 0;
             const message = status.result_data?.is_broad
               ? `Successfully created ${coursesCreated} courses! The topic was broad and has been split into a structured learning path.`
               : 'Successfully created course!';
             alert(message);
-            
+
             // Close dialog and refresh courses
             setDialogOpen(false);
             setFormData({
@@ -192,7 +194,7 @@ export default function PopularCoursesPage() {
           alert('Failed to check course planning status');
         }
       }, 2000); // Poll every 2 seconds
-      
+
     } catch (err: any) {
       setCreating(false);
       setPlanningStatus('');
@@ -208,7 +210,8 @@ export default function PopularCoursesPage() {
       navigate('/login');
       return;
     }
-    if (course.is_sub_topic === false) {
+    // Broad parent topic (is_sub_topic=false, no parent) — cannot enroll directly
+    if (course.is_sub_topic === false && !course.parent_topic_name) {
       alert(`Please choose a learnable sub-topic for "${course.title}" from the course details page.`);
       navigate(`/courses/${course.id}`);
       return;
@@ -225,22 +228,38 @@ export default function PopularCoursesPage() {
 
   const filteredCourses = courses.filter((course) => {
     const matchesSearch = course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         course.description.toLowerCase().includes(searchQuery.toLowerCase());
+      course.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = categoryFilter === 'all' || course.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
 
+  // Collect names of parent topics that have sub-topics in the current filtered list
+  const parentNamesWithChildren = new Set(
+    filteredCourses
+      .filter(c => c.is_sub_topic && c.parent_topic_name)
+      .map(c => c.parent_topic_name as string)
+  );
+
   // Group courses by parent topic
   const groupedCourses = filteredCourses.reduce((groups, course) => {
     if (course.is_sub_topic && course.parent_topic_name) {
-      // This is a sub-topic, group it under its parent
+      // Sub-topic: group it under its parent topic name
       if (!groups[course.parent_topic_name]) {
         groups[course.parent_topic_name] = [];
       }
       groups[course.parent_topic_name].push(course);
+    } else if (!course.is_sub_topic && !course.parent_topic_name) {
+      // Broad parent topic (is_sub_topic=false, no parent)
+      // Only show as a card if its sub-topics are NOT already shown as a group
+      // (prevents duplicating when sub-topics appear separately under the same name)
+      if (!parentNamesWithChildren.has(course.title)) {
+        const key = `__broad__${course.title}`;
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(course);
+      }
     } else {
-      // This is a broad topic or standalone course
-      const key = `__broad__${course.title}`;
+      // Standalone narrow course (is_sub_topic=true, no parent_topic_name)
+      const key = `__standalone__${course.id}`;
       groups[key] = [course];
     }
     return groups;
@@ -284,7 +303,7 @@ export default function PopularCoursesPage() {
   return (
     <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-      
+
       <main className="flex-1 ml-64">
         <div className="p-8">
           {/* Header */}
@@ -327,7 +346,7 @@ export default function PopularCoursesPage() {
                           required
                         />
                       </div>
-                      
+
                       <div className="grid gap-2">
                         <Label htmlFor="description">Description *</Label>
                         <textarea
@@ -401,7 +420,7 @@ export default function PopularCoursesPage() {
                         />
                       </div>
                     </div>
-                    
+
                     {/* Show planning status when creating */}
                     {creating && planningStatus && (
                       <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 p-3 rounded-md">
@@ -409,7 +428,7 @@ export default function PopularCoursesPage() {
                         <span>{planningStatus}</span>
                       </div>
                     )}
-                    
+
                     <DialogFooter>
                       <Button
                         type="button"
@@ -448,7 +467,7 @@ export default function PopularCoursesPage() {
                 className="pl-10"
               />
             </div>
-            
+
             <Select value={categoryFilter} onValueChange={setCategoryFilter}>
               <SelectTrigger className="w-[240px]">
                 <Filter className="w-4 h-4 mr-2" />
@@ -479,8 +498,10 @@ export default function PopularCoursesPage() {
                   courses.forEach(course => {
                     if (course.is_sub_topic && course.parent_topic_name) {
                       allGroups.add(course.parent_topic_name);
-                    } else {
+                    } else if (!course.is_sub_topic && !course.parent_topic_name) {
                       allGroups.add(`__broad__${course.title}`);
+                    } else {
+                      allGroups.add(`__standalone__${course.id}`);
                     }
                   });
                   setExpandedGroups(allGroups);
@@ -504,8 +525,8 @@ export default function PopularCoursesPage() {
               <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
               <h3 className="text-xl font-semibold text-gray-900 mb-2">No courses found</h3>
               <p className="text-gray-600">
-                {searchQuery || categoryFilter !== 'all' 
-                  ? 'Try adjusting your filters' 
+                {searchQuery || categoryFilter !== 'all'
+                  ? 'Try adjusting your filters'
                   : 'Be the first to create a course!'}
               </p>
             </div>
@@ -513,13 +534,18 @@ export default function PopularCoursesPage() {
             <div className="space-y-6">
               {Object.entries(groupedCourses).map(([groupKey, groupCourses]) => {
                 const isBroadTopic = groupKey.startsWith('__broad__');
-                const displayName = isBroadTopic ? groupKey.replace('__broad__', '') : groupKey;
+                const isStandalone = groupKey.startsWith('__standalone__');
+                const displayName = isBroadTopic
+                  ? groupKey.replace('__broad__', '')
+                  : isStandalone
+                    ? groupCourses[0]?.title ?? groupKey
+                    : groupKey;
                 const isExpanded = expandedGroups.has(groupKey);
-                
+
                 return (
                   <div key={groupKey} className="bg-white rounded-lg shadow-sm border border-gray-200">
                     {/* Group Header */}
-                    <div 
+                    <div
                       className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors"
                       onClick={() => toggleGroup(groupKey)}
                     >
@@ -541,8 +567,8 @@ export default function PopularCoursesPage() {
                       <div className="p-4 pt-0">
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                           {groupCourses.map((course) => (
-                            <Card 
-                              key={course.id} 
+                            <Card
+                              key={course.id}
                               className="hover:shadow-xl transition-shadow cursor-pointer"
                               onClick={() => navigate(`/courses/${course.id}`)}
                             >
@@ -559,7 +585,7 @@ export default function PopularCoursesPage() {
                                   />
                                 </div>
                               )}
-                              
+
                               <CardHeader>
                                 <div className="flex items-start justify-between gap-2 mb-2">
                                   <Badge variant="secondary" className="text-xs">
@@ -573,12 +599,12 @@ export default function PopularCoursesPage() {
                                   {course.title}
                                 </CardTitle>
                               </CardHeader>
-                              
+
                               <CardContent>
                                 <CardDescription className="line-clamp-3 mb-4">
                                   {course.description}
                                 </CardDescription>
-                                
+
                                 <div className="flex items-center gap-4 text-sm text-gray-600">
                                   <div className="flex items-center gap-1">
                                     <Clock className="w-4 h-4" />
@@ -592,19 +618,19 @@ export default function PopularCoursesPage() {
                                   )}
                                 </div>
                               </CardContent>
-                              
+
                               <CardFooter className="flex gap-2">
                                 {isAuthenticated ? (
                                   <>
-                                    <Button 
+                                    <Button
                                       className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
                                       onClick={(e) => handleEnrollClick(e, course)}
-                                      disabled={course.is_sub_topic === false}
+                                      disabled={course.is_sub_topic === false && !course.parent_topic_name}
                                     >
                                       <GraduationCap className="w-4 h-4 mr-2" />
-                                      {course.is_sub_topic === false ? 'Choose Sub-topic' : 'Enroll Now'}
+                                      {course.is_sub_topic === false && !course.parent_topic_name ? 'Choose Sub-topic' : 'Enroll Now'}
                                     </Button>
-                                    <Button 
+                                    <Button
                                       variant="outline"
                                       className="flex-1"
                                       onClick={(e) => {
@@ -616,7 +642,7 @@ export default function PopularCoursesPage() {
                                     </Button>
                                   </>
                                 ) : (
-                                  <Button 
+                                  <Button
                                     className="w-full"
                                     onClick={(e) => {
                                       e.stopPropagation();
