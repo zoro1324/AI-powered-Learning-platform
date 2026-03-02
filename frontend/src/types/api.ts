@@ -168,11 +168,11 @@ export interface ActivityLog {
   id: number;
   user: number;
   activity_type: string;
+  title?: string;
   description: string;
-  timestamp: string;
-  related_course?: number;
-  related_module?: number;
-  related_lesson?: number;
+  created_at: string;
+  timestamp?: string;  // kept for backward compat
+  metadata?: Record<string, any>;
 }
 
 export interface DashboardData {

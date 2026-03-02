@@ -337,7 +337,7 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """Filter enrollments by current user"""
-        return Enrollment.objects.filter(user=self.request.user)
+        return Enrollment.objects.filter(user=self.request.user).order_by('-enrolled_at')
     
     def perform_create(self, serializer):
         """Create enrollment and log activity"""
@@ -536,7 +536,7 @@ class ModuleProgressViewSet(viewsets.ModelViewSet):
     
     def get_queryset(self):
         """Filter progress by current user's enrollments"""
-        return ModuleProgress.objects.filter(enrollment__user=self.request.user)
+        return ModuleProgress.objects.filter(enrollment__user=self.request.user).order_by('id')
 
 
 class LearningRoadmapViewSet(viewsets.ModelViewSet):
@@ -660,6 +660,11 @@ class DashboardView(APIView):
         # Get earned achievements
         user_achievements = UserAchievement.objects.filter(user=user).count()
         
+        # Aggregate total study time from all enrollments (field lives on Enrollment, not User)
+        total_study_minutes = enrollments.aggregate(
+            total=Sum('total_study_time_minutes')
+        )['total'] or 0
+
         return Response({
             'user': UserSerializer(user).data,
             'stats': {
@@ -667,8 +672,8 @@ class DashboardView(APIView):
                 'active_courses': active_enrollments.count(),
                 'completed_courses': completed_enrollments.count(),
                 'average_progress': round(avg_progress, 1),
-                'study_time_hours': round(user.total_study_time / 60, 1),
-                'streak_days': user.streak_days,
+                'study_time_hours': round(total_study_minutes / 60, 1),
+                'streak_days': 0,
                 'achievements_earned': user_achievements
             },
             'recent_activities': ActivityLogSerializer(recent_activities, many=True).data,

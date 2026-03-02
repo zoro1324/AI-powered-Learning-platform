@@ -112,9 +112,9 @@ export default function DashboardPage() {
                   <div key={activity.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
                     <div className="w-2 h-2 rounded-full bg-blue-500"></div>
                     <div className="flex-1">
-                      <p className="text-gray-900 font-medium">{activity.description}</p>
+                      <p className="text-gray-900 font-medium">{activity.title || activity.description}</p>
                       <p className="text-sm text-gray-500">
-                        {new Date(activity.timestamp).toLocaleString()}
+                        {new Date(activity.created_at ?? activity.timestamp).toLocaleString()}
                       </p>
                     </div>
                   </div>

@@ -137,7 +137,7 @@ class CourseSerializer(serializers.ModelSerializer):
     modules = ModuleSerializer(many=True, read_only=True)
     modules_count = serializers.SerializerMethodField()
     enrolled_count = serializers.SerializerMethodField()
-    created_by_username = serializers.CharField(source='created_by.username', read_only=True)
+    created_by_email = serializers.CharField(source='created_by.email', read_only=True)
     
     class Meta:
         model = Course
@@ -268,7 +268,7 @@ class ActivityLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = ActivityLog
         fields = '__all__'
-        read_only_fields = ('user', 'timestamp')
+        read_only_fields = ('user', 'created_at')
 
 
 # ============================================================================
