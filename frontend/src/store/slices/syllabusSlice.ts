@@ -850,8 +850,9 @@ export const selectRemediationLoading = (
 /**
  * A module is unlocked if:
  *  - It is module 0 (always unlocked), OR
- *  - ALL topics in the previous module are completed AND
- *    every topic in the previous module scored >= 80% on the quiz.
+ *  - ALL topics in the previous module are completed
+ * 
+ * Note: Users can complete topics even with scores below 80% by clicking "Continue Anyway"
  */
 export const selectIsModuleUnlocked = (
   state: { syllabus: SyllabusState },
@@ -859,7 +860,7 @@ export const selectIsModuleUnlocked = (
 ): boolean => {
   if (moduleIndex === 0) return true;
 
-  const { syllabus, topicCompletion, quizResults, enrollmentId } = state.syllabus;
+  const { syllabus, topicCompletion, enrollmentId } = state.syllabus;
   if (!syllabus) return false;
 
   const prevModule = syllabus.modules[moduleIndex - 1];
@@ -869,13 +870,6 @@ export const selectIsModuleUnlocked = (
   for (let t = 0; t < prevModule.topics.length; t++) {
     const key = topicId(enrollmentId, moduleIndex - 1, t);
     if (!topicCompletion[key]) return false;
-  }
-
-  // Every topic in the previous module must have a quiz score >= 80%
-  for (let t = 0; t < prevModule.topics.length; t++) {
-    const key = topicId(enrollmentId, moduleIndex - 1, t);
-    const result = quizResults[key];
-    if (!result || result.scorePercent < 80) return false;
   }
 
   return true;

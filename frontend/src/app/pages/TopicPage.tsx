@@ -60,7 +60,6 @@ export default function TopicPage() {
     generatedContent,
     contentLoading,
     topicCompletion,
-    quizResults,
   } = useAppSelector((state) => state.syllabus);
 
   const content = generatedContent[topicKey];
@@ -128,15 +127,14 @@ export default function TopicPage() {
       if (!syllabus) return false;
       const prevMod = syllabus.modules[moduleIdx - 1];
       if (!prevMod) return false;
+      // Module unlocks when all topics in previous module are completed
       for (let t = 0; t < prevMod.topics.length; t++) {
         const key = `${eId}-${moduleIdx - 1}-${t}`;
         if (!topicCompletion[key]) return false;
-        const result = quizResults[key];
-        if (!result || result.scorePercent < 80) return false;
       }
       return true;
     },
-    [syllabus, topicCompletion, quizResults, eId]
+    [syllabus, topicCompletion, eId]
   );
 
   // Quiz overlay state
@@ -785,7 +783,7 @@ export default function TopicPage() {
                   Next Module Locked
                 </Button>
                 <p className="text-xs text-gray-400">
-                  Score 80%+ on all topics to unlock
+                  Complete all topics to unlock
                 </p>
               </div>
             ) : (

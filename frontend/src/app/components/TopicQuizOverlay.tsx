@@ -262,7 +262,7 @@ export function TopicQuizOverlay({
               <p className={cn('text-sm font-medium mt-2', passed ? 'text-green-600' : 'text-amber-600')}>
                 {passed
                   ? 'Great job! You scored 80%+ and can proceed to the next topic.'
-                  : 'You need 80% to unlock the next module. Review the concepts and try again.'}
+                  : 'You can review the content or continue to the next topic anyway.'}
               </p>
             </div>
 
