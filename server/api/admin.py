@@ -4,10 +4,12 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from .models import (
     Achievement,
     ActivityLog,
+    ChatHistory,
     Course,
     CoursePlanningTask,
     Enrollment,
     Lesson,
+    LessonProgress,
     LearningProfile,
     LearningRoadmap,
     Module,
@@ -115,6 +117,14 @@ class ModuleProgressAdmin(admin.ModelAdmin):
     list_filter = ('status',)
 
 
+@admin.register(LessonProgress)
+class LessonProgressAdmin(admin.ModelAdmin):
+    list_display = ('enrollment', 'lesson', 'is_completed', 'completed_at', 'time_spent_minutes')
+    list_filter = ('is_completed',)
+    search_fields = ('enrollment__user__email', 'lesson__title')
+    list_select_related = ('enrollment__user', 'lesson__module')
+
+
 @admin.register(LearningRoadmap)
 class LearningRoadmapAdmin(admin.ModelAdmin):
     list_display = ('enrollment', 'version', 'is_active', 'generated_by_model', 'created_at')
@@ -154,3 +164,10 @@ class PersonalizedSyllabusAdmin(admin.ModelAdmin):
     list_display = ('enrollment', 'generated_by_model', 'created_at')
     search_fields = ('enrollment__user__email', 'enrollment__course__name')
 
+
+@admin.register(ChatHistory)
+class ChatHistoryAdmin(admin.ModelAdmin):
+    list_display = ('enrollment', 'role', 'topic_name', 'created_at')
+    list_filter = ('role',)
+    search_fields = ('enrollment__user__email', 'content', 'topic_name')
+    readonly_fields = ('created_at',)

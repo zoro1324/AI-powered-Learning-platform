@@ -364,6 +364,35 @@ class Lesson(models.Model):
 
 
 # ===========================================================================
+# 7b. LessonProgress (Topic Completion Tracking)
+# ===========================================================================
+
+class LessonProgress(models.Model):
+    """Track user's progress/completion status for individual lessons/topics"""
+    enrollment = models.ForeignKey(
+        Enrollment, on_delete=models.CASCADE, related_name='lesson_progresses',
+    )
+    lesson = models.ForeignKey(
+        Lesson, on_delete=models.CASCADE, related_name='user_progresses',
+    )
+    is_completed = models.BooleanField(default=False)
+    completed_at = models.DateTimeField(null=True, blank=True)
+    time_spent_minutes = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'lesson_progress'
+        unique_together = ['enrollment', 'lesson']
+        indexes = [
+            models.Index(fields=['enrollment', 'is_completed']),
+        ]
+
+    def __str__(self):
+        return f'{self.enrollment.user.email} – {self.lesson.title} ({"✓" if self.is_completed else "○"})'
+
+
+# ===========================================================================
 # 8. Resource
 # ===========================================================================
 
@@ -474,6 +503,10 @@ class QuizAttempt(models.Model):
     module = models.ForeignKey(
         Module, on_delete=models.CASCADE, related_name='quiz_attempts',
         null=True, blank=True, help_text='Set for topic quizzes, null for diagnostic',
+    )
+    lesson = models.ForeignKey(
+        Lesson, on_delete=models.CASCADE, related_name='quiz_attempts',
+        null=True, blank=True, help_text='Set for topic quizzes to identify specific topic/lesson',
     )
     attempt_type = models.CharField(max_length=15, choices=AttemptType.choices)
     score_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
@@ -793,3 +826,42 @@ class CoursePlanningTask(models.Model):
 
     def __str__(self):
         return f'{self.course_title} ({self.status})'
+
+
+# ===========================================================================
+# 19. ChatHistory
+# ===========================================================================
+
+class ChatHistory(models.Model):
+    """
+    Stores chat message history for each enrollment.
+    Each enrollment gets its own separate chat history.
+    """
+    class Role(models.TextChoices):
+        USER = 'user', 'User'
+        ASSISTANT = 'assistant', 'Assistant'
+
+    enrollment = models.ForeignKey(
+        Enrollment, on_delete=models.CASCADE, related_name='chat_messages',
+        help_text='The enrollment this chat message belongs to',
+    )
+    role = models.CharField(
+        max_length=10, choices=Role.choices,
+        help_text='Whether this is a user message or assistant response',
+    )
+    content = models.TextField(help_text='The actual message content')
+    topic_name = models.CharField(
+        max_length=255, blank=True, default='',
+        help_text='Optional: Which topic was being discussed',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'chat_history'
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['enrollment', 'created_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.enrollment.user.email} - {self.role} - {self.created_at}'

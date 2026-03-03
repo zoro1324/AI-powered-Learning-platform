@@ -4,10 +4,10 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 
 from .models import (
-    VideoTask, LearningProfile, Course, Module, Lesson, Resource,
+    VideoTask, LearningProfile, Course, Module, Lesson, LessonProgress, Resource,
     Enrollment, Question, QuizAttempt, QuizAnswer, ModuleProgress,
     LearningRoadmap, Achievement, UserAchievement, ActivityLog,
-    PersonalizedSyllabus, CoursePlanningTask
+    PersonalizedSyllabus, CoursePlanningTask, ChatHistory
 )
 
 User = get_user_model()
@@ -223,6 +223,19 @@ class ModuleProgressSerializer(serializers.ModelSerializer):
         read_only_fields = ('enrollment', 'module', 'started_at', 'completed_at', 'progress_percentage')
 
 
+class LessonProgressSerializer(serializers.ModelSerializer):
+    """Serializer for lesson/topic progress and completion"""
+    lesson_title = serializers.CharField(source='lesson.title', read_only=True)
+    module_id = serializers.IntegerField(source='lesson.module.id', read_only=True)
+    
+    class Meta:
+        model = LessonProgress
+        fields = ['id', 'enrollment', 'lesson', 'lesson_title', 'module_id', 
+                  'is_completed', 'completed_at', 'time_spent_minutes', 
+                  'created_at', 'updated_at']
+        read_only_fields = ('enrollment', 'completed_at', 'created_at', 'updated_at')
+
+
 class LearningRoadmapSerializer(serializers.ModelSerializer):
     """Serializer for AI-generated learning roadmaps"""
     enrollment = EnrollmentSerializer(read_only=True)
@@ -341,3 +354,12 @@ class CoursePlanningTaskSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["id", "status", "progress_message", "result_data", 
                            "created_courses", "error_message", "created_at", "completed_at"]
+
+
+class ChatHistorySerializer(serializers.ModelSerializer):
+    """Serializer for chat history messages"""
+    
+    class Meta:
+        model = ChatHistory
+        fields = ['id', 'enrollment', 'role', 'content', 'topic_name', 'created_at']
+        read_only_fields = ['id', 'created_at']
