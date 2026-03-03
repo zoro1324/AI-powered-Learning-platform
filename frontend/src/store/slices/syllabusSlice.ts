@@ -4,6 +4,7 @@ import {
   videoAPI,
   resourceAPI,
   enrollmentAPI,
+  progressAPI,
   Syllabus,
   AssessmentQuestion,
   Resource,
@@ -250,6 +251,7 @@ export const evaluateTopicQuiz = createAsyncThunk(
     data: {
       enrollmentId: number;
       moduleId: number;
+      lessonId?: number;
       questionIds: number[];
       answers: string[];
       moduleIndex: number;
@@ -261,6 +263,7 @@ export const evaluateTopicQuiz = createAsyncThunk(
       const response = await assessmentAPI.evaluateTopicQuiz({
         enrollment_id: data.enrollmentId,
         module_id: data.moduleId,
+        lesson_id: data.lessonId,
         question_ids: data.questionIds,
         answers: data.answers,
       });
@@ -412,6 +415,66 @@ export const createNote = createAsyncThunk(
     } catch (error: any) {
       return rejectWithValue(
         error.response?.data?.error || 'Failed to create note'
+      );
+    }
+  }
+);
+
+export const fetchLessonProgress = createAsyncThunk(
+  'syllabus/fetchLessonProgress',
+  async (enrollmentId: number, { rejectWithValue }) => {
+    try {
+      const progress = await progressAPI.getLessonProgressByEnrollment(enrollmentId);
+      return { enrollmentId, progress };
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.error || 'Failed to fetch lesson progress'
+      );
+    }
+  }
+);
+
+export const saveLessonCompletion = createAsyncThunk(
+  'syllabus/saveLessonCompletion',
+  async (
+    data: {
+      enrollmentId: number;
+      lessonId: number;
+      isCompleted: boolean;
+      moduleIndex: number;
+      topicIndex: number;
+    },
+    { rejectWithValue }
+  ) => {
+    try {
+      await progressAPI.markLessonComplete({
+        enrollment_id: data.enrollmentId,
+        lesson_id: data.lessonId,
+        is_completed: data.isCompleted,
+      });
+      return {
+        enrollmentId: data.enrollmentId,
+        moduleIndex: data.moduleIndex,
+        topicIndex: data.topicIndex,
+        isCompleted: data.isCompleted,
+      };
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.error || 'Failed to save lesson completion'
+      );
+    }
+  }
+);
+
+export const fetchQuizAttempts = createAsyncThunk(
+  'syllabus/fetchQuizAttempts',
+  async (enrollmentId: number, { rejectWithValue }) => {
+    try {
+      const attempts = await assessmentAPI.getQuizAttempts(enrollmentId);
+      return { enrollmentId, attempts };
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.error || 'Failed to fetch quiz attempts'
       );
     }
   }
@@ -627,6 +690,66 @@ const syllabusSlice = createSlice({
         const { resource, lessonId } = action.payload;
         const existing = state.resources[lessonId] || [];
         state.resources[lessonId] = [...existing, resource];
+      });
+
+    // fetchLessonProgress — load completion status from backend
+    builder
+      .addCase(fetchLessonProgress.fulfilled, (state, action) => {
+        const { enrollmentId, progress } = action.payload;
+        // progress is an array of { enrollment, lesson, is_completed, lesson_title, module_id }
+        progress.forEach((item: any) => {
+          // We need to find the module and topic indices from the lesson
+          // For now, we'll store by lesson ID and reconstruct the key when needed
+          if (!state.syllabus) return;
+          
+          // Find the module and topic indices for this lesson
+          let found = false;
+          state.syllabus.modules.forEach((module, mIdx) => {
+            module.topics.forEach((topic, tIdx) => {
+              // Assuming topic has a lesson_id or we match by title
+              // This is simplified - you may need to adjust based on your data structure
+              if (topic.topic_name === item.lesson_title) {
+                const key = topicId(enrollmentId, mIdx, tIdx);
+                state.topicCompletion[key] = item.is_completed;
+                found = true;
+              }
+            });
+          });
+        });
+      });
+
+    // saveLessonCompletion — update local state after saving to backend
+    builder
+      .addCase(saveLessonCompletion.fulfilled, (state, action) => {
+        const { enrollmentId, moduleIndex, topicIndex, isCompleted } = action.payload;
+        const key = topicId(enrollmentId, moduleIndex, topicIndex);
+        state.topicCompletion[key] = isCompleted;
+      });
+
+    // fetchQuizAttempts — populate quiz results from database
+    builder
+      .addCase(fetchQuizAttempts.fulfilled, (state, action) => {
+        const { enrollmentId, attempts } = action.payload;
+        
+        // attempts is an array of { id, enrollment, module, lesson, score_percent, ... }
+        // We need to map lesson.id to moduleIndex/topicIndex using generatedContent
+        attempts.forEach((attempt: any) => {
+          if (!attempt.lesson?.id || !state.syllabus) return;
+          
+          // Find the topic by matching lesson ID in generatedContent
+          Object.entries(state.generatedContent).forEach(([topicKey, content]) => {
+            if (content.lessonId === attempt.lesson.id) {
+              // This is the correct topic for this quiz attempt
+              state.quizResults[topicKey] = {
+                score: `${attempt.correct_answers}/${attempt.total_questions}`,
+                scorePercent: parseFloat(attempt.score_percent),
+                correctCount: attempt.correct_answers,
+                totalQuestions: attempt.total_questions,
+                weakAreas: attempt.weak_areas || [],
+              };
+            }
+          });
+        });
       });
 
     // generateCourseMindMap

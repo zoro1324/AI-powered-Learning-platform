@@ -348,6 +348,23 @@ export const progressAPI = {
     const response = await api.patch<ModuleProgress>(`/module-progress/${id}/`, data);
     return response.data;
   },
+
+  // Lesson Progress methods
+  getLessonProgressByEnrollment: async (enrollmentId: number): Promise<any[]> => {
+    const response = await api.get(`/lesson-progress/by_enrollment/`, {
+      params: { enrollment_id: enrollmentId },
+    });
+    return response.data;
+  },
+
+  markLessonComplete: async (data: {
+    enrollment_id: number;
+    lesson_id: number;
+    is_completed: boolean;
+  }): Promise<any> => {
+    const response = await api.post('/lesson-progress/mark_complete/', data);
+    return response.data;
+  },
 };
 
 // ============================================================================
@@ -641,6 +658,7 @@ export const assessmentAPI = {
   evaluateTopicQuiz: async (data: {
     enrollment_id: number;
     module_id: number;
+    lesson_id?: number;
     question_ids: number[];
     answers: string[];
   }): Promise<TopicEvaluationResponse> => {
@@ -648,6 +666,13 @@ export const assessmentAPI = {
       '/assessment/topic/evaluate/',
       data
     );
+    return response.data;
+  },
+
+  getQuizAttempts: async (enrollmentId: number): Promise<any[]> => {
+    const response = await api.get('/quiz-attempts/by_enrollment/', {
+      params: { enrollment_id: enrollmentId },
+    });
     return response.data;
   },
 
@@ -738,10 +763,17 @@ export const podcastAPI = {
 export interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  id?: number;
+  topic_name?: string;
+  created_at?: string;
 }
 
 export interface ChatResponse {
   response: string;
+}
+
+export interface ChatHistoryResponse {
+  messages: ChatMessage[];
 }
 
 export const chatAPI = {
@@ -750,9 +782,23 @@ export const chatAPI = {
     context: string;
     topic_name: string;
     course_name: string;
-    chat_history?: ChatMessage[];
+    enrollment_id: number;
   }): Promise<ChatResponse> => {
     const response = await api.post<ChatResponse>('/chat/', data);
+    return response.data;
+  },
+  
+  getChatHistory: async (enrollmentId: number): Promise<ChatHistoryResponse> => {
+    const response = await api.get<ChatHistoryResponse>('/chat/history/', {
+      params: { enrollment_id: enrollmentId }
+    });
+    return response.data;
+  },
+  
+  clearChatHistory: async (enrollmentId: number): Promise<{ message: string; deleted_count: number }> => {
+    const response = await api.delete('/chat/clear/', {
+      params: { enrollment_id: enrollmentId }
+    });
     return response.data;
   },
 };
