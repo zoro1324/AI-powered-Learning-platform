@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Outlet, useParams, useNavigate } from 'react-router';
 import { useAppDispatch, useAppSelector } from '../../store';
-import { fetchSyllabus } from '../../store/slices/syllabusSlice';
+import { fetchSyllabus, fetchLessonProgress, fetchQuizAttempts } from '../../store/slices/syllabusSlice';
 import { CourseOutlineSidebar } from './CourseOutlineSidebar';
 import { StudioPanel } from './StudioPanel';
 import { Loader2 } from 'lucide-react';
@@ -22,7 +22,11 @@ export function CourseLayout() {
   // Fetch syllabus if not already loaded for this enrollment
   useEffect(() => {
     if (eId && (!syllabus || storedEId !== eId)) {
-      dispatch(fetchSyllabus(eId));
+      dispatch(fetchSyllabus(eId)).then(() => {
+        // After syllabus is loaded, fetch lesson progress and quiz attempts
+        dispatch(fetchLessonProgress(eId));
+        dispatch(fetchQuizAttempts(eId));
+      });
     }
   }, [eId, syllabus, storedEId, dispatch]);
 

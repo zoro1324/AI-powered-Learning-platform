@@ -113,6 +113,16 @@ export function CourseOutlineSidebar({
 
   return (
     <aside className="w-72 bg-white border-r border-gray-200 flex flex-col h-full shrink-0">
+      {/* Logo - Clickable to Dashboard */}
+      <Link to="/dashboard" className="px-4 pt-4 pb-2 border-b border-gray-200 hover:bg-gray-50 transition-colors">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+            <BookOpen className="w-5 h-5 text-white" />
+          </div>
+          <span className="font-semibold text-lg text-gray-900">LearnPath</span>
+        </div>
+      </Link>
+      
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between mb-3">
