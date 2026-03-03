@@ -21,6 +21,7 @@ import { useAppDispatch, useAppSelector } from '../../store';
 import {
   generateTopicContent,
   toggleTopicCompletion,
+  saveLessonCompletion,
   fetchResources,
   selectResources,
   selectActiveResourceView,
@@ -59,7 +60,6 @@ export default function TopicPage() {
     generatedContent,
     contentLoading,
     topicCompletion,
-    quizResults,
   } = useAppSelector((state) => state.syllabus);
 
   const content = generatedContent[topicKey];
@@ -127,15 +127,14 @@ export default function TopicPage() {
       if (!syllabus) return false;
       const prevMod = syllabus.modules[moduleIdx - 1];
       if (!prevMod) return false;
+      // Module unlocks when all topics in previous module are completed
       for (let t = 0; t < prevMod.topics.length; t++) {
         const key = `${eId}-${moduleIdx - 1}-${t}`;
         if (!topicCompletion[key]) return false;
-        const result = quizResults[key];
-        if (!result || result.scorePercent < 80) return false;
       }
       return true;
     },
-    [syllabus, topicCompletion, quizResults, eId]
+    [syllabus, topicCompletion, eId]
   );
 
   // Quiz overlay state
@@ -281,6 +280,17 @@ export default function TopicPage() {
     if (isComplete) {
       // If already complete, allow toggling off
       dispatch(toggleTopicCompletion({ moduleIndex: mIdx, topicIndex: tIdx }));
+      
+      // Also save to backend if we have the lesson ID
+      if (content?.lessonId) {
+        dispatch(saveLessonCompletion({
+          enrollmentId: eId!,
+          lessonId: content.lessonId,
+          isCompleted: false,
+          moduleIndex: mIdx,
+          topicIndex: tIdx,
+        }));
+      }
     } else {
       // If not complete, open quiz overlay for knowledge check
       setQuizOverlayOpen(true);
@@ -289,7 +299,14 @@ export default function TopicPage() {
 
   const handleQuizComplete = () => {
     // Called after quiz is passed (or user chooses to continue)
-    // Navigation to next topic is handled by the next button
+    // Automatically navigate to the next topic
+    const nextTopic = getNextTopic();
+    if (nextTopic) {
+      navigateToTopic(nextTopic);
+    } else {
+      // If no next topic, close the overlay and stay on current page
+      setQuizOverlayOpen(false);
+    }
   };
 
   // ─── Scroll to top & reset view on topic change ─────────────────────────────
@@ -766,7 +783,7 @@ export default function TopicPage() {
                   Next Module Locked
                 </Button>
                 <p className="text-xs text-gray-400">
-                  Score 80%+ on all topics to unlock
+                  Complete all topics to unlock
                 </p>
               </div>
             ) : (

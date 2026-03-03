@@ -16,7 +16,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 from .models import (
-    VideoTask, LearningProfile, Course, Module, Lesson, Resource,
+    VideoTask, LearningProfile, Course, Module, Lesson, LessonProgress, Resource,
     Enrollment, Question, QuizAttempt, QuizAnswer, ModuleProgress,
     LearningRoadmap, Achievement, UserAchievement, ActivityLog,
     PersonalizedSyllabus, CoursePlanningTask
@@ -26,7 +26,7 @@ from .serializers import (
     CoursePlanningTaskSerializer,
     UserRegisterSerializer, UserSerializer, LearningProfileSerializer,
     CustomTokenObtainPairSerializer, CourseSerializer, ModuleSerializer,
-    LessonSerializer, ResourceSerializer, EnrollmentSerializer,
+    LessonSerializer, LessonProgressSerializer, ResourceSerializer, EnrollmentSerializer,
     QuestionSerializer, QuizAttemptSerializer, QuizAnswerSerializer,
     QuizSubmissionSerializer, ModuleProgressSerializer,
     LearningRoadmapSerializer, AchievementSerializer,
@@ -444,8 +444,33 @@ class QuizAttemptViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     
     def get_queryset(self):
-        """Filter quiz attempts by current user"""
-        return QuizAttempt.objects.filter(user=self.request.user)
+        """Filter quiz attempts by current user's enrollments"""
+        return QuizAttempt.objects.filter(enrollment__user=self.request.user)
+    
+    @action(detail=False, methods=['get'])
+    def by_enrollment(self, request):
+        """Get all quiz attempts for a specific enrollment"""
+        enrollment_id = request.query_params.get('enrollment_id')
+        
+        if not enrollment_id:
+            return Response(
+                {'detail': 'enrollment_id query parameter is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            enrollment = Enrollment.objects.get(id=enrollment_id, user=request.user)
+        except Enrollment.DoesNotExist:
+            return Response({'detail': 'Enrollment not found.'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Get all topic quiz attempts for this enrollment
+        attempts = self.get_queryset().filter(
+            enrollment=enrollment,
+            attempt_type='topic_quiz'
+        ).select_related('lesson', 'module').order_by('-completed_at')
+        
+        serializer = self.get_serializer(attempts, many=True)
+        return Response(serializer.data)
     
     @action(detail=False, methods=['post'])
     def submit(self, request):
@@ -537,6 +562,80 @@ class ModuleProgressViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         """Filter progress by current user's enrollments"""
         return ModuleProgress.objects.filter(enrollment__user=self.request.user).order_by('id')
+
+
+class LessonProgressViewSet(viewsets.ModelViewSet):
+    """ViewSet for lesson/topic progress and completion tracking"""
+    queryset = LessonProgress.objects.all()
+    serializer_class = LessonProgressSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['enrollment', 'lesson', 'is_completed']
+    
+    def get_queryset(self):
+        """Filter progress by current user's enrollments"""
+        return LessonProgress.objects.filter(enrollment__user=self.request.user).select_related('lesson', 'lesson__module')
+    
+    @action(detail=False, methods=['post'])
+    def mark_complete(self, request):
+        """Mark a lesson/topic as complete"""
+        from django.utils import timezone
+        
+        enrollment_id = request.data.get('enrollment_id')
+        lesson_id = request.data.get('lesson_id')
+        is_completed = request.data.get('is_completed', True)
+        
+        if not enrollment_id or not lesson_id:
+            return Response(
+                {'detail': 'enrollment_id and lesson_id are required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            enrollment = Enrollment.objects.get(id=enrollment_id, user=request.user)
+            lesson = Lesson.objects.get(id=lesson_id)
+        except Enrollment.DoesNotExist:
+            return Response({'detail': 'Enrollment not found.'}, status=status.HTTP_404_NOT_FOUND)
+        except Lesson.DoesNotExist:
+            return Response({'detail': 'Lesson not found.'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Get or create lesson progress
+        progress, created = LessonProgress.objects.get_or_create(
+            enrollment=enrollment,
+            lesson=lesson
+        )
+        
+        # Update completion status
+        progress.is_completed = is_completed
+        if is_completed and not progress.completed_at:
+            progress.completed_at = timezone.now()
+        elif not is_completed:
+            progress.completed_at = None
+        progress.save()
+        
+        serializer = self.get_serializer(progress)
+        return Response(serializer.data)
+    
+    @action(detail=False, methods=['get'])
+    def by_enrollment(self, request):
+        """Get all lesson progress for a specific enrollment"""
+        enrollment_id = request.query_params.get('enrollment_id')
+        
+        if not enrollment_id:
+            return Response(
+                {'detail': 'enrollment_id query parameter is required'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            enrollment = Enrollment.objects.get(id=enrollment_id, user=request.user)
+        except Enrollment.DoesNotExist:
+            return Response({'detail': 'Enrollment not found.'}, status=status.HTTP_404_NOT_FOUND)
+        
+        # Get all lesson progress for this enrollment
+        progress_items = self.get_queryset().filter(enrollment=enrollment)
+        serializer = self.get_serializer(progress_items, many=True)
+        return Response(serializer.data)
 
 
 class LearningRoadmapViewSet(viewsets.ModelViewSet):
@@ -2056,6 +2155,7 @@ class EvaluateTopicQuizView(APIView):
         {
             "enrollment_id": 1,
             "module_id": 5,
+            "lesson_id": 42,  // Added to track specific topic
             "question_ids": [42, 43, 44, 45, 46],
             "answers": ["Option A", "Option B", ...]
         }
@@ -2074,6 +2174,7 @@ class EvaluateTopicQuizView(APIView):
         
         enrollment_id = request.data.get('enrollment_id')
         module_id = request.data.get('module_id')
+        lesson_id = request.data.get('lesson_id')  # Added to track specific topic
         question_ids = request.data.get('question_ids')
         answers = request.data.get('answers')
         
@@ -2178,14 +2279,23 @@ class EvaluateTopicQuizView(APIView):
 
             print("\n**************************************************")
             print("*** EvaluateTopicQuizView: Server-side evaluation ***")
-            print(f"*** Enrollment ID: {enrollment_id}, Module ID: {module_id} ***")
+            print(f"*** Enrollment ID: {enrollment_id}, Module ID: {module_id}, Lesson ID: {lesson_id} ***")
             print(f"*** Score: {correct_count}/{total_questions} ({score_percent}%) ***")
             print("**************************************************\n")
+            
+            # Get the lesson object if lesson_id was provided
+            lesson = None
+            if lesson_id:
+                try:
+                    lesson = Lesson.objects.get(id=lesson_id)
+                except Lesson.DoesNotExist:
+                    pass  # Continue without lesson if not found
             
             # ── Create QuizAttempt + QuizAnswer records ──────────────
             quiz_attempt = QuizAttempt.objects.create(
                 enrollment=enrollment,
                 module=module,
+                lesson=lesson,  # Store the lesson to track which topic
                 attempt_type='topic_quiz',
                 score_percent=score_percent,
                 total_questions=total_questions,
@@ -2629,10 +2739,7 @@ class ChatWithContextView(APIView):
             "context": "The generated lesson content...",
             "topic_name": "Introduction to HTML",
             "course_name": "Web Development",
-            "chat_history": [
-                {"role": "user", "content": "previous question"},
-                {"role": "assistant", "content": "previous answer"}
-            ]
+            "enrollment_id": 123
         }
         
         Returns:
@@ -2641,12 +2748,13 @@ class ChatWithContextView(APIView):
         }
         """
         from .services.assessment_service import get_assessment_service
+        from .models import ChatHistory, Enrollment
         
         message = request.data.get('message', '').strip()
         context = request.data.get('context', '').strip()
         topic_name = request.data.get('topic_name', '')
         course_name = request.data.get('course_name', '')
-        chat_history = request.data.get('chat_history', [])
+        enrollment_id = request.data.get('enrollment_id')
         
         if not message:
             return Response(
@@ -2660,7 +2768,24 @@ class ChatWithContextView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
         
+        if not enrollment_id:
+            return Response(
+                {'error': 'enrollment_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
         try:
+            # Verify enrollment belongs to user
+            enrollment = Enrollment.objects.get(id=enrollment_id, user=request.user)
+            
+            # Load chat history from database for this enrollment
+            chat_history_queryset = ChatHistory.objects.filter(enrollment=enrollment).order_by('created_at')
+            chat_history = [
+                {"role": msg.role, "content": msg.content}
+                for msg in chat_history_queryset
+            ]
+            
+            # Get AI response
             assessment_service = get_assessment_service()
             response_text = assessment_service.chat_with_context(
                 message=message,
@@ -2670,10 +2795,31 @@ class ChatWithContextView(APIView):
                 chat_history=chat_history
             )
             
+            # Save user message to database
+            ChatHistory.objects.create(
+                enrollment=enrollment,
+                role='user',
+                content=message,
+                topic_name=topic_name
+            )
+            
+            # Save assistant response to database
+            ChatHistory.objects.create(
+                enrollment=enrollment,
+                role='assistant',
+                content=response_text,
+                topic_name=topic_name
+            )
+            
             return Response({
                 'response': response_text
             }, status=status.HTTP_200_OK)
             
+        except Enrollment.DoesNotExist:
+            return Response(
+                {'error': 'Enrollment not found or access denied'},
+                status=status.HTTP_404_NOT_FOUND
+            )
         except Exception as e:
             logger.error(f"Error in chat: {e}", exc_info=True)
             return Response(
@@ -2681,3 +2827,105 @@ class ChatWithContextView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
+
+class GetChatHistoryView(APIView):
+    """Get chat history for a specific enrollment"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        """
+        Get all chat messages for an enrollment.
+        Query params: ?enrollment_id=123
+        
+        Returns:
+        {
+            "messages": [
+                {"id": 1, "role": "user", "content": "...", "topic_name": "...", "created_at": "..."},
+                {"id": 2, "role": "assistant", "content": "...", "topic_name": "...", "created_at": "..."}
+            ]
+        }
+        """
+        from .models import ChatHistory, Enrollment
+        from .serializers import ChatHistorySerializer
+        
+        enrollment_id = request.query_params.get('enrollment_id')
+        
+        if not enrollment_id:
+            return Response(
+                {'error': 'enrollment_id query parameter is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Verify enrollment belongs to user
+            enrollment = Enrollment.objects.get(id=enrollment_id, user=request.user)
+            
+            # Get all messages for this enrollment
+            messages = ChatHistory.objects.filter(enrollment=enrollment).order_by('created_at')
+            serializer = ChatHistorySerializer(messages, many=True)
+            
+            return Response({
+                'messages': serializer.data
+            }, status=status.HTTP_200_OK)
+            
+        except Enrollment.DoesNotExist:
+            return Response(
+                {'error': 'Enrollment not found or access denied'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error fetching chat history: {e}", exc_info=True)
+            return Response(
+                {'error': f'Failed to fetch chat history: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class ClearChatHistoryView(APIView):
+    """Clear all chat history for a specific enrollment"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def delete(self, request):
+        """
+        Delete all chat messages for an enrollment.
+        Query params: ?enrollment_id=123
+        
+        Returns:
+        {
+            "message": "Chat history cleared successfully",
+            "deleted_count": 10
+        }
+        """
+        from .models import ChatHistory, Enrollment
+        
+        enrollment_id = request.query_params.get('enrollment_id')
+        
+        if not enrollment_id:
+            return Response(
+                {'error': 'enrollment_id query parameter is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            # Verify enrollment belongs to user
+            enrollment = Enrollment.objects.get(id=enrollment_id, user=request.user)
+            
+            # Delete all messages for this enrollment
+            deleted_count, _ = ChatHistory.objects.filter(enrollment=enrollment).delete()
+            
+            return Response({
+                'message': 'Chat history cleared successfully',
+                'deleted_count': deleted_count
+            }, status=status.HTTP_200_OK)
+            
+        except Enrollment.DoesNotExist:
+            return Response(
+                {'error': 'Enrollment not found or access denied'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            logger.error(f"Error clearing chat history: {e}", exc_info=True)
+            return Response(
+                {'error': f'Failed to clear chat history: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

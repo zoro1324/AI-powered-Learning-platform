@@ -48,11 +48,10 @@ export default function CoursePage() {
     if (mIdx === 0) return true;
     const prevModule = syllabus!.modules[mIdx - 1];
     if (!prevModule) return false;
+    // Module unlocks when all topics in previous module are completed
     for (let t = 0; t < prevModule.topics.length; t++) {
       const key = `${eId}-${mIdx - 1}-${t}`;
       if (!topicCompletion[key]) return false;
-      const result = quizResults[key];
-      if (!result || result.scorePercent < 80) return false;
     }
     return true;
   };
@@ -183,7 +182,7 @@ export default function CoursePage() {
                       </h3>
                       <p className="text-sm text-gray-500 mt-0.5">
                         {!unlocked
-                          ? 'Complete the previous module with 80%+ quiz scores to unlock'
+                          ? 'Complete all topics in the previous module to unlock'
                           : mod.description}
                       </p>
                     </div>

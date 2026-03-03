@@ -68,8 +68,8 @@ export function CourseOutlineSidebar({
 
   /**
    * Module 0 is always unlocked.
-   * Module N requires all topics in module N-1 to be completed
-   * AND every topic quiz in module N-1 scored >= 80%.
+   * Module N requires all topics in module N-1 to be completed.
+   * Users can complete topics even with scores below 80% by clicking "Continue Anyway"
    */
   const isModuleUnlocked = useCallback(
     (mIdx: number) => {
@@ -77,15 +77,14 @@ export function CourseOutlineSidebar({
       if (!syllabus) return false;
       const prevModule = syllabus.modules[mIdx - 1];
       if (!prevModule) return false;
+      // Module unlocks when all topics in previous module are completed
       for (let t = 0; t < prevModule.topics.length; t++) {
         const key = `${eId}-${mIdx - 1}-${t}`;
         if (!topicCompletion[key]) return false;
-        const result = quizResults[key];
-        if (!result || result.scorePercent < 80) return false;
       }
       return true;
     },
-    [syllabus, topicCompletion, quizResults, eId]
+    [syllabus, topicCompletion, eId]
   );
 
   if (collapsed) {
@@ -113,6 +112,16 @@ export function CourseOutlineSidebar({
 
   return (
     <aside className="w-72 bg-white border-r border-gray-200 flex flex-col h-full shrink-0">
+      {/* Logo - Clickable to Dashboard */}
+      <Link to="/dashboard" className="px-4 pt-4 pb-2 border-b border-gray-200 hover:bg-gray-50 transition-colors">
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+            <BookOpen className="w-5 h-5 text-white" />
+          </div>
+          <span className="font-semibold text-lg text-gray-900">LearnPath</span>
+        </div>
+      </Link>
+      
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center justify-between mb-3">
@@ -186,7 +195,7 @@ export function CourseOutlineSidebar({
                         </span>
                       ) : (
                         <span className="text-[10px] text-gray-400">
-                          Locked — complete previous module with 80%+
+                          Locked — complete all topics in previous module
                         </span>
                       )}
                     </div>

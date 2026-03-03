@@ -9,13 +9,13 @@ from .views import (
     UserProfileView, LearningProfileView,
     CourseViewSet, ModuleViewSet, LessonViewSet, ResourceViewSet,
     EnrollmentViewSet, QuestionViewSet, QuizAttemptViewSet, QuizAnswerViewSet,
-    ModuleProgressViewSet, LearningRoadmapViewSet, AchievementViewSet,
+    ModuleProgressViewSet, LessonProgressViewSet, LearningRoadmapViewSet, AchievementViewSet,
     UserAchievementViewSet, ActivityLogViewSet, DashboardView,
     InitialAssessmentView, EvaluateAssessmentView, GetSyllabusView,
     GenerateTopicContentView, GenerateTopicQuizView, EvaluateTopicQuizView,
     GenerateTopicMindMapView, GenerateRemediationContentView,
     GeneratePersonaOptionsView, GenerateScenarioOptionsView, GeneratePodcastView,
-    ChatWithContextView
+    ChatWithContextView, GetChatHistoryView, ClearChatHistoryView
 )
 
 # Create router for ViewSets
@@ -29,6 +29,7 @@ router.register(r'questions', QuestionViewSet, basename='question')
 router.register(r'quiz-attempts', QuizAttemptViewSet, basename='quiz-attempt')
 router.register(r'quiz-answers', QuizAnswerViewSet, basename='quiz-answer')
 router.register(r'module-progress', ModuleProgressViewSet, basename='module-progress')
+router.register(r'lesson-progress', LessonProgressViewSet, basename='lesson-progress')
 router.register(r'learning-roadmaps', LearningRoadmapViewSet, basename='learning-roadmap')
 router.register(r'achievements', AchievementViewSet, basename='achievement')
 router.register(r'user-achievements', UserAchievementViewSet, basename='user-achievement')
@@ -73,8 +74,9 @@ urlpatterns = [
     
     # RAG Chatbot
     path('chat/', ChatWithContextView.as_view(), name='chat'),
+    path('chat/history/', GetChatHistoryView.as_view(), name='chat-history'),
+    path('chat/clear/', ClearChatHistoryView.as_view(), name='chat-clear'),
     
     # Router URLs (all ViewSets)
     path('', include(router.urls)),
 ]
-

@@ -14,6 +14,7 @@ import {
   evaluateTopicQuiz,
   generateRemediationContent,
   markTopicComplete,
+  saveLessonCompletion,
 } from '../../store/slices/syllabusSlice';
 import {
   Dialog,
@@ -120,13 +121,14 @@ export function TopicQuizOverlay({
       evaluateTopicQuiz({
         enrollmentId,
         moduleId,
+        lessonId: content?.lessonId,  // Include lessonId to track which topic
         questionIds,
         answers,
         moduleIndex,
         topicIndex,
       })
     );
-  }, [dispatch, enrollmentId, currentModule, quiz, quizAnswers, moduleIndex, topicIndex]);
+  }, [dispatch, enrollmentId, currentModule, content, quiz, quizAnswers, moduleIndex, topicIndex]);
 
   const handleGenerateRemediation = useCallback(() => {
     if (!content || !quizResult || !currentTopic || remediationTriggered) return;
@@ -144,10 +146,23 @@ export function TopicQuizOverlay({
   }, [dispatch, enrollmentId, content, quizResult, currentTopic, moduleIndex, topicIndex, remediationTriggered]);
 
   const handleMarkComplete = useCallback(() => {
+    // Mark as complete in local state
     dispatch(markTopicComplete({ moduleIndex, topicIndex }));
+    
+    // Save to backend if we have the lesson ID
+    if (content?.lessonId) {
+      dispatch(saveLessonCompletion({
+        enrollmentId,
+        lessonId: content.lessonId,
+        isCompleted: true,
+        moduleIndex,
+        topicIndex,
+      }));
+    }
+    
     onOpenChange(false);
     onComplete();
-  }, [dispatch, moduleIndex, topicIndex, onOpenChange, onComplete]);
+  }, [dispatch, moduleIndex, topicIndex, enrollmentId, content, onOpenChange, onComplete]);
 
   const passed = quizResult && quizResult.scorePercent >= 80;
   const failed = quizResult && quizResult.scorePercent < 80;
@@ -247,7 +262,7 @@ export function TopicQuizOverlay({
               <p className={cn('text-sm font-medium mt-2', passed ? 'text-green-600' : 'text-amber-600')}>
                 {passed
                   ? 'Great job! You scored 80%+ and can proceed to the next topic.'
-                  : 'You need 80% to unlock the next module. Review the concepts and try again.'}
+                  : 'You can review the content or continue to the next topic anyway.'}
               </p>
             </div>
 

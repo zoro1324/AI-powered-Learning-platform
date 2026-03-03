@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
-import { Send, Loader2, Bot, User, Sparkles, BookOpen } from 'lucide-react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { Send, Loader2, Bot, User, Sparkles, BookOpen, Trash2, MessageSquare, History, ChevronRight } from 'lucide-react';
 import { chatAPI, ChatMessage } from '../../services/api';
 import { Button } from './ui/button';
 import { ScrollArea } from './ui/scroll-area';
@@ -12,6 +12,7 @@ interface ChatPanelProps {
   topicName: string;
   courseName: string;
   hasContent: boolean;
+  enrollmentId?: number;
 }
 
 export function ChatPanel({
@@ -19,23 +20,69 @@ export function ChatPanel({
   topicName,
   courseName,
   hasContent,
+  enrollmentId,
 }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [allMessages, setAllMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+  const [isClearing, setIsClearing] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Load chat history on mount
+  useEffect(() => {
+    if (enrollmentId) {
+      setIsLoadingHistory(true);
+      chatAPI
+        .getChatHistory(enrollmentId)
+        .then((response) => {
+          setAllMessages(response.messages);
+          // If no topic selected, show all messages
+          if (!selectedTopic) {
+            setMessages(response.messages);
+          }
+        })
+        .catch((error) => {
+          console.error('Failed to load chat history:', error);
+        })
+        .finally(() => {
+          setIsLoadingHistory(false);
+        });
+    } else {
+      setIsLoadingHistory(false);
+    }
+  }, [enrollmentId]);
+
+  // Group messages by topic
+  const topicGroups = useMemo(() => {
+    const groups: { [key: string]: ChatMessage[] } = {};
+    allMessages.forEach((msg) => {
+      const topic = msg.topic_name || 'General';
+      if (!groups[topic]) {
+        groups[topic] = [];
+      }
+      groups[topic].push(msg);
+    });
+    return groups;
+  }, [allMessages]);
+
+  // Filter messages by selected topic
+  useEffect(() => {
+    if (selectedTopic) {
+      setMessages(allMessages.filter(msg => msg.topic_name === selectedTopic));
+    } else {
+      setMessages(allMessages);
+    }
+  }, [selectedTopic, allMessages]);
 
   // Auto-scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  // Reset chat when topic changes
-  useEffect(() => {
-    setMessages([]);
-    setInput('');
-  }, [topicName]);
 
   // Auto-resize textarea
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -47,7 +94,7 @@ export function ChatPanel({
 
   const handleSend = useCallback(async () => {
     const trimmed = input.trim();
-    if (!trimmed || isLoading || !hasContent) return;
+    if (!trimmed || isLoading || !hasContent || !enrollmentId) return;
 
     const userMessage: ChatMessage = { role: 'user', content: trimmed };
     setMessages((prev) => [...prev, userMessage]);
@@ -65,7 +112,7 @@ export function ChatPanel({
         context,
         topic_name: topicName,
         course_name: courseName,
-        chat_history: messages,
+        enrollment_id: enrollmentId,
       });
 
       const assistantMessage: ChatMessage = {
@@ -73,6 +120,13 @@ export function ChatPanel({
         content: response.response,
       };
       setMessages((prev) => [...prev, assistantMessage]);
+      
+      // Reload all messages to update history
+      if (enrollmentId) {
+        chatAPI.getChatHistory(enrollmentId).then((res) => {
+          setAllMessages(res.messages);
+        });
+      }
     } catch (error: any) {
       const errorMessage: ChatMessage = {
         role: 'assistant',
@@ -84,7 +138,7 @@ export function ChatPanel({
     } finally {
       setIsLoading(false);
     }
-  }, [input, isLoading, hasContent, context, topicName, courseName, messages]);
+  }, [input, isLoading, hasContent, context, topicName, courseName, enrollmentId]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -92,6 +146,28 @@ export function ChatPanel({
       handleSend();
     }
   };
+
+  const handleClearChat = useCallback(async () => {
+    if (!enrollmentId || isClearing) return;
+    
+    if (!confirm('Are you sure you want to clear all chat history? This cannot be undone.')) {
+      return;
+    }
+    
+    setIsClearing(true);
+    try {
+      await chatAPI.clearChatHistory(enrollmentId);
+      setMessages([]);
+      setAllMessages([]);
+      setSelectedTopic(null);
+      setInput('');
+    } catch (error) {
+      console.error('Failed to clear chat history:', error);
+      alert('Failed to clear chat history. Please try again.');
+    } finally {
+      setIsClearing(false);
+    }
+  }, [enrollmentId, isClearing]);
 
 
   // ─── No content state ────────────────────────────────────────────────────
@@ -115,11 +191,129 @@ export function ChatPanel({
   // ─── Main chat UI ────────────────────────────────────────────────────────
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full">
+      {/* History Sidebar */}
+      {showHistory && Object.keys(topicGroups).length > 0 && (
+        <div className="w-64 border-r border-gray-200 flex flex-col bg-gray-50">
+          <div className="px-3 py-2 border-b border-gray-200 flex items-center justify-between bg-white">
+            <div className="flex items-center gap-2">
+              <History className="w-4 h-4 text-gray-600" />
+              <span className="text-xs font-medium text-gray-700">Conversation History</span>
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowHistory(false)}
+              className="h-6 w-6 p-0"
+            >
+              <ChevronRight className="w-3 h-3" />
+            </Button>
+          </div>
+          <ScrollArea className="flex-1">
+            <div className="p-2 space-y-1">
+              <button
+                onClick={() => setSelectedTopic(null)}
+                className={cn(
+                  "w-full text-left px-3 py-2 rounded-lg text-xs transition-colors",
+                  !selectedTopic
+                    ? "bg-blue-100 text-blue-700 font-medium"
+                    : "hover:bg-gray-100 text-gray-700"
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <span>All Messages</span>
+                  <span className="text-[10px] opacity-70">({allMessages.length})</span>
+                </div>
+              </button>
+              {Object.entries(topicGroups).map(([topic, msgs]) => (
+                <button
+                  key={topic}
+                  onClick={() => setSelectedTopic(topic)}
+                  className={cn(
+                    "w-full text-left px-3 py-2 rounded-lg text-xs transition-colors",
+                    selectedTopic === topic
+                      ? "bg-blue-100 text-blue-700 font-medium"
+                      : "hover:bg-gray-100 text-gray-700"
+                  )}
+                >
+                  <div className="flex items-center gap-2 mb-1">
+                    <MessageSquare className="w-3 h-3 shrink-0" />
+                    <span className="truncate flex-1">{topic}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-gray-500 truncate">
+                      {msgs[msgs.length - 1]?.content.slice(0, 30)}...
+                    </span>
+                    <span className="text-[10px] opacity-70">({msgs.length})</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
+      )}
+      
+      {/* Main Chat Area */}
+      <div className="flex flex-col flex-1">
+        {/* Chat header with history toggle and clear button */}
+        {!isLoadingHistory && (
+          <div className="px-3 py-2 border-b border-gray-200 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {Object.keys(topicGroups).length > 0 && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setShowHistory(!showHistory)}
+                  className="h-7 px-2 text-xs"
+                >
+                  <History className="w-3 h-3 mr-1" />
+                  {showHistory ? 'Hide' : 'Show'} History
+                </Button>
+              )}
+              {selectedTopic && (
+                <div className="flex items-center gap-1 text-xs text-gray-600">
+                  <ChevronRight className="w-3 h-3" />
+                  <span className="font-medium">{selectedTopic}</span>
+                </div>
+              )}
+              {!selectedTopic && messages.length > 0 && (
+                <>
+                  <Bot className="w-4 h-4 text-blue-600" />
+                  <span className="text-xs font-medium text-gray-700">Chat</span>
+                  <span className="text-xs text-gray-500">({messages.length} messages)</span>
+                </>
+              )}
+            </div>
+            {messages.length > 0 && (
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleClearChat}
+                disabled={isClearing}
+                className="h-7 px-2 text-xs hover:bg-red-50 hover:text-red-600 transition-colors"
+              >
+                {isClearing ? (
+                  <Loader2 className="w-3 h-3 animate-spin mr-1" />
+                ) : (
+                  <Trash2 className="w-3 h-3 mr-1" />
+                )}
+                Clear All
+              </Button>
+            )}
+          </div>
+        )}
+      
       {/* Messages area */}
       <ScrollArea className="flex-1 overflow-y-auto">
         <div className="p-3 space-y-3">
-          {messages.length === 0 && (
+          {isLoadingHistory && (
+            <div className="text-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto mb-2" />
+              <p className="text-xs text-gray-500">Loading chat history...</p>
+            </div>
+          )}
+          
+          {!isLoadingHistory && messages.length === 0 && (
             <div className="text-center py-8">
               <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center mx-auto mb-3">
                 <Bot className="w-6 h-6 text-white" />
@@ -140,6 +334,7 @@ export function ChatPanel({
                   <button
                     key={suggestion}
                     onClick={() => {
+                      if (!enrollmentId) return;
                       const msg = suggestion;
                       setInput('');
                       const userMsg: ChatMessage = { role: 'user', content: msg };
@@ -151,13 +346,19 @@ export function ChatPanel({
                           context,
                           topic_name: topicName,
                           course_name: courseName,
-                          chat_history: [],
+                          enrollment_id: enrollmentId,
                         })
                         .then((res) => {
                           setMessages((prev) => [
                             ...prev,
                             { role: 'assistant', content: res.response },
                           ]);
+                          // Reload all messages to update history
+                          if (enrollmentId) {
+                            chatAPI.getChatHistory(enrollmentId).then((response) => {
+                              setAllMessages(response.messages);
+                            });
+                          }
                         })
                         .catch(() => {
                           setMessages((prev) => [
@@ -280,6 +481,7 @@ export function ChatPanel({
         <p className="text-[10px] text-gray-600 mt-1.5 text-center">
           AI answers based on generated content
         </p>
+      </div>
       </div>
     </div>
   );

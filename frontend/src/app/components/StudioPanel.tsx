@@ -371,6 +371,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
           topicName={currentTopic?.topic_name || ''}
           courseName={syllabus?.course_name || ''}
           hasContent={!!content}
+          enrollmentId={eId ?? undefined}
         />
       ) : (
         /* Studio Tab */
