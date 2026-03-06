@@ -15,6 +15,7 @@ import PopularCoursesPage from './pages/PopularCoursesPage';
 import MyCoursesPage from './pages/MyCoursesPage';
 import CoursePage from './pages/CoursePage';
 import TopicPage from './pages/TopicPage';
+import CodingAssessmentPage from './pages/CodingAssessmentPage';
 import PodcastPage from './pages/PodcastPage';
 import CourseDetailsPage from './pages/CourseDetailsPage';
 import { CourseLayout } from './components/CourseLayout';
@@ -103,6 +104,10 @@ export const router = createBrowserRouter([
       {
         path: 'module/:moduleIndex/topic/:topicIndex',
         Component: TopicPage,
+      },
+      {
+        path: 'module/:moduleIndex/topic/:topicIndex/coding/:problemId',
+        Component: CodingAssessmentPage,
       },
     ],
   },

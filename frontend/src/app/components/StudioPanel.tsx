@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams } from 'react-router';
+import { useNavigate, useParams } from 'react-router';
 import {
   FileText,
   ListChecks,
@@ -14,7 +14,10 @@ import {
   Wrench,
   Plus,
   Network,
+  Code2,
 } from 'lucide-react';
+import { codingAPI } from '../../services/api';
+import type { CodingProblem, Resource } from '../../types/api';
 import { useAppDispatch, useAppSelector } from '../../store';
 import {
   generateTopicContent,
@@ -46,6 +49,7 @@ interface StudioPanelProps {
 
 export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const { enrollmentId, moduleIndex, topicIndex } = useParams();
   const eId = enrollmentId ? parseInt(enrollmentId) : null;
   const mIdx = moduleIndex ? parseInt(moduleIndex) : -1;
@@ -90,6 +94,10 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
   const [mindMapDialogOpen, setMindMapDialogOpen] = useState(false);
   const [activeMindMapData, setActiveMindMapData] = useState<any>(null); // Course or Topic
   const [activeMindMapTitle, setActiveMindMapTitle] = useState('Mind Map');
+  const [codingProblem, setCodingProblem] = useState<CodingProblem | null>(null);
+  const [codingLoading, setCodingLoading] = useState(false);
+  const [codingDialogOpen, setCodingDialogOpen] = useState(false);
+  const [codingError, setCodingError] = useState<string | null>(null);
 
   // Topic specific mind map state
   const topicMindMapData = useAppSelector(state => isTopicView ? selectTopicMindMapData(state, mIdx, tIdx) : null);
@@ -211,6 +219,64 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
       })
     );
   }, [dispatch, content, currentTopic, mIdx, tIdx]);
+
+  const handleGenerateCodingAssessment = useCallback(async () => {
+    if (!eId || !currentTopic) return;
+
+    setCodingLoading(true);
+    setCodingError(null);
+
+    try {
+      const problem = await codingAPI.generateProblem({
+        enrollment_id: eId,
+        module_id: mIdx + 1,
+        topic_name: currentTopic.topic_name,
+        regenerate: !!codingProblem,
+      });
+
+      setCodingProblem(problem);
+      navigate(`/course/${eId}/module/${mIdx}/topic/${tIdx}/coding/${problem.id}`);
+
+      if (problem.lesson) {
+        dispatch(fetchResources(problem.lesson));
+      } else if (content?.lessonId) {
+        dispatch(fetchResources(content.lessonId));
+      }
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.error ||
+        error?.message ||
+        'Failed to generate coding assessment';
+      setCodingError(message);
+    } finally {
+      setCodingLoading(false);
+    }
+  }, [eId, currentTopic, mIdx, codingProblem, content?.lessonId, dispatch]);
+
+  const handleOpenCodingResource = useCallback(async (resource: Resource) => {
+    const problemId = resource.content_json?.coding_problem_id;
+    if (!problemId) return;
+
+    setCodingLoading(true);
+    setCodingError(null);
+    try {
+      const problem = await codingAPI.getProblem(problemId);
+      setCodingProblem(problem);
+      if (eId !== null) {
+        navigate(`/course/${eId}/module/${mIdx}/topic/${tIdx}/coding/${problem.id}`);
+      } else {
+        setCodingDialogOpen(true);
+      }
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.error ||
+        error?.message ||
+        'Failed to open coding assessment';
+      setCodingError(message);
+    } finally {
+      setCodingLoading(false);
+    }
+  }, []);
 
   const openMindMapDialog = (data: any, title: string) => {
     setActiveMindMapData(data);
@@ -487,6 +553,27 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                   disabled={!content}
                 />
 
+                <ToolCard
+                  icon={Code2}
+                  label="Coding Assessment"
+                  bgColor="bg-cyan-800/80"
+                  hasData={
+                    !!codingProblem ||
+                    resources.some((r) => r.resource_type === 'code_exercise')
+                  }
+                  isLoading={codingLoading}
+                  onGenerate={handleGenerateCodingAssessment}
+                >
+                  {codingProblem && (
+                    <p className="text-[11px] text-white/80 line-clamp-2">
+                      {codingProblem.title}
+                    </p>
+                  )}
+                  {codingError && (
+                    <p className="text-[11px] text-red-200">{codingError}</p>
+                  )}
+                </ToolCard>
+
                 {/* Generated Content list */}
                 {(content || quiz || videoTask || generatedPodcast || resources.length > 0) && (
                   <div className="pt-4 border-t border-gray-100 space-y-2">
@@ -700,6 +787,29 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                           </div>
                         </div>
                       )}
+
+                    {/* Code exercises */}
+                    {resources
+                      .filter((r) => r.resource_type === 'code_exercise')
+                      .map((resource) => (
+                        <button
+                          key={resource.id}
+                          onClick={() => handleOpenCodingResource(resource)}
+                          className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
+                        >
+                          <Code2 className="w-4 h-4 text-cyan-600 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-700 truncate">
+                              {resource.title}
+                            </p>
+                            <p className="text-[10px] text-gray-500">
+                              {resource.created_at
+                                ? new Date(resource.created_at).toLocaleDateString()
+                                : 'Generated'}
+                            </p>
+                          </div>
+                        </button>
+                      ))}
                   </div>
                 )}
               </>
@@ -739,6 +849,68 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
           <div className="flex-1 overflow-auto relative">
             {activeMindMapData && <MindMapViewer data={activeMindMapData} />}
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Coding Assessment Dialog */}
+      <Dialog open={codingDialogOpen} onOpenChange={setCodingDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Code2 className="w-5 h-5 text-cyan-600" />
+              Coding Assessment
+            </DialogTitle>
+          </DialogHeader>
+
+          {codingProblem ? (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">{codingProblem.title}</h3>
+                <p className="text-sm text-gray-600 mt-1">Difficulty: {codingProblem.difficulty}</p>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium text-gray-800 mb-2">Problem</p>
+                <p className="text-sm text-gray-700 whitespace-pre-wrap">{codingProblem.problem_statement}</p>
+              </div>
+
+              <div>
+                <p className="text-sm font-medium text-gray-800 mb-2">Starter Code</p>
+                <pre className="bg-gray-900 text-gray-100 text-xs rounded-lg p-4 overflow-x-auto">
+                  <code>{codingProblem.starter_code}</code>
+                </pre>
+              </div>
+
+              {codingProblem.test_cases?.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium text-gray-800 mb-2">Sample Test Cases</p>
+                  <div className="space-y-2">
+                    {codingProblem.test_cases.map((test, idx) => (
+                      <div key={test.id} className="rounded-lg border border-gray-200 p-3">
+                        <p className="text-xs font-semibold text-gray-500 mb-1">Case {idx + 1}</p>
+                        <p className="text-xs text-gray-700"><span className="font-medium">Input:</span> {test.input_data || '(empty)'}</p>
+                        <p className="text-xs text-gray-700"><span className="font-medium">Expected:</span> {test.expected_output || '(empty)'}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {eId && codingProblem && (
+                <Button
+                  className="w-full bg-cyan-600 hover:bg-cyan-700"
+                  onClick={() => {
+                    setCodingDialogOpen(false);
+                    navigate(`/course/${eId}/module/${mIdx}/topic/${tIdx}/coding/${codingProblem.id}`);
+                  }}
+                >
+                  Open Compiler Page
+                </Button>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500">No coding assessment generated yet.</p>
+          )}
         </DialogContent>
       </Dialog>
     </aside>
