@@ -124,6 +124,8 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
   const [codingLoading, setCodingLoading] = useState(false);
   const [codingDialogOpen, setCodingDialogOpen] = useState(false);
   const [codingError, setCodingError] = useState<string | null>(null);
+  const [sampleCodeLoading, setSampleCodeLoading] = useState(false);
+  const [sampleCodeError, setSampleCodeError] = useState<string | null>(null);
   const [dynamicScriptDialogOpen, setDynamicScriptDialogOpen] = useState(false);
   const [runnerStateByBlock, setRunnerStateByBlock] = useState<Record<number, CodeRunnerState>>({});
 
@@ -300,11 +302,51 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
     );
 
     if (generateDynamicScript.fulfilled.match(action)) {
-      setDynamicScriptDialogOpen(true);
+      dispatch(
+        setActiveResourceView({
+          moduleIndex: mIdx,
+          topicIndex: tIdx,
+          view: { type: 'dynamic-script' },
+        })
+      );
       setRunnerStateByBlock({});
       dispatch(fetchResources(action.payload.lesson_id));
     }
   }, [dispatch, eId, currentTopic, mIdx, tIdx, dynamicScript]);
+
+  const handleGenerateSampleCode = useCallback(async () => {
+    if (!eId || !currentTopic) return;
+
+    setSampleCodeLoading(true);
+    setSampleCodeError(null);
+    try {
+      const resource = await codingAPI.generateSampleCode({
+        enrollment_id: eId,
+        module_id: mIdx + 1,
+        topic_name: currentTopic.topic_name,
+      });
+
+      if (resource.lesson) {
+        dispatch(fetchResources(resource.lesson));
+      } else if (content?.lessonId) {
+        dispatch(fetchResources(content.lessonId));
+      }
+
+      dispatch(
+        setActiveResourceView({
+          moduleIndex: mIdx,
+          topicIndex: tIdx,
+          view: { type: 'code', resourceId: resource.id },
+        })
+      );
+    } catch (error: any) {
+      setSampleCodeError(
+        error?.response?.data?.error || error?.message || 'Failed to generate sample code'
+      );
+    } finally {
+      setSampleCodeLoading(false);
+    }
+  }, [eId, currentTopic, mIdx, content?.lessonId, dispatch]);
 
   const getRunnerState = useCallback(
     (blockIndex: number): CodeRunnerState => {
@@ -744,7 +786,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
 
                 <ToolCard
                   icon={Code2}
-                  label="Coding Assessment"
+                  label="Try Yourself"
                   bgColor="bg-cyan-800/80"
                   hasData={
                     !!codingProblem ||
@@ -761,6 +803,18 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                   {codingError && (
                     <p className="text-[11px] text-red-200">{codingError}</p>
                   )}
+                </ToolCard>
+
+                <ToolCard
+                  icon={Code2}
+                  label="Sample Code"
+                  bgColor="bg-teal-800/80"
+                  hasData={resources.some((r) => r.resource_type === 'code_exercise' && r.content_json?.mode === 'sample_code')}
+                  isLoading={sampleCodeLoading}
+                  onGenerate={handleGenerateSampleCode}
+                  disabled={!content}
+                >
+                  {sampleCodeError && <p className="text-[11px] text-red-200">{sampleCodeError}</p>}
                 </ToolCard>
 
                 <ToolCard
@@ -908,7 +962,15 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
 
                     {dynamicScript && (
                       <button
-                        onClick={() => setDynamicScriptDialogOpen(true)}
+                        onClick={() =>
+                          dispatch(
+                            setActiveResourceView({
+                              moduleIndex: mIdx,
+                              topicIndex: tIdx,
+                              view: { type: 'dynamic-script' },
+                            })
+                          )
+                        }
                         className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
                       >
                         <Sparkle className="w-4 h-4 text-fuchsia-600 shrink-0" />
@@ -1023,7 +1085,19 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                       .map((resource) => (
                         <button
                           key={resource.id}
-                          onClick={() => handleOpenCodingResource(resource)}
+                          onClick={() => {
+                            if (resource.content_json?.mode === 'sample_code') {
+                              dispatch(
+                                setActiveResourceView({
+                                  moduleIndex: mIdx,
+                                  topicIndex: tIdx,
+                                  view: { type: 'code', resourceId: resource.id },
+                                })
+                              );
+                            } else {
+                              handleOpenCodingResource(resource);
+                            }
+                          }}
                           className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
                         >
                           <Code2 className="w-4 h-4 text-cyan-600 shrink-0" />
