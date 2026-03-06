@@ -18,6 +18,7 @@ from .views import (
     ChatWithContextView, GetChatHistoryView, ClearChatHistoryView,
     GenerateCodingProblemView, CodingProblemDetailView,
     CreateCodeSubmissionView, CodeExecutionTaskStatusView, CodeSubmissionResultView,
+    GenerateSampleCodeView, RunSampleCodeView,
 )
 
 # Create router for ViewSets
@@ -76,6 +77,8 @@ urlpatterns = [
     path('coding/submissions/', CreateCodeSubmissionView.as_view(), name='coding-submission-create'),
     path('coding/tasks/<uuid:task_id>/', CodeExecutionTaskStatusView.as_view(), name='coding-task-status'),
     path('coding/submissions/<uuid:submission_id>/result/', CodeSubmissionResultView.as_view(), name='coding-submission-result'),
+    path('coding/samples/generate/', GenerateSampleCodeView.as_view(), name='coding-sample-generate'),
+    path('coding/samples/run/', RunSampleCodeView.as_view(), name='coding-sample-run'),
     
     # Podcast Generation
     path('podcast/personas/', GeneratePersonaOptionsView.as_view(), name='podcast-personas'),

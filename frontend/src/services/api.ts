@@ -595,6 +595,14 @@ export interface DynamicScriptResponse {
   blocks: DynamicScriptBlock[];
 }
 
+export interface SampleCodeRunResponse {
+  status: 'ok' | 'runtime_error' | 'timeout' | 'internal_error';
+  stdout: string;
+  stderr: string;
+  error_message: string;
+  runtime_ms: number;
+}
+
 export interface TopicQuizResponse {
   questions: AssessmentQuestion[];
 }
@@ -789,6 +797,24 @@ export const codingAPI = {
 
   getSubmissionResult: async (submissionId: string): Promise<CodeSubmission> => {
     const response = await api.get<CodeSubmission>(`/coding/submissions/${submissionId}/result/`);
+    return response.data;
+  },
+
+  generateSampleCode: async (data: {
+    enrollment_id: number;
+    module_id: number;
+    topic_name: string;
+    regenerate?: boolean;
+  }): Promise<Resource> => {
+    const response = await api.post<Resource>('/coding/samples/generate/', data);
+    return response.data;
+  },
+
+  runSampleCode: async (data: {
+    source_code: string;
+    raw_input?: string;
+  }): Promise<SampleCodeRunResponse> => {
+    const response = await api.post<SampleCodeRunResponse>('/coding/samples/run/', data);
     return response.data;
   },
 };
