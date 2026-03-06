@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Outlet, useParams, useNavigate } from 'react-router';
+import { Outlet, useParams, useNavigate, useLocation } from 'react-router';
 import { useAppDispatch, useAppSelector } from '../../store';
 import { fetchSyllabus, fetchLessonProgress, fetchQuizAttempts } from '../../store/slices/syllabusSlice';
 import { CourseOutlineSidebar } from './CourseOutlineSidebar';
@@ -9,6 +9,7 @@ import { Loader2 } from 'lucide-react';
 export function CourseLayout() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const { enrollmentId } = useParams();
   const eId = enrollmentId ? parseInt(enrollmentId) : null;
 
@@ -18,6 +19,7 @@ export function CourseLayout() {
 
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
+  const isCodingAssessmentPage = location.pathname.includes('/coding/');
 
   // Fetch syllabus if not already loaded for this enrollment
   useEffect(() => {
@@ -81,11 +83,13 @@ export function CourseLayout() {
         <Outlet />
       </main>
 
-      {/* Right: Studio Panel */}
-      <StudioPanel
-        collapsed={rightCollapsed}
-        onToggle={() => setRightCollapsed(!rightCollapsed)}
-      />
+      {/* Right: Studio Panel (hidden on dedicated coding assessment page) */}
+      {!isCodingAssessmentPage && (
+        <StudioPanel
+          collapsed={rightCollapsed}
+          onToggle={() => setRightCollapsed(!rightCollapsed)}
+        />
+      )}
     </div>
   );
 }

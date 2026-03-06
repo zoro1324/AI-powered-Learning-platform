@@ -235,7 +235,11 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
       });
 
       setCodingProblem(problem);
-      navigate(`/course/${eId}/module/${mIdx}/topic/${tIdx}/coding/${problem.id}`);
+      if (mIdx >= 0 && tIdx >= 0) {
+        navigate(`/course/${eId}/module/${mIdx}/topic/${tIdx}/coding/${problem.id}`);
+      } else {
+        setCodingDialogOpen(true);
+      }
 
       if (problem.lesson) {
         dispatch(fetchResources(problem.lesson));
@@ -262,7 +266,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
     try {
       const problem = await codingAPI.getProblem(problemId);
       setCodingProblem(problem);
-      if (eId !== null) {
+      if (eId !== null && mIdx >= 0 && tIdx >= 0) {
         navigate(`/course/${eId}/module/${mIdx}/topic/${tIdx}/coding/${problem.id}`);
       } else {
         setCodingDialogOpen(true);
