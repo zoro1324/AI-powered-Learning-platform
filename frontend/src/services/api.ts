@@ -579,6 +579,22 @@ export interface TopicContentResponse {
   content: string;
 }
 
+export type DynamicScriptBlockType = 'text' | 'code' | 'video' | 'mind_map' | 'quiz';
+
+export interface DynamicScriptBlock {
+  type: DynamicScriptBlockType;
+  prompt: string;
+  payload: Record<string, any>;
+}
+
+export interface DynamicScriptResponse {
+  lesson_id: number;
+  schema_version: string;
+  title: string;
+  overview: string;
+  blocks: DynamicScriptBlock[];
+}
+
 export interface TopicQuizResponse {
   questions: AssessmentQuestion[];
 }
@@ -653,6 +669,19 @@ export const assessmentAPI = {
   }): Promise<TopicQuizResponse> => {
     const response = await api.post<TopicQuizResponse>(
       '/assessment/topic/quiz/',
+      data
+    );
+    return response.data;
+  },
+
+  generateDynamicScript: async (data: {
+    enrollment_id: number;
+    module_id: number;
+    topic_name: string;
+    regenerate?: boolean;
+  }): Promise<DynamicScriptResponse> => {
+    const response = await api.post<DynamicScriptResponse>(
+      '/assessment/topic/dynamic-script/',
       data
     );
     return response.data;

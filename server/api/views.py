@@ -35,12 +35,14 @@ from .serializers import (
     GenerateCodingProblemRequestSerializer, CodingProblemSerializer,
     CreateCodeSubmissionSerializer, CodeExecutionTaskSerializer,
     CodeSubmissionSerializer,
+    GenerateDynamicScriptRequestSerializer, DynamicScriptResponseSerializer,
 )
 from .tasks import generate_video_task
 from .services.assessment_service import get_assessment_service
 from .services.podcast_service import get_podcast_service
 from .services.code_problem_service import get_code_problem_service
 from .services.code_execution_service import get_code_execution_service
+from .services.dynamic_script_service import get_dynamic_script_service
 
 User = get_user_model()
 
@@ -2217,6 +2219,145 @@ class GenerateTopicContentView(APIView):
             return Response(
                 {'error': f'Failed to generate content: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class GenerateDynamicScriptView(APIView):
+    """Generate a structured interactive script for a topic."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = GenerateDynamicScriptRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = serializer.validated_data
+
+        enrollment_id = payload['enrollment_id']
+        module_id = payload['module_id']
+        topic_name = payload['topic_name']
+        regenerate = payload.get('regenerate', False)
+
+        try:
+            enrollment = Enrollment.objects.get(pk=enrollment_id, user=request.user)
+
+            try:
+                module = Module.objects.get(course=enrollment.course, order=module_id)
+            except Module.DoesNotExist:
+                try:
+                    syllabus_obj = PersonalizedSyllabus.objects.get(enrollment=enrollment)
+                    modules_list = syllabus_obj.syllabus_data.get('modules', [])
+                    module_pos = int(module_id) - 1
+                    if module_pos < 0 or module_pos >= len(modules_list):
+                        return Response(
+                            {'error': f'Module with order {module_id} not found in syllabus'},
+                            status=status.HTTP_404_NOT_FOUND,
+                        )
+
+                    module_data = modules_list[module_pos]
+                    module = Module.objects.create(
+                        course=enrollment.course,
+                        order=module_id,
+                        title=module_data.get('module_name', f'Module {module_id}'),
+                        description=module_data.get('module_description', ''),
+                        difficulty_level=module_data.get('difficulty_level', 'beginner'),
+                        estimated_duration_minutes=module_data.get('estimated_duration_minutes', 60),
+                        is_generated=True,
+                    )
+                except PersonalizedSyllabus.DoesNotExist:
+                    return Response(
+                        {'error': 'Syllabus not found for this enrollment'},
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
+
+            lesson_order = module.lessons.count() + 1
+            lesson, _ = Lesson.objects.get_or_create(
+                module=module,
+                title=topic_name,
+                defaults={'order': lesson_order, 'content': ''},
+            )
+
+            if not regenerate:
+                existing_script = Resource.objects.filter(
+                    lesson=lesson,
+                    resource_type=Resource.ResourceType.VIDEO_SCRIPT,
+                    title__startswith=f'Dynamic Script: {topic_name}',
+                ).order_by('-created_at').first()
+
+                if existing_script and isinstance(existing_script.content_json, dict):
+                    cached_data = {
+                        'lesson_id': lesson.id,
+                        'schema_version': existing_script.content_json.get('schema_version', '1.0'),
+                        'title': existing_script.content_json.get('title', f'Interactive Script: {topic_name}'),
+                        'overview': existing_script.content_json.get('overview', ''),
+                        'blocks': existing_script.content_json.get('blocks', []),
+                    }
+                    response_serializer = DynamicScriptResponseSerializer(data=cached_data)
+                    response_serializer.is_valid(raise_exception=True)
+                    return Response(response_serializer.validated_data, status=status.HTTP_200_OK)
+
+            topic_description = ''
+            try:
+                syllabus_obj = PersonalizedSyllabus.objects.get(enrollment=enrollment)
+                for idx, mod in enumerate(syllabus_obj.syllabus_data.get('modules', [])):
+                    mod_order = mod.get('order')
+                    mod_match = (mod_order == module_id) if mod_order is not None else ((idx + 1) == module_id)
+                    if not mod_match:
+                        continue
+
+                    for topic in mod.get('topics', []):
+                        if topic.get('topic_name') == topic_name:
+                            topic_description = (
+                                topic.get('detailed_description')
+                                or topic.get('short_description')
+                                or topic.get('description', '')
+                            )
+                            break
+                    if topic_description:
+                        break
+            except PersonalizedSyllabus.DoesNotExist:
+                topic_description = ''
+
+            script_data = get_dynamic_script_service().generate_script(
+                course_title=enrollment.course.title,
+                topic_name=topic_name,
+                topic_description=topic_description,
+                lesson_content=lesson.content or '',
+                system_prompt=enrollment.ai_system_prompt or None,
+            )
+
+            response_data = {
+                'lesson_id': lesson.id,
+                'schema_version': script_data.get('schema_version', '1.0'),
+                'title': script_data.get('title', f'Interactive Script: {topic_name}'),
+                'overview': script_data.get('overview', ''),
+                'blocks': script_data.get('blocks', []),
+            }
+
+            response_serializer = DynamicScriptResponseSerializer(data=response_data)
+            response_serializer.is_valid(raise_exception=True)
+
+            Resource.objects.create(
+                lesson=lesson,
+                resource_type=Resource.ResourceType.VIDEO_SCRIPT,
+                title=f'Dynamic Script: {topic_name}',
+                content_text=response_data.get('overview', ''),
+                content_json={
+                    'schema_version': response_data['schema_version'],
+                    'title': response_data['title'],
+                    'overview': response_data['overview'],
+                    'blocks': response_data['blocks'],
+                },
+                is_generated=True,
+                generation_model=getattr(settings, 'OLLAMA_MODEL', 'unknown'),
+            )
+
+            return Response(response_serializer.validated_data, status=status.HTTP_200_OK)
+        except Enrollment.DoesNotExist:
+            return Response({'error': 'Enrollment not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as exc:
+            logger.error('Error generating dynamic script: %s', exc, exc_info=True)
+            return Response(
+                {'error': f'Failed to generate dynamic script: {str(exc)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
 

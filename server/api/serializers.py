@@ -413,6 +413,27 @@ class GenerateCodingProblemRequestSerializer(serializers.Serializer):
     regenerate = serializers.BooleanField(required=False, default=False)
 
 
+class DynamicScriptBlockSerializer(serializers.Serializer):
+    type = serializers.ChoiceField(choices=['text', 'code', 'video', 'mind_map', 'quiz'])
+    prompt = serializers.CharField()
+    payload = serializers.JSONField(required=False, default=dict)
+
+
+class GenerateDynamicScriptRequestSerializer(serializers.Serializer):
+    enrollment_id = serializers.IntegerField()
+    module_id = serializers.IntegerField()
+    topic_name = serializers.CharField(max_length=255)
+    regenerate = serializers.BooleanField(required=False, default=False)
+
+
+class DynamicScriptResponseSerializer(serializers.Serializer):
+    lesson_id = serializers.IntegerField()
+    schema_version = serializers.CharField(default='1.0')
+    title = serializers.CharField()
+    overview = serializers.CharField(allow_blank=True, required=False)
+    blocks = DynamicScriptBlockSerializer(many=True)
+
+
 class CreateCodeSubmissionSerializer(serializers.Serializer):
     enrollment_id = serializers.IntegerField()
     problem_id = serializers.IntegerField()
