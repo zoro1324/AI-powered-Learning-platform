@@ -407,6 +407,7 @@ class Resource(models.Model):
         AUDIO = 'audio', 'Audio/Podcast (MP3)'
         IMAGE = 'image', 'Image (PNG)'
         REEL = 'reel', 'Short Reel'
+        CODE_EXERCISE = 'code_exercise', 'Code Exercise'
 
     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='resources')
     resource_type = models.CharField(max_length=15, choices=ResourceType.choices)
@@ -458,6 +459,7 @@ class Question(models.Model):
         DIAGNOSTIC = 'diagnostic', 'Diagnostic Assessment'
         TOPIC_QUIZ = 'topic_quiz', 'Topic Quiz'
         FINAL_QUIZ = 'final_quiz', 'Final Quiz'
+        CODE_PROBLEM = 'code_problem', 'Code Problem'
 
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='questions')
     module = models.ForeignKey(
@@ -553,6 +555,162 @@ class QuizAnswer(models.Model):
 
     def __str__(self):
         return f'Q{self.question_id} → {"✓" if self.is_correct else "✗"}'
+
+
+# ===========================================================================
+# 11b. CodingProblem
+# ===========================================================================
+
+class CodingProblem(models.Model):
+    class Language(models.TextChoices):
+        PYTHON = 'python', 'Python'
+
+    class Difficulty(models.TextChoices):
+        EASY = 'easy', 'Easy'
+        INTERMEDIATE = 'intermediate', 'Intermediate'
+        DIFFICULT = 'difficult', 'Difficult'
+
+    course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='coding_problems')
+    module = models.ForeignKey(
+        Module,
+        on_delete=models.CASCADE,
+        related_name='coding_problems',
+        null=True,
+        blank=True,
+    )
+    lesson = models.ForeignKey(
+        Lesson,
+        on_delete=models.CASCADE,
+        related_name='coding_problems',
+        null=True,
+        blank=True,
+    )
+    title = models.CharField(max_length=255)
+    problem_statement = models.TextField()
+    starter_code = models.TextField(blank=True, default='')
+    reference_solution = models.TextField(blank=True, default='')
+    language = models.CharField(max_length=20, choices=Language.choices, default=Language.PYTHON)
+    difficulty = models.CharField(max_length=15, choices=Difficulty.choices, default=Difficulty.INTERMEDIATE)
+    constraints = models.JSONField(default=dict, blank=True)
+    hints = models.JSONField(default=list, blank=True)
+    is_generated = models.BooleanField(default=False)
+    generation_model = models.CharField(max_length=100, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'coding_problems'
+        indexes = [
+            models.Index(fields=['course', 'language']),
+            models.Index(fields=['lesson', '-created_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.title} ({self.language})'
+
+
+# ===========================================================================
+# 11c. CodingTestCase
+# ===========================================================================
+
+class CodingTestCase(models.Model):
+    problem = models.ForeignKey(CodingProblem, on_delete=models.CASCADE, related_name='test_cases')
+    input_data = models.TextField(blank=True, default='')
+    expected_output = models.TextField(blank=True, default='')
+    explanation = models.TextField(blank=True, default='')
+    is_hidden = models.BooleanField(default=False)
+    weight = models.DecimalField(max_digits=5, decimal_places=2, default=1.00)
+    order = models.PositiveIntegerField(default=1)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'coding_test_cases'
+        ordering = ['order', 'id']
+        indexes = [
+            models.Index(fields=['problem', 'is_hidden']),
+        ]
+
+    def __str__(self):
+        visibility = 'hidden' if self.is_hidden else 'visible'
+        return f'{self.problem_id} test#{self.order} ({visibility})'
+
+
+# ===========================================================================
+# 11d. CodeSubmission
+# ===========================================================================
+
+class CodeSubmission(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        RUNNING = 'running', 'Running'
+        COMPLETED = 'completed', 'Completed'
+        FAILED = 'failed', 'Failed'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='code_submissions')
+    enrollment = models.ForeignKey(
+        Enrollment,
+        on_delete=models.CASCADE,
+        related_name='code_submissions',
+    )
+    problem = models.ForeignKey(
+        CodingProblem,
+        on_delete=models.CASCADE,
+        related_name='submissions',
+    )
+    language = models.CharField(max_length=20, choices=CodingProblem.Language.choices, default=CodingProblem.Language.PYTHON)
+    source_code = models.TextField()
+    status = models.CharField(max_length=15, choices=Status.choices, default=Status.PENDING)
+    score_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0.00)
+    passed_tests = models.PositiveSmallIntegerField(default=0)
+    total_tests = models.PositiveSmallIntegerField(default=0)
+    feedback = models.JSONField(default=dict, blank=True)
+    error_message = models.TextField(blank=True, default='')
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'code_submissions'
+        indexes = [
+            models.Index(fields=['user', '-submitted_at']),
+            models.Index(fields=['problem', '-submitted_at']),
+            models.Index(fields=['enrollment', '-submitted_at']),
+        ]
+
+    def __str__(self):
+        return f'{self.user.email} -> {self.problem_id} ({self.status})'
+
+
+# ===========================================================================
+# 11e. CodeExecutionTask
+# ===========================================================================
+
+class CodeExecutionTask(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'Pending'
+        PROCESSING = 'processing', 'Processing'
+        COMPLETED = 'completed', 'Completed'
+        FAILED = 'failed', 'Failed'
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    submission = models.OneToOneField(
+        CodeSubmission,
+        on_delete=models.CASCADE,
+        related_name='execution_task',
+    )
+    status = models.CharField(max_length=15, choices=Status.choices, default=Status.PENDING)
+    progress_message = models.TextField(blank=True, default='')
+    result_data = models.JSONField(default=dict, blank=True)
+    error_message = models.TextField(blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'code_execution_tasks'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.submission_id} ({self.status})'
 
 
 # ===========================================================================
