@@ -65,7 +65,7 @@ interface RemediationItem {
   generatedAt: string;
 }
 
-export type ActiveResourceViewType = 'text' | 'video' | 'audio' | 'notes' | 'create-note';
+export type ActiveResourceViewType = 'text' | 'video' | 'audio' | 'notes' | 'create-note' | 'dynamic-script' | 'code';
 
 export interface ActiveResourceView {
   type: ActiveResourceViewType;

@@ -28,7 +28,9 @@ import {
   setActiveResourceView,
   createNote,
   selectTopicContentError,
+  selectDynamicScript,
 } from '../../store/slices/syllabusSlice';
+import { codingAPI } from '../../services/api';
 import { Button } from '../components/ui/button';
 import {
   Breadcrumb,
@@ -44,6 +46,8 @@ import { TopicQuizOverlay } from '../components/TopicQuizOverlay';
 import { CourseStructureDialog } from '../components/CourseStructureDialog';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
+import Editor from '@monaco-editor/react';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '../components/ui/resizable';
 
 export default function TopicPage() {
   const dispatch = useAppDispatch();
@@ -80,6 +84,9 @@ export default function TopicPage() {
   const error = useAppSelector((state) =>
     selectTopicContentError(state, mIdx, tIdx)
   );
+  const dynamicScript = useAppSelector((state) =>
+    selectDynamicScript(state, mIdx, tIdx)
+  );
 
   // Fetch resources when content is loaded
   useEffect(() => {
@@ -93,12 +100,52 @@ export default function TopicPage() {
     ? resources.find((r) => r.id === activeView.resourceId)
     : null;
 
+  const isSampleCodeResource =
+    activeView?.type === 'code' && activeResource?.content_json?.mode === 'sample_code';
+
+  useEffect(() => {
+    if (isSampleCodeResource && activeResource?.content_json) {
+      setSampleCodeValue(activeResource.content_json.starter_code || '');
+      setSampleCodeInput(activeResource.content_json.sample_input || '');
+      setSampleCodeOutput('');
+      setSampleCodeError(null);
+    }
+  }, [isSampleCodeResource, activeResource?.id]);
+
+  const handleRunSampleCode = async () => {
+    if (!sampleCodeValue.trim()) return;
+    setSampleCodeRunning(true);
+    setSampleCodeError(null);
+    setSampleCodeOutput('');
+    try {
+      const result = await codingAPI.runSampleCode({
+        source_code: sampleCodeValue,
+        raw_input: sampleCodeInput,
+      });
+
+      if (result.status === 'ok') {
+        setSampleCodeOutput(result.stdout || '(no output)');
+      } else {
+        setSampleCodeError(result.error_message || result.stderr || 'Execution failed');
+      }
+    } catch (err: any) {
+      setSampleCodeError(err?.response?.data?.error || err?.message || 'Failed to run sample code');
+    } finally {
+      setSampleCodeRunning(false);
+    }
+  };
+
   // ─── Create Note state ─────────────────────────────────────────────────────
 
   const [noteTitle, setNoteTitle] = useState('');
   const [noteContent, setNoteContent] = useState('');
   const [noteSaving, setNoteSaving] = useState(false);
   const [structureDialogOpen, setStructureDialogOpen] = useState(false);
+  const [sampleCodeValue, setSampleCodeValue] = useState('');
+  const [sampleCodeInput, setSampleCodeInput] = useState('');
+  const [sampleCodeOutput, setSampleCodeOutput] = useState('');
+  const [sampleCodeRunning, setSampleCodeRunning] = useState(false);
+  const [sampleCodeError, setSampleCodeError] = useState<string | null>(null);
 
   const handleSaveNote = async () => {
     if (!content?.lessonId || !noteTitle.trim() || !noteContent.trim()) return;
@@ -317,6 +364,8 @@ export default function TopicPage() {
     dispatch(setActiveResourceView({ moduleIndex: mIdx, topicIndex: tIdx, view: null }));
     setNoteTitle('');
     setNoteContent('');
+    setSampleCodeOutput('');
+    setSampleCodeError(null);
   }, [mIdx, tIdx, dispatch]);
 
   // ─── Redirect if module is locked ──────────────────────────────────────────
@@ -514,6 +563,55 @@ export default function TopicPage() {
                       {r.title.length > 20 ? r.title.slice(0, 20) + '...' : r.title}
                     </button>
                   ))}
+
+                {dynamicScript && (
+                  <button
+                    onClick={() =>
+                      dispatch(
+                        setActiveResourceView({
+                          moduleIndex: mIdx,
+                          topicIndex: tIdx,
+                          view: { type: 'dynamic-script' },
+                        })
+                      )
+                    }
+                    className={cn(
+                      'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap',
+                      activeView?.type === 'dynamic-script'
+                        ? 'bg-fuchsia-50 text-fuchsia-700'
+                        : 'text-gray-500 hover:bg-gray-50'
+                    )}
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    {dynamicScript.title.length > 25 ? `${dynamicScript.title.slice(0, 25)}...` : dynamicScript.title}
+                  </button>
+                )}
+
+                {resources
+                  .filter((r) => r.resource_type === 'code_exercise')
+                  .map((r) => (
+                    <button
+                      key={`code-${r.id}`}
+                      onClick={() =>
+                        dispatch(
+                          setActiveResourceView({
+                            moduleIndex: mIdx,
+                            topicIndex: tIdx,
+                            view: { type: 'code', resourceId: r.id },
+                          })
+                        )
+                      }
+                      className={cn(
+                        'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap',
+                        activeView?.type === 'code' && activeView.resourceId === r.id
+                          ? 'bg-cyan-50 text-cyan-700'
+                          : 'text-gray-500 hover:bg-gray-50'
+                      )}
+                    >
+                      <Play className="w-3.5 h-3.5" />
+                      {r.title.length > 25 ? `${r.title.slice(0, 25)}...` : r.title}
+                    </button>
+                  ))}
               </div>
             )}
 
@@ -578,6 +676,106 @@ export default function TopicPage() {
                   </Button>
                 </div>
               </div>
+            ) : activeView?.type === 'dynamic-script' && dynamicScript ? (
+              <div className="p-8 space-y-4">
+                <h2 className="text-lg font-semibold text-gray-900">{dynamicScript.title}</h2>
+                {dynamicScript.overview && (
+                  <p className="text-sm text-gray-600">{dynamicScript.overview}</p>
+                )}
+                <div className="space-y-3">
+                  {dynamicScript.blocks.map((block, idx) => (
+                    <div key={`${block.type}-${idx}`} className="rounded-xl border border-gray-200 p-4 bg-gray-50">
+                      <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">
+                        {block.type.replace('_', ' ')}
+                      </p>
+                      <p className="text-sm text-gray-800 font-medium mb-2">{block.prompt}</p>
+                      {block.type === 'text' && (
+                        <div className="text-sm text-gray-700 whitespace-pre-wrap">
+                          {block.payload?.markdown || block.payload?.content || ''}
+                        </div>
+                      )}
+                      {block.type === 'quiz' && Array.isArray(block.payload?.questions) && (
+                        <p className="text-xs text-gray-600">{block.payload.questions.length} questions</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : activeView?.type === 'code' && activeResource ? (
+              isSampleCodeResource ? (
+                <div className="p-6 space-y-4">
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900">
+                      {activeResource.content_json?.title || activeResource.title}
+                    </h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {activeResource.content_text || activeResource.content_json?.explanation || 'Edit and run the code.'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 overflow-hidden h-[460px]">
+                    <ResizablePanelGroup direction="horizontal">
+                      <ResizablePanel defaultSize={60} minSize={35}>
+                        <div className="h-full flex flex-col">
+                          <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-600">Code Runner</div>
+                          <Editor
+                            height="100%"
+                            defaultLanguage="python"
+                            language="python"
+                            theme="vs-dark"
+                            value={sampleCodeValue}
+                            onChange={(val) => setSampleCodeValue(val || '')}
+                            options={{
+                              minimap: { enabled: false },
+                              fontSize: 14,
+                              automaticLayout: true,
+                              wordWrap: 'on',
+                            }}
+                          />
+                        </div>
+                      </ResizablePanel>
+                      <ResizableHandle withHandle />
+                      <ResizablePanel defaultSize={40} minSize={30}>
+                        <div className="h-full flex flex-col p-3 gap-3 bg-white">
+                          <label className="text-xs font-medium text-gray-700">Input</label>
+                          <textarea
+                            value={sampleCodeInput}
+                            onChange={(e) => setSampleCodeInput(e.target.value)}
+                            rows={5}
+                            className="w-full rounded-lg border border-gray-200 p-2 text-xs font-mono"
+                            placeholder="Optional stdin input"
+                          />
+                          <Button onClick={handleRunSampleCode} disabled={sampleCodeRunning || !sampleCodeValue.trim()} className="gap-2 w-full">
+                            {sampleCodeRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                            Run
+                          </Button>
+                          <label className="text-xs font-medium text-gray-700">Output</label>
+                          <div className="flex-1 overflow-auto rounded-lg border border-gray-200 p-2 bg-gray-50 text-xs font-mono whitespace-pre-wrap">
+                            {sampleCodeError ? `Error: ${sampleCodeError}` : (sampleCodeOutput || 'Run code to see output')}
+                          </div>
+                        </div>
+                      </ResizablePanel>
+                    </ResizablePanelGroup>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-8 space-y-4">
+                  <h2 className="text-lg font-semibold text-gray-900">{activeResource.title}</h2>
+                  <p className="text-sm text-gray-600">Try-yourself coding assessment with test cases.</p>
+                  <Button
+                    onClick={() => {
+                      const problemId = activeResource.content_json?.coding_problem_id;
+                      if (problemId) {
+                        navigate(`/course/${enrollmentId}/module/${mIdx}/topic/${tIdx}/coding/${problemId}`);
+                      }
+                    }}
+                    className="gap-2"
+                  >
+                    <Play className="w-4 h-4" />
+                    Open Compiler Page
+                  </Button>
+                </div>
+              )
             ) : activeView?.type === 'video' && activeResource ? (
               /* ── Video player ──────────────────────────────────────── */
               <div className="p-8">
@@ -660,7 +858,6 @@ export default function TopicPage() {
                       ),
                       ul: ({ ...props }) => <ul className="list-disc ml-6 mb-4 space-y-2 text-gray-700" {...props} />,
                       ol: ({ ...props }) => <ol className="list-decimal ml-6 mb-4 space-y-2 text-gray-700" {...props} />,
-                      li: ({ ...props }) => <li className="leading-relaxed" {...props} />,
                       blockquote: ({ ...props }) => <blockquote className="border-l-4 border-gray-200 pl-4 italic my-4 text-gray-600" {...props} />,
                     }}
                   >
@@ -692,7 +889,6 @@ export default function TopicPage() {
                       ),
                       ul: ({ ...props }) => <ul className="list-disc ml-6 mb-4 space-y-2 text-gray-700" {...props} />,
                       ol: ({ ...props }) => <ol className="list-decimal ml-6 mb-4 space-y-2 text-gray-700" {...props} />,
-                      li: ({ ...props }) => <li className="leading-relaxed" {...props} />,
                       blockquote: ({ ...props }) => <blockquote className="border-l-4 border-gray-200 pl-4 italic my-4 text-gray-600" {...props} />,
                     }}
                   >
