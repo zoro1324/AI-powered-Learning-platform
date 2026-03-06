@@ -408,6 +408,34 @@ class EnrollmentViewSet(viewsets.ModelViewSet):
             
             mindmap_data = MindMapService.generate_course_mindmap(course_title, user_level)
             
+            # Save mind map to the database
+            # Try to save to the first lesson/module of the course
+            first_module = enrollment.course.modules.first()
+            if first_module:
+                first_lesson = first_module.lessons.first()
+                if first_lesson:
+                    # Check if a course mind map already exists for this lesson
+                    existing_mindmap = Resource.objects.filter(
+                        lesson=first_lesson,
+                        resource_type=Resource.ResourceType.MINDMAP,
+                        title__icontains="Course Mind Map"
+                    ).first()
+                    
+                    if existing_mindmap:
+                        # Update existing mind map
+                        existing_mindmap.content_json = mindmap_data
+                        existing_mindmap.is_generated = True
+                        existing_mindmap.save()
+                    else:
+                        # Create new mind map resource
+                        Resource.objects.create(
+                            lesson=first_lesson,
+                            resource_type=Resource.ResourceType.MINDMAP,
+                            title=f'Course Mind Map: {course_title}',
+                            content_json=mindmap_data,
+                            is_generated=True,
+                        )
+            
             # Log activity
             ActivityLog.objects.create(
                 user=request.user,
@@ -2117,6 +2145,29 @@ class GenerateTopicMindMapView(APIView):
                 )
             
             mindmap_data = MindMapService.generate_topic_mindmap(topic_name, content)
+            
+            # Save mind map to the database
+            # Check if a mind map already exists for this topic
+            existing_mindmap = Resource.objects.filter(
+                lesson=lesson,
+                resource_type=Resource.ResourceType.MINDMAP,
+                title__icontains=topic_name
+            ).first()
+            
+            if existing_mindmap:
+                # Update existing mind map
+                existing_mindmap.content_json = mindmap_data
+                existing_mindmap.is_generated = True
+                existing_mindmap.save()
+            else:
+                # Create new mind map resource
+                Resource.objects.create(
+                    lesson=lesson,
+                    resource_type=Resource.ResourceType.MINDMAP,
+                    title=f'Mind Map: {topic_name}',
+                    content_json=mindmap_data,
+                    is_generated=True,
+                )
             
             ActivityLog.objects.create(
                 user=request.user,

@@ -729,7 +729,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
 
       {/* Mind Map Dialog */}
       <Dialog open={mindMapDialogOpen} onOpenChange={setMindMapDialogOpen}>
-        <DialogContent className="max-w-[90vw] w-[1200px] h-[85vh] p-0 overflow-hidden flex flex-col bg-[#E8EAED] border-gray-300">
+        <DialogContent className="!max-w-none !w-screen !h-screen !p-0 overflow-hidden flex flex-col bg-[#E8EAED] border-0 !rounded-none !translate-x-[-50%] !translate-y-[-50%] !top-[50%] !left-[50%]">
           <DialogHeader className="p-6 border-b border-gray-300 bg-white flex-shrink-0">
             <DialogTitle className="text-xl font-bold items-center gap-2 flex text-gray-800">
               <Network className="w-5 h-5 text-indigo-500" />

@@ -87,11 +87,14 @@ export function MindMapViewer({ data }: MindMapViewerProps) {
 
         // Small delay to allow framer-motion animations to complete layout
         const timeoutId = setTimeout(updateLines, 50);
-        // Also listen to window resize
+        // Also listen to window resize and scroll
+        const container = containerRef.current;
         window.addEventListener('resize', updateLines);
+        container.addEventListener('scroll', updateLines);
         return () => {
             clearTimeout(timeoutId);
             window.removeEventListener('resize', updateLines);
+            container.removeEventListener('scroll', updateLines);
         };
     }, [data, tick]);
 
@@ -122,20 +125,20 @@ export function MindMapViewer({ data }: MindMapViewerProps) {
     const onToggle = () => setTick(t => t + 1);
 
     return (
-        <div className="w-full relative py-16 px-16 flex min-h-[600px] overflow-auto bg-[#E8EAED]" ref={containerRef}>
+        <div className="w-full h-full relative py-16 px-16 flex overflow-auto bg-[#E8EAED]" ref={containerRef}>
             {/* SVG Canvas for Connectors */}
             <svg
-                className="absolute inset-0 pointer-events-none z-0"
-                style={{ width: '100%', height: '100%', minWidth: '100%', minHeight: '100%' }}
+                className="absolute inset-0 pointer-events-none z-0 w-full h-full min-w-full min-h-full"
             >
                 {lines.map((path, i) => (
                     <path
                         key={i}
                         d={path}
                         fill="none"
-                        stroke="#A8C7FA"
-                        strokeWidth="2"
+                        stroke="#667EEA"
+                        strokeWidth="3"
                         className="transition-all duration-300 ease-in-out"
+                        opacity="0.6"
                     />
                 ))}
             </svg>
@@ -175,24 +178,23 @@ function RootNode({ data, onToggle }: { data: MindMapData, onToggle: () => void 
                 </motion.div>
 
                 {/* Out Port */}
-                {isExpanded && (
-                    <button
-                        id="port-root-out"
-                        onClick={toggle}
-                        className="absolute right-[-14px] z-20 w-6 h-6 bg-white border border-gray-300 rounded-full flex items-center justify-center shadow-sm hover:bg-gray-50 transition-colors"
-                    >
+                <button
+                    id="port-root-out"
+                    onClick={toggle}
+                    aria-label={isExpanded ? "Collapse root node" : "Expand root node"}
+                    className={cn(
+                        "absolute right-[-14px] z-20 w-6 h-6 rounded-full flex items-center justify-center shadow-sm transition-all",
+                        isExpanded
+                            ? "bg-white border border-gray-300 hover:bg-gray-50"
+                            : "bg-[#A8C7FA] hover:opacity-90"
+                    )}
+                >
+                    {isExpanded ? (
                         <ChevronLeft className="w-4 h-4 text-gray-600" />
-                    </button>
-                )}
-                {!isExpanded && (
-                    <button
-                        id="port-root-out"
-                        onClick={toggle}
-                        className="absolute right-[-14px] z-20 w-6 h-6 bg-[#A8C7FA] rounded-full flex items-center justify-center shadow-sm hover:opacity-90 transition-opacity"
-                    >
+                    ) : (
                         <ChevronRight className="w-4 h-4 text-[#444746]" />
-                    </button>
-                )}
+                    )}
+                </button>
             </div>
 
             {/* Branches Container */}
@@ -249,24 +251,23 @@ function BranchNode({ branch, bIdx, onToggle }: { branch: MindMapBranch, bIdx: n
                 </motion.div>
 
                 {/* Out Port */}
-                {isExpanded && (
-                    <button
-                        id={`port-branch-${bIdx}-out`}
-                        onClick={toggle}
-                        className="absolute right-[-14px] z-20 w-6 h-6 bg-white border border-gray-300 rounded-full flex items-center justify-center shadow-sm hover:bg-gray-50 transition-colors"
-                    >
+                <button
+                    id={`port-branch-${bIdx}-out`}
+                    onClick={toggle}
+                    aria-label={isExpanded ? `Collapse ${branch.name}` : `Expand ${branch.name}`}
+                    className={cn(
+                        "absolute right-[-14px] z-20 w-6 h-6 rounded-full flex items-center justify-center shadow-sm transition-all",
+                        isExpanded
+                            ? "bg-white border border-gray-300 hover:bg-gray-50"
+                            : "bg-[#A8C7FA] hover:opacity-90"
+                    )}
+                >
+                    {isExpanded ? (
                         <ChevronLeft className="w-4 h-4 text-gray-600" />
-                    </button>
-                )}
-                {!isExpanded && (
-                    <button
-                        id={`port-branch-${bIdx}-out`}
-                        onClick={toggle}
-                        className="absolute right-[-14px] z-20 w-6 h-6 bg-[#A8C7FA] rounded-full flex items-center justify-center shadow-sm hover:opacity-90 transition-opacity"
-                    >
+                    ) : (
                         <ChevronRight className="w-4 h-4 text-[#444746]" />
-                    </button>
-                )}
+                    )}
+                </button>
             </div>
 
             {/* Subtopics Container */}
