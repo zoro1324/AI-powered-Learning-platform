@@ -45,6 +45,17 @@ class CodeExecutionService:
             "test_results": results,
         }
 
+    def run_python_sample(self, source_code: str, raw_input: str = '', timeout_seconds: int = 3) -> dict[str, Any]:
+        """Run learner sample code once and return stdout/stderr (no test assertions)."""
+        result = self._run_single_case(source_code=source_code, raw_input=raw_input, timeout_seconds=timeout_seconds)
+        return {
+            "status": result.get("status", "internal_error"),
+            "stdout": self._normalize_output(result.get("stdout", "")),
+            "stderr": result.get("stderr", ""),
+            "error_message": result.get("error_message", ""),
+            "runtime_ms": result.get("runtime_ms", 0),
+        }
+
     def _run_single_case(self, source_code: str, raw_input: str, timeout_seconds: int) -> dict[str, Any]:
         with tempfile.TemporaryDirectory(prefix="code_exec_") as tmpdir:
             submission_path = os.path.join(tmpdir, "submission.py")
