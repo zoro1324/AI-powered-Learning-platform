@@ -47,7 +47,7 @@ class CodeExecutionService:
 
     def run_python_sample(self, source_code: str, raw_input: str = '', timeout_seconds: int = 3) -> dict[str, Any]:
         """Run learner sample code once and return stdout/stderr (no test assertions)."""
-        result = self._run_single_case(source_code=source_code, raw_input=raw_input, timeout_seconds=timeout_seconds)
+        result = self._run_plain_script(source_code=source_code, raw_input=raw_input, timeout_seconds=timeout_seconds)
         return {
             "status": result.get("status", "internal_error"),
             "stdout": self._normalize_output(result.get("stdout", "")),
@@ -55,6 +55,54 @@ class CodeExecutionService:
             "error_message": result.get("error_message", ""),
             "runtime_ms": result.get("runtime_ms", 0),
         }
+
+    def _run_plain_script(self, source_code: str, raw_input: str, timeout_seconds: int) -> dict[str, Any]:
+        """Execute source code as a normal Python script (no solve() contract)."""
+        with tempfile.TemporaryDirectory(prefix="code_exec_") as tmpdir:
+            script_path = os.path.join(tmpdir, "script.py")
+
+            with open(script_path, "w", encoding="utf-8") as f:
+                f.write(source_code)
+
+            env = {"PYTHONIOENCODING": "utf-8"}
+            command = [sys.executable, "-I", script_path]
+            # Provide at least one line of stdin so a single input() call does not immediately raise EOFError.
+            stdin_payload = raw_input if raw_input else "\n"
+            try:
+                completed = subprocess.run(
+                    command,
+                    input=stdin_payload,
+                    text=True,
+                    capture_output=True,
+                    timeout=timeout_seconds,
+                    cwd=tmpdir,
+                    env=env,
+                    check=False,
+                )
+                status = "ok" if completed.returncode == 0 else "runtime_error"
+                return {
+                    "status": status,
+                    "stdout": completed.stdout,
+                    "stderr": completed.stderr,
+                    "runtime_ms": 0,
+                    "error_message": "" if status == "ok" else (completed.stderr or "Runtime error"),
+                }
+            except subprocess.TimeoutExpired:
+                return {
+                    "status": "timeout",
+                    "stdout": "",
+                    "stderr": "",
+                    "runtime_ms": timeout_seconds * 1000,
+                    "error_message": "Execution timed out",
+                }
+            except Exception as exc:
+                return {
+                    "status": "internal_error",
+                    "stdout": "",
+                    "stderr": "",
+                    "runtime_ms": 0,
+                    "error_message": str(exc),
+                }
 
     def _run_single_case(self, source_code: str, raw_input: str, timeout_seconds: int) -> dict[str, Any]:
         with tempfile.TemporaryDirectory(prefix="code_exec_") as tmpdir:

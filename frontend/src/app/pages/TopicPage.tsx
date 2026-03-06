@@ -147,6 +147,12 @@ export default function TopicPage() {
   const [visibleDynamicBlocks, setVisibleDynamicBlocks] = useState(0);
   const [sampleCodeRunning, setSampleCodeRunning] = useState(false);
   const [sampleCodeError, setSampleCodeError] = useState<string | null>(null);
+  const [dynamicCodeByBlock, setDynamicCodeByBlock] = useState<Record<number, string>>({});
+  const [dynamicInputByBlock, setDynamicInputByBlock] = useState<Record<number, string>>({});
+  const [dynamicOutputByBlock, setDynamicOutputByBlock] = useState<Record<number, string>>({});
+  const [dynamicCodeRunningByBlock, setDynamicCodeRunningByBlock] = useState<Record<number, boolean>>({});
+  const [dynamicCodeErrorByBlock, setDynamicCodeErrorByBlock] = useState<Record<number, string | null>>({});
+  const [quizRevealByQuestion, setQuizRevealByQuestion] = useState<Record<string, boolean>>({});
 
   const handleSaveNote = async () => {
     if (!content?.lessonId || !noteTitle.trim() || !noteContent.trim()) return;
@@ -185,6 +191,58 @@ export default function TopicPage() {
 
     return () => clearInterval(timer);
   }, [activeView?.type, dynamicScript?.blocks?.length]);
+
+  useEffect(() => {
+    if (!dynamicScript?.blocks?.length) return;
+
+    const nextCode: Record<number, string> = {};
+    const nextInput: Record<number, string> = {};
+    dynamicScript.blocks.forEach((block, idx) => {
+      if (block.type === 'code') {
+        nextCode[idx] = block.payload?.starter_code || block.payload?.code || 'def solve(raw_input: str) -> str:\n    return raw_input\n';
+        nextInput[idx] = block.payload?.sample_input || '';
+      }
+    });
+
+    setDynamicCodeByBlock(nextCode);
+    setDynamicInputByBlock(nextInput);
+    setDynamicOutputByBlock({});
+    setDynamicCodeErrorByBlock({});
+    setDynamicCodeRunningByBlock({});
+    setQuizRevealByQuestion({});
+  }, [dynamicScript?.title, dynamicScript?.blocks]);
+
+  const handleRunDynamicCodeBlock = async (blockIdx: number) => {
+    const sourceCode = dynamicCodeByBlock[blockIdx] || '';
+    if (!sourceCode.trim()) return;
+
+    setDynamicCodeRunningByBlock((prev) => ({ ...prev, [blockIdx]: true }));
+    setDynamicCodeErrorByBlock((prev) => ({ ...prev, [blockIdx]: null }));
+    setDynamicOutputByBlock((prev) => ({ ...prev, [blockIdx]: '' }));
+
+    try {
+      const result = await codingAPI.runSampleCode({
+        source_code: sourceCode,
+        raw_input: dynamicInputByBlock[blockIdx] || '',
+      });
+
+      if (result.status === 'ok') {
+        setDynamicOutputByBlock((prev) => ({ ...prev, [blockIdx]: result.stdout || '(no output)' }));
+      } else {
+        setDynamicCodeErrorByBlock((prev) => ({
+          ...prev,
+          [blockIdx]: result.error_message || result.stderr || 'Execution failed',
+        }));
+      }
+    } catch (err: any) {
+      setDynamicCodeErrorByBlock((prev) => ({
+        ...prev,
+        [blockIdx]: err?.response?.data?.error || err?.message || 'Failed to run code',
+      }));
+    } finally {
+      setDynamicCodeRunningByBlock((prev) => ({ ...prev, [blockIdx]: false }));
+    }
+  };
 
   // ─── Module unlock check ──────────────────────────────────────────────────
 
@@ -739,7 +797,135 @@ export default function TopicPage() {
                         </div>
                       )}
                       {block.type === 'quiz' && Array.isArray(block.payload?.questions) && (
-                        <p className="text-xs text-gray-600">{block.payload.questions.length} questions</p>
+                        <div className="space-y-2">
+                          <p className="text-xs text-gray-600">{block.payload.questions.length} questions</p>
+                          {block.payload.questions.map((question: any, qIdx: number) => (
+                            <div key={`${qIdx}-${question?.question || 'question'}`} className="rounded-lg border border-gray-200 bg-white p-3">
+                              <p className="text-sm font-medium text-gray-900">Q{qIdx + 1}. {question?.question || 'Question'}</p>
+                              {Array.isArray(question?.options) && question.options.length > 0 && (
+                                <div className="mt-2 space-y-1.5">
+                                  {question.options.map((option: string, oIdx: number) => (
+                                    <div key={`${oIdx}-${option}`} className="rounded-md border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-sm text-gray-700">
+                                      <span className="font-medium text-gray-500 mr-2">{String.fromCharCode(65 + oIdx)}.</span>
+                                      {option}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {question?.correct_answer && (
+                                <div className="mt-2">
+                                  <button
+                                    onClick={() => setQuizRevealByQuestion((prev) => ({
+                                      ...prev,
+                                      [`${idx}-${qIdx}`]: !prev[`${idx}-${qIdx}`],
+                                    }))}
+                                    className="text-xs text-blue-600 hover:text-blue-500"
+                                  >
+                                    {quizRevealByQuestion[`${idx}-${qIdx}`] ? 'Hide answer' : 'Show answer'}
+                                  </button>
+                                  {quizRevealByQuestion[`${idx}-${qIdx}`] && (
+                                    <p className="text-xs text-emerald-700 mt-1">
+                                      Answer: {question.correct_answer}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {block.type === 'code' && (
+                        <div className="space-y-3">
+                          <p className="text-sm text-gray-700">
+                            {block.payload?.instructions || 'Edit and run this code directly below.'}
+                          </p>
+                          <div className="rounded-xl border border-gray-200 overflow-hidden h-[400px] bg-white">
+                            <ResizablePanelGroup direction="horizontal">
+                              <ResizablePanel defaultSize={60} minSize={35}>
+                                <div className="h-full flex flex-col">
+                                  <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-600">Code</div>
+                                  <Editor
+                                    height="100%"
+                                    defaultLanguage="python"
+                                    language="python"
+                                    theme="vs-dark"
+                                    value={dynamicCodeByBlock[idx] || ''}
+                                    onChange={(val) => setDynamicCodeByBlock((prev) => ({ ...prev, [idx]: val || '' }))}
+                                    options={{
+                                      minimap: { enabled: false },
+                                      fontSize: 14,
+                                      automaticLayout: true,
+                                      wordWrap: 'on',
+                                    }}
+                                  />
+                                </div>
+                              </ResizablePanel>
+                              <ResizableHandle withHandle />
+                              <ResizablePanel defaultSize={40} minSize={28}>
+                                <div className="h-full flex flex-col p-3 gap-2 bg-white">
+                                  <label className="text-xs font-medium text-gray-700">Input</label>
+                                  <textarea
+                                    value={dynamicInputByBlock[idx] || ''}
+                                    onChange={(e) => setDynamicInputByBlock((prev) => ({ ...prev, [idx]: e.target.value }))}
+                                    rows={4}
+                                    className="w-full rounded-lg border border-gray-200 p-2 text-xs font-mono"
+                                    placeholder="Optional stdin input"
+                                  />
+                                  <Button
+                                    onClick={() => handleRunDynamicCodeBlock(idx)}
+                                    disabled={!!dynamicCodeRunningByBlock[idx] || !(dynamicCodeByBlock[idx] || '').trim()}
+                                    className="gap-2 w-full"
+                                  >
+                                    {dynamicCodeRunningByBlock[idx] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                                    Run
+                                  </Button>
+                                  <label className="text-xs font-medium text-gray-700">Output</label>
+                                  <div className="flex-1 overflow-auto rounded-lg border border-gray-200 p-2 bg-gray-50 text-xs font-mono whitespace-pre-wrap">
+                                    {dynamicCodeErrorByBlock[idx]
+                                      ? `Error: ${dynamicCodeErrorByBlock[idx]}`
+                                      : (dynamicOutputByBlock[idx] || 'Run code to see output')}
+                                  </div>
+                                </div>
+                              </ResizablePanel>
+                            </ResizablePanelGroup>
+                          </div>
+                        </div>
+                      )}
+                      {block.type === 'video' && (
+                        <div className="space-y-2">
+                          <p className="text-sm font-medium text-gray-900">
+                            {block.payload?.title || 'Video Segment'}
+                          </p>
+                          <p className="text-sm text-gray-700">
+                            {block.payload?.description || 'Video guidance for this step will appear here.'}
+                          </p>
+                          {Array.isArray(block.payload?.key_points) && block.payload.key_points.length > 0 && (
+                            <ul className="list-disc ml-5 text-sm text-gray-700 space-y-1">
+                              {block.payload.key_points.map((point: string, pIdx: number) => (
+                                <li key={`${pIdx}-${point}`}>{point}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
+                      {block.type === 'mind_map' && (
+                        <div className="space-y-2">
+                          <p className="text-sm font-medium text-gray-900">
+                            Root: {block.payload?.root || 'Mind Map'}
+                          </p>
+                          {Array.isArray(block.payload?.nodes) && block.payload.nodes.length > 0 ? (
+                            <div className="space-y-1 text-sm text-gray-700">
+                              {block.payload.nodes.slice(0, 12).map((node: any, nIdx: number) => (
+                                <p key={`${nIdx}-${node?.id || node?.label || 'node'}`}>
+                                  • {node?.label || 'Node'}
+                                  {node?.parent_id ? ` (parent: ${node.parent_id})` : ''}
+                                </p>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-700">No nodes provided.</p>
+                          )}
+                        </div>
                       )}
                     </div>
                   ))}
