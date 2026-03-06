@@ -105,6 +105,7 @@ export default function ModulesPage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Select Course</label>
                   <select
                     className="w-full max-w-md px-4 py-3 rounded-xl border border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    title="Select active course"
                     value={selectedEnrollment?.id || ''}
                     onChange={(e) => {
                       const enrollment = enrollments.find((en) => en.id === Number(e.target.value));
@@ -134,12 +135,12 @@ export default function ModulesPage() {
                     <p className="text-3xl font-bold text-gray-900">{overallProgress}%</p>
                   </div>
                 </div>
-                <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-blue-500 to-purple-600 transition-all duration-500"
-                    style={{ width: `${overallProgress}%` }}
-                  />
-                </div>
+                <progress
+                  className="w-full h-3 [&::-webkit-progress-bar]:bg-gray-200 [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-value]:bg-gradient-to-r [&::-webkit-progress-value]:from-blue-500 [&::-webkit-progress-value]:to-purple-600 [&::-webkit-progress-value]:rounded-full [&::-moz-progress-bar]:bg-blue-500 [&::-moz-progress-bar]:rounded-full"
+                  value={overallProgress}
+                  max={100}
+                  aria-label="Overall course progress"
+                />
               </div>
 
               {/* Modules List */}
@@ -216,12 +217,12 @@ export default function ModulesPage() {
                                 <span className="text-sm text-gray-600">Progress</span>
                                 <span className="text-sm font-medium text-gray-900">{progressPercent}%</span>
                               </div>
-                              <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                                <div
-                                  className="h-full bg-blue-500 transition-all duration-300"
-                                  style={{ width: `${progressPercent}%` }}
-                                />
-                              </div>
+                              <progress
+                                className="w-full h-2 [&::-webkit-progress-bar]:bg-gray-200 [&::-webkit-progress-bar]:rounded-full [&::-webkit-progress-value]:bg-blue-500 [&::-webkit-progress-value]:rounded-full [&::-moz-progress-bar]:bg-blue-500 [&::-moz-progress-bar]:rounded-full"
+                                value={progressPercent}
+                                max={100}
+                                aria-label={`Progress for ${module.title}`}
+                              />
                             </div>
                           )}
 
