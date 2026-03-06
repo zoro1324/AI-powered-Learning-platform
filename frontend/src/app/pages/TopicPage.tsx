@@ -47,7 +47,6 @@ import { CourseStructureDialog } from '../components/CourseStructureDialog';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
 import Editor from '@monaco-editor/react';
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '../components/ui/resizable';
 
 export default function TopicPage() {
   const dispatch = useAppDispatch();
@@ -107,16 +106,15 @@ export default function TopicPage() {
     if (isSampleCodeResource && activeResource?.content_json) {
       setSampleCodeValue(activeResource.content_json.starter_code || '');
       setSampleCodeInput(activeResource.content_json.sample_input || '');
-      setSampleCodeOutput('');
-      setSampleCodeError(null);
+      setSampleTerminalHistory(['Ready. Press Run to execute your code.']);
     }
   }, [isSampleCodeResource, activeResource?.id]);
 
   const handleRunSampleCode = async () => {
     if (!sampleCodeValue.trim()) return;
+    const command = `$ ${sampleCodeInput || '<empty>'}`;
     setSampleCodeRunning(true);
-    setSampleCodeError(null);
-    setSampleCodeOutput('');
+    setSampleTerminalHistory((prev) => [...prev, command]);
     try {
       const result = await codingAPI.runSampleCode({
         source_code: sampleCodeValue,
@@ -124,14 +122,18 @@ export default function TopicPage() {
       });
 
       if (result.status === 'ok') {
-        setSampleCodeOutput(result.stdout || '(no output)');
+        const output = result.stdout || '(no output)';
+        setSampleTerminalHistory((prev) => [...prev, output]);
       } else {
-        setSampleCodeError(result.error_message || result.stderr || 'Execution failed');
+        const errText = result.error_message || result.stderr || 'Execution failed';
+        setSampleTerminalHistory((prev) => [...prev, `Traceback\n${errText}`]);
       }
     } catch (err: any) {
-      setSampleCodeError(err?.response?.data?.error || err?.message || 'Failed to run sample code');
+      const errText = err?.response?.data?.error || err?.message || 'Failed to run sample code';
+      setSampleTerminalHistory((prev) => [...prev, `Traceback\n${errText}`]);
     } finally {
       setSampleCodeRunning(false);
+      setSampleCodeInput('');
     }
   };
 
@@ -143,15 +145,13 @@ export default function TopicPage() {
   const [structureDialogOpen, setStructureDialogOpen] = useState(false);
   const [sampleCodeValue, setSampleCodeValue] = useState('');
   const [sampleCodeInput, setSampleCodeInput] = useState('');
-  const [sampleCodeOutput, setSampleCodeOutput] = useState('');
   const [visibleDynamicBlocks, setVisibleDynamicBlocks] = useState(0);
   const [sampleCodeRunning, setSampleCodeRunning] = useState(false);
-  const [sampleCodeError, setSampleCodeError] = useState<string | null>(null);
+  const [sampleTerminalHistory, setSampleTerminalHistory] = useState<string[]>(['Ready. Press Run to execute your code.']);
   const [dynamicCodeByBlock, setDynamicCodeByBlock] = useState<Record<number, string>>({});
   const [dynamicInputByBlock, setDynamicInputByBlock] = useState<Record<number, string>>({});
-  const [dynamicOutputByBlock, setDynamicOutputByBlock] = useState<Record<number, string>>({});
   const [dynamicCodeRunningByBlock, setDynamicCodeRunningByBlock] = useState<Record<number, boolean>>({});
-  const [dynamicCodeErrorByBlock, setDynamicCodeErrorByBlock] = useState<Record<number, string | null>>({});
+  const [dynamicTerminalHistoryByBlock, setDynamicTerminalHistoryByBlock] = useState<Record<number, string[]>>({});
   const [quizRevealByQuestion, setQuizRevealByQuestion] = useState<Record<string, boolean>>({});
 
   const handleSaveNote = async () => {
@@ -197,28 +197,32 @@ export default function TopicPage() {
 
     const nextCode: Record<number, string> = {};
     const nextInput: Record<number, string> = {};
+    const nextHistory: Record<number, string[]> = {};
     dynamicScript.blocks.forEach((block, idx) => {
       if (block.type === 'code') {
         nextCode[idx] = block.payload?.starter_code || block.payload?.code || 'def solve(raw_input: str) -> str:\n    return raw_input\n';
         nextInput[idx] = block.payload?.sample_input || '';
+        nextHistory[idx] = ['Ready. Press Run to execute your code.'];
       }
     });
 
     setDynamicCodeByBlock(nextCode);
     setDynamicInputByBlock(nextInput);
-    setDynamicOutputByBlock({});
-    setDynamicCodeErrorByBlock({});
     setDynamicCodeRunningByBlock({});
+    setDynamicTerminalHistoryByBlock(nextHistory);
     setQuizRevealByQuestion({});
   }, [dynamicScript?.title, dynamicScript?.blocks]);
 
   const handleRunDynamicCodeBlock = async (blockIdx: number) => {
     const sourceCode = dynamicCodeByBlock[blockIdx] || '';
     if (!sourceCode.trim()) return;
+    const command = `$ ${dynamicInputByBlock[blockIdx] || '<empty>'}`;
 
     setDynamicCodeRunningByBlock((prev) => ({ ...prev, [blockIdx]: true }));
-    setDynamicCodeErrorByBlock((prev) => ({ ...prev, [blockIdx]: null }));
-    setDynamicOutputByBlock((prev) => ({ ...prev, [blockIdx]: '' }));
+    setDynamicTerminalHistoryByBlock((prev) => ({
+      ...prev,
+      [blockIdx]: [...(prev[blockIdx] || []), command],
+    }));
 
     try {
       const result = await codingAPI.runSampleCode({
@@ -227,20 +231,27 @@ export default function TopicPage() {
       });
 
       if (result.status === 'ok') {
-        setDynamicOutputByBlock((prev) => ({ ...prev, [blockIdx]: result.stdout || '(no output)' }));
-      } else {
-        setDynamicCodeErrorByBlock((prev) => ({
+        const output = result.stdout || '(no output)';
+        setDynamicTerminalHistoryByBlock((prev) => ({
           ...prev,
-          [blockIdx]: result.error_message || result.stderr || 'Execution failed',
+          [blockIdx]: [...(prev[blockIdx] || []), output],
+        }));
+      } else {
+        const errText = result.error_message || result.stderr || 'Execution failed';
+        setDynamicTerminalHistoryByBlock((prev) => ({
+          ...prev,
+          [blockIdx]: [...(prev[blockIdx] || []), `Traceback\n${errText}`],
         }));
       }
     } catch (err: any) {
-      setDynamicCodeErrorByBlock((prev) => ({
+      const errText = err?.response?.data?.error || err?.message || 'Failed to run code';
+      setDynamicTerminalHistoryByBlock((prev) => ({
         ...prev,
-        [blockIdx]: err?.response?.data?.error || err?.message || 'Failed to run code',
+        [blockIdx]: [...(prev[blockIdx] || []), `Traceback\n${errText}`],
       }));
     } finally {
       setDynamicCodeRunningByBlock((prev) => ({ ...prev, [blockIdx]: false }));
+      setDynamicInputByBlock((prev) => ({ ...prev, [blockIdx]: '' }));
     }
   };
 
@@ -442,8 +453,8 @@ export default function TopicPage() {
     dispatch(setActiveResourceView({ moduleIndex: mIdx, topicIndex: tIdx, view: null }));
     setNoteTitle('');
     setNoteContent('');
-    setSampleCodeOutput('');
-    setSampleCodeError(null);
+    setSampleTerminalHistory(['Ready. Press Run to execute your code.']);
+    setDynamicTerminalHistoryByBlock({});
   }, [mIdx, tIdx, dispatch]);
 
   // ─── Redirect if module is locked ──────────────────────────────────────────
@@ -839,55 +850,47 @@ export default function TopicPage() {
                           <p className="text-sm text-gray-700">
                             {block.payload?.instructions || 'Edit and run this code directly below.'}
                           </p>
-                          <div className="rounded-xl border border-gray-200 overflow-hidden h-[400px] bg-white">
-                            <ResizablePanelGroup direction="horizontal">
-                              <ResizablePanel defaultSize={60} minSize={35}>
-                                <div className="h-full flex flex-col">
-                                  <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-600">Code</div>
-                                  <Editor
-                                    height="100%"
-                                    defaultLanguage="python"
-                                    language="python"
-                                    theme="vs-dark"
-                                    value={dynamicCodeByBlock[idx] || ''}
-                                    onChange={(val) => setDynamicCodeByBlock((prev) => ({ ...prev, [idx]: val || '' }))}
-                                    options={{
-                                      minimap: { enabled: false },
-                                      fontSize: 14,
-                                      automaticLayout: true,
-                                      wordWrap: 'on',
-                                    }}
-                                  />
-                                </div>
-                              </ResizablePanel>
-                              <ResizableHandle withHandle />
-                              <ResizablePanel defaultSize={40} minSize={28}>
-                                <div className="h-full flex flex-col p-3 gap-2 bg-white">
-                                  <label className="text-xs font-medium text-gray-700">Input</label>
-                                  <textarea
+                          <div className="rounded-xl border border-gray-200 overflow-hidden h-[520px] bg-white flex flex-col">
+                            <div className="h-[58%] min-h-[220px] flex flex-col border-b border-gray-200">
+                              <div className="px-3 py-2 bg-gray-50 text-xs font-medium text-gray-600">Code</div>
+                              <Editor
+                                height="100%"
+                                defaultLanguage="python"
+                                language="python"
+                                theme="vs-dark"
+                                value={dynamicCodeByBlock[idx] || ''}
+                                onChange={(val) => setDynamicCodeByBlock((prev) => ({ ...prev, [idx]: val || '' }))}
+                                options={{
+                                  minimap: { enabled: false },
+                                  fontSize: 14,
+                                  automaticLayout: true,
+                                  wordWrap: 'on',
+                                }}
+                              />
+                            </div>
+
+                            <div className="h-[42%] min-h-[170px] flex flex-col p-2 bg-[#0b1220] text-[#d5e6ff]">
+                              <div className="text-xs font-semibold text-[#8fb5ff] mb-1">Terminal</div>
+                              <div className="flex-1 overflow-auto rounded-lg border border-[#1f2a44] p-2 bg-[#070d18] text-xs font-mono whitespace-pre-wrap">
+                                {(dynamicTerminalHistoryByBlock[idx] || ['Ready. Press Run to execute your code.']).join('\n')}
+                                <div className="mt-2 flex items-center gap-2 border-t border-[#1f2a44] pt-2">
+                                  <span className="text-[#6de2a1]">$</span>
+                                  <input
                                     value={dynamicInputByBlock[idx] || ''}
                                     onChange={(e) => setDynamicInputByBlock((prev) => ({ ...prev, [idx]: e.target.value }))}
-                                    rows={4}
-                                    className="w-full rounded-lg border border-gray-200 p-2 text-xs font-mono"
-                                    placeholder="Optional stdin input"
+                                    className="flex-1 bg-transparent outline-none text-xs font-mono text-[#d5e6ff]"
+                                    placeholder="type stdin..."
                                   />
-                                  <Button
+                                  <button
                                     onClick={() => handleRunDynamicCodeBlock(idx)}
                                     disabled={!!dynamicCodeRunningByBlock[idx] || !(dynamicCodeByBlock[idx] || '').trim()}
-                                    className="gap-2 w-full"
+                                    className="px-2 py-0.5 rounded bg-[#123a70] hover:bg-[#1a4e93] text-white text-xs disabled:opacity-50"
                                   >
-                                    {dynamicCodeRunningByBlock[idx] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                                    Run
-                                  </Button>
-                                  <label className="text-xs font-medium text-gray-700">Output</label>
-                                  <div className="flex-1 overflow-auto rounded-lg border border-gray-200 p-2 bg-gray-50 text-xs font-mono whitespace-pre-wrap">
-                                    {dynamicCodeErrorByBlock[idx]
-                                      ? `Error: ${dynamicCodeErrorByBlock[idx]}`
-                                      : (dynamicOutputByBlock[idx] || 'Run code to see output')}
-                                  </div>
+                                    {dynamicCodeRunningByBlock[idx] ? 'Running...' : 'Run'}
+                                  </button>
                                 </div>
-                              </ResizablePanel>
-                            </ResizablePanelGroup>
+                              </div>
+                            </div>
                           </div>
                         </div>
                       )}
@@ -943,49 +946,47 @@ export default function TopicPage() {
                     </p>
                   </div>
 
-                  <div className="rounded-xl border border-gray-200 overflow-hidden h-[460px]">
-                    <ResizablePanelGroup direction="horizontal">
-                      <ResizablePanel defaultSize={60} minSize={35}>
-                        <div className="h-full flex flex-col">
-                          <div className="px-3 py-2 bg-gray-50 border-b border-gray-200 text-xs font-medium text-gray-600">Code Runner</div>
-                          <Editor
-                            height="100%"
-                            defaultLanguage="python"
-                            language="python"
-                            theme="vs-dark"
-                            value={sampleCodeValue}
-                            onChange={(val) => setSampleCodeValue(val || '')}
-                            options={{
-                              minimap: { enabled: false },
-                              fontSize: 14,
-                              automaticLayout: true,
-                              wordWrap: 'on',
-                            }}
-                          />
-                        </div>
-                      </ResizablePanel>
-                      <ResizableHandle withHandle />
-                      <ResizablePanel defaultSize={40} minSize={30}>
-                        <div className="h-full flex flex-col p-3 gap-3 bg-white">
-                          <label className="text-xs font-medium text-gray-700">Input</label>
-                          <textarea
+                  <div className="rounded-xl border border-gray-200 overflow-hidden h-[560px] bg-white flex flex-col">
+                    <div className="h-[58%] min-h-[250px] flex flex-col border-b border-gray-200">
+                      <div className="px-3 py-2 bg-gray-50 text-xs font-medium text-gray-600">Code Runner</div>
+                      <Editor
+                        height="100%"
+                        defaultLanguage="python"
+                        language="python"
+                        theme="vs-dark"
+                        value={sampleCodeValue}
+                        onChange={(val) => setSampleCodeValue(val || '')}
+                        options={{
+                          minimap: { enabled: false },
+                          fontSize: 14,
+                          automaticLayout: true,
+                          wordWrap: 'on',
+                        }}
+                      />
+                    </div>
+
+                    <div className="h-[42%] min-h-[190px] flex flex-col p-2 bg-[#0b1220] text-[#d5e6ff]">
+                      <div className="text-xs font-semibold text-[#8fb5ff] mb-1">Terminal</div>
+                      <div className="flex-1 overflow-auto rounded-lg border border-[#1f2a44] p-2 bg-[#070d18] text-xs font-mono whitespace-pre-wrap">
+                        {sampleTerminalHistory.join('\n')}
+                        <div className="mt-2 flex items-center gap-2 border-t border-[#1f2a44] pt-2">
+                          <span className="text-[#6de2a1]">$</span>
+                          <input
                             value={sampleCodeInput}
                             onChange={(e) => setSampleCodeInput(e.target.value)}
-                            rows={5}
-                            className="w-full rounded-lg border border-gray-200 p-2 text-xs font-mono"
-                            placeholder="Optional stdin input"
+                            className="flex-1 bg-transparent outline-none text-xs font-mono text-[#d5e6ff]"
+                            placeholder="type stdin..."
                           />
-                          <Button onClick={handleRunSampleCode} disabled={sampleCodeRunning || !sampleCodeValue.trim()} className="gap-2 w-full">
-                            {sampleCodeRunning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                            Run
-                          </Button>
-                          <label className="text-xs font-medium text-gray-700">Output</label>
-                          <div className="flex-1 overflow-auto rounded-lg border border-gray-200 p-2 bg-gray-50 text-xs font-mono whitespace-pre-wrap">
-                            {sampleCodeError ? `Error: ${sampleCodeError}` : (sampleCodeOutput || 'Run code to see output')}
-                          </div>
+                          <button
+                            onClick={handleRunSampleCode}
+                            disabled={sampleCodeRunning || !sampleCodeValue.trim()}
+                            className="px-2 py-0.5 rounded bg-[#123a70] hover:bg-[#1a4e93] text-white text-xs disabled:opacity-50"
+                          >
+                            {sampleCodeRunning ? 'Running...' : 'Run'}
+                          </button>
                         </div>
-                      </ResizablePanel>
-                    </ResizablePanelGroup>
+                      </div>
+                    </div>
                   </div>
                 </div>
               ) : (
