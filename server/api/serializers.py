@@ -434,6 +434,18 @@ class DynamicScriptResponseSerializer(serializers.Serializer):
     blocks = DynamicScriptBlockSerializer(many=True)
 
 
+class GenerateSampleCodeRequestSerializer(serializers.Serializer):
+    enrollment_id = serializers.IntegerField()
+    module_id = serializers.IntegerField()
+    topic_name = serializers.CharField(max_length=255)
+    regenerate = serializers.BooleanField(required=False, default=False)
+
+
+class RunSampleCodeRequestSerializer(serializers.Serializer):
+    source_code = serializers.CharField()
+    raw_input = serializers.CharField(required=False, allow_blank=True, default='')
+
+
 class CreateCodeSubmissionSerializer(serializers.Serializer):
     enrollment_id = serializers.IntegerField()
     problem_id = serializers.IntegerField()

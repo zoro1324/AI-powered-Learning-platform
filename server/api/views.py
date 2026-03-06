@@ -36,6 +36,7 @@ from .serializers import (
     CreateCodeSubmissionSerializer, CodeExecutionTaskSerializer,
     CodeSubmissionSerializer,
     GenerateDynamicScriptRequestSerializer, DynamicScriptResponseSerializer,
+    GenerateSampleCodeRequestSerializer, RunSampleCodeRequestSerializer,
 )
 from .tasks import generate_video_task
 from .services.assessment_service import get_assessment_service
@@ -43,6 +44,7 @@ from .services.podcast_service import get_podcast_service
 from .services.code_problem_service import get_code_problem_service
 from .services.code_execution_service import get_code_execution_service
 from .services.dynamic_script_service import get_dynamic_script_service
+from .services.sample_code_service import get_sample_code_service
 
 User = get_user_model()
 
@@ -2013,6 +2015,90 @@ class CodeSubmissionResultView(APIView):
             return Response({'error': 'Submission not found'}, status=status.HTTP_404_NOT_FOUND)
 
         return Response(CodeSubmissionSerializer(submission).data, status=status.HTTP_200_OK)
+
+
+class GenerateSampleCodeView(APIView):
+    """Generate runnable sample code for a topic (without test cases)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = GenerateSampleCodeRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = serializer.validated_data
+
+        enrollment_id = payload['enrollment_id']
+        module_id = payload['module_id']
+        topic_name = payload['topic_name']
+        regenerate = payload.get('regenerate', False)
+
+        try:
+            enrollment = Enrollment.objects.get(pk=enrollment_id, user=request.user)
+            module = Module.objects.get(course=enrollment.course, order=module_id)
+        except Enrollment.DoesNotExist:
+            return Response({'error': 'Enrollment not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Module.DoesNotExist:
+            return Response({'error': 'Module not found for this enrollment/course'}, status=status.HTTP_404_NOT_FOUND)
+
+        lesson_order = module.lessons.count() + 1
+        lesson, _ = Lesson.objects.get_or_create(
+            module=module,
+            title=topic_name,
+            defaults={'order': lesson_order, 'content': ''},
+        )
+
+        if not regenerate:
+            existing = Resource.objects.filter(
+                lesson=lesson,
+                resource_type=Resource.ResourceType.CODE_EXERCISE,
+                title__startswith=f'Sample Code: {topic_name}',
+            ).order_by('-created_at').first()
+            if existing:
+                return Response(ResourceSerializer(existing, context={'request': request}).data, status=status.HTTP_200_OK)
+
+        sample = get_sample_code_service().generate_sample(
+            course_title=enrollment.course.title,
+            topic_name=topic_name,
+            topic_content=lesson.content or '',
+        )
+
+        resource = Resource.objects.create(
+            lesson=lesson,
+            resource_type=Resource.ResourceType.CODE_EXERCISE,
+            title=f"Sample Code: {topic_name}",
+            content_text=sample['explanation'],
+            content_json={
+                'mode': 'sample_code',
+                'title': sample['title'],
+                'explanation': sample['explanation'],
+                'language': 'python',
+                'starter_code': sample['starter_code'],
+                'sample_input': sample['sample_input'],
+            },
+            is_generated=True,
+            generation_model=getattr(settings, 'CODING_MODEL', getattr(settings, 'OLLAMA_MODEL', 'unknown')),
+        )
+
+        return Response(ResourceSerializer(resource, context={'request': request}).data, status=status.HTTP_201_CREATED)
+
+
+class RunSampleCodeView(APIView):
+    """Execute sample code once without test cases."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = RunSampleCodeRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = serializer.validated_data
+
+        try:
+            result = get_code_execution_service().run_python_sample(
+                source_code=payload['source_code'],
+                raw_input=payload.get('raw_input', ''),
+                timeout_seconds=3,
+            )
+            return Response(result, status=status.HTTP_200_OK)
+        except Exception as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class GenerateTopicContentView(APIView):
