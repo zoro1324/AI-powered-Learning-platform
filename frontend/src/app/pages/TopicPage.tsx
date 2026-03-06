@@ -144,6 +144,7 @@ export default function TopicPage() {
   const [sampleCodeValue, setSampleCodeValue] = useState('');
   const [sampleCodeInput, setSampleCodeInput] = useState('');
   const [sampleCodeOutput, setSampleCodeOutput] = useState('');
+  const [visibleDynamicBlocks, setVisibleDynamicBlocks] = useState(0);
   const [sampleCodeRunning, setSampleCodeRunning] = useState(false);
   const [sampleCodeError, setSampleCodeError] = useState<string | null>(null);
 
@@ -162,9 +163,28 @@ export default function TopicPage() {
     setNoteSaving(false);
     setNoteTitle('');
     setNoteContent('');
-    // Switch to text view after saving
     dispatch(setActiveResourceView({ moduleIndex: mIdx, topicIndex: tIdx, view: null }));
   };
+
+  useEffect(() => {
+    if (activeView?.type !== 'dynamic-script' || !dynamicScript?.blocks?.length) {
+      setVisibleDynamicBlocks(0);
+      return;
+    }
+
+    setVisibleDynamicBlocks(1);
+    const timer = setInterval(() => {
+      setVisibleDynamicBlocks((prev) => {
+        if (prev >= dynamicScript.blocks.length) {
+          clearInterval(timer);
+          return prev;
+        }
+        return prev + 1;
+      });
+    }, 1200);
+
+    return () => clearInterval(timer);
+  }, [activeView?.type, dynamicScript?.blocks?.length]);
 
   // ─── Module unlock check ──────────────────────────────────────────────────
 
@@ -683,15 +703,39 @@ export default function TopicPage() {
                   <p className="text-sm text-gray-600">{dynamicScript.overview}</p>
                 )}
                 <div className="space-y-3">
-                  {dynamicScript.blocks.map((block, idx) => (
+                  {dynamicScript.blocks.slice(0, visibleDynamicBlocks).map((block, idx) => (
                     <div key={`${block.type}-${idx}`} className="rounded-xl border border-gray-200 p-4 bg-gray-50">
                       <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">
                         {block.type.replace('_', ' ')}
                       </p>
                       <p className="text-sm text-gray-800 font-medium mb-2">{block.prompt}</p>
                       {block.type === 'text' && (
-                        <div className="text-sm text-gray-700 whitespace-pre-wrap">
-                          {block.payload?.markdown || block.payload?.content || ''}
+                        <div className="prose prose-gray max-w-none text-sm">
+                          <ReactMarkdown
+                            rehypePlugins={[rehypeHighlight]}
+                            components={{
+                              h1: ({ ...props }) => <h1 className="text-2xl font-bold text-gray-900 mt-6 mb-3" {...props} />,
+                              h2: ({ ...props }) => <h2 className="text-xl font-bold text-gray-900 mt-5 mb-2" {...props} />,
+                              h3: ({ ...props }) => <h3 className="text-lg font-semibold text-gray-900 mt-4 mb-2" {...props} />,
+                              p: ({ ...props }) => <p className="text-gray-700 leading-relaxed mb-3" {...props} />,
+                              code: ({ ...props }) => {
+                                const { className } = props;
+                                const isInline = !className?.includes('language-');
+                                if (isInline) {
+                                  return <code className="bg-gray-100 text-pink-600 px-1.5 py-0.5 rounded text-sm" {...props} />;
+                                }
+                                return <code className={cn(className, 'font-mono')} {...props} />;
+                              },
+                              pre: ({ ...props }) => (
+                                <pre className="bg-[#1e1e1e] text-[#d4d4d4] rounded-xl p-4 overflow-x-auto my-4 text-sm not-prose border border-gray-800 shadow-lg" {...props} />
+                              ),
+                              ul: ({ ...props }) => <ul className="list-disc ml-6 mb-3 space-y-1 text-gray-700" {...props} />,
+                              ol: ({ ...props }) => <ol className="list-decimal ml-6 mb-3 space-y-1 text-gray-700" {...props} />,
+                              blockquote: ({ ...props }) => <blockquote className="border-l-4 border-gray-200 pl-4 italic my-3 text-gray-600" {...props} />,
+                            }}
+                          >
+                            {block.payload?.markdown || block.payload?.content || ''}
+                          </ReactMarkdown>
                         </div>
                       )}
                       {block.type === 'quiz' && Array.isArray(block.payload?.questions) && (

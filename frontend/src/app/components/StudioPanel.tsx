@@ -49,6 +49,8 @@ import { ChatPanel } from './ChatPanel';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { MindMapViewer } from './MindMapViewer';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './ui/resizable';
+import ReactMarkdown from 'react-markdown';
+import rehypeHighlight from 'rehype-highlight';
 
 interface StudioPanelProps {
   collapsed: boolean;
@@ -1254,8 +1256,34 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                     <p className="text-sm text-gray-700">{block.prompt}</p>
 
                     {block.type === 'text' && (
-                      <div className="rounded-lg bg-gray-50 border border-gray-200 p-3 text-sm text-gray-700 whitespace-pre-wrap">
-                        {block.payload?.markdown || block.payload?.content || 'No text payload provided.'}
+                      <div className="rounded-lg bg-gray-50 border border-gray-200 p-3 text-sm text-gray-700">
+                        <div className="prose prose-gray max-w-none text-sm">
+                          <ReactMarkdown
+                            rehypePlugins={[rehypeHighlight]}
+                            components={{
+                              h1: ({ ...props }) => <h1 className="text-2xl font-bold text-gray-900 mt-6 mb-3" {...props} />,
+                              h2: ({ ...props }) => <h2 className="text-xl font-bold text-gray-900 mt-5 mb-2" {...props} />,
+                              h3: ({ ...props }) => <h3 className="text-lg font-semibold text-gray-900 mt-4 mb-2" {...props} />,
+                              p: ({ ...props }) => <p className="text-gray-700 leading-relaxed mb-3" {...props} />,
+                              code: ({ ...props }) => {
+                                const { className } = props;
+                                const isInline = !className?.includes('language-');
+                                if (isInline) {
+                                  return <code className="bg-gray-100 text-pink-600 px-1.5 py-0.5 rounded text-sm" {...props} />;
+                                }
+                                return <code className={cn(className, 'font-mono')} {...props} />;
+                              },
+                              pre: ({ ...props }) => (
+                                <pre className="bg-[#1e1e1e] text-[#d4d4d4] rounded-xl p-4 overflow-x-auto my-4 text-sm not-prose border border-gray-800 shadow-lg" {...props} />
+                              ),
+                              ul: ({ ...props }) => <ul className="list-disc ml-6 mb-3 space-y-1 text-gray-700" {...props} />,
+                              ol: ({ ...props }) => <ol className="list-decimal ml-6 mb-3 space-y-1 text-gray-700" {...props} />,
+                              blockquote: ({ ...props }) => <blockquote className="border-l-4 border-gray-200 pl-4 italic my-3 text-gray-600" {...props} />,
+                            }}
+                          >
+                            {block.payload?.markdown || block.payload?.content || 'No text payload provided.'}
+                          </ReactMarkdown>
+                        </div>
                       </div>
                     )}
 
