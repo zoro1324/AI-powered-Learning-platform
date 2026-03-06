@@ -7,7 +7,8 @@ from .models import (
     VideoTask, LearningProfile, Course, Module, Lesson, LessonProgress, Resource,
     Enrollment, Question, QuizAttempt, QuizAnswer, ModuleProgress,
     LearningRoadmap, Achievement, UserAchievement, ActivityLog,
-    PersonalizedSyllabus, CoursePlanningTask, ChatHistory
+    PersonalizedSyllabus, CoursePlanningTask, ChatHistory,
+    CodingProblem, CodingTestCase, CodeSubmission, CodeExecutionTask,
 )
 
 User = get_user_model()
@@ -363,3 +364,90 @@ class ChatHistorySerializer(serializers.ModelSerializer):
         model = ChatHistory
         fields = ['id', 'enrollment', 'role', 'content', 'topic_name', 'created_at']
         read_only_fields = ['id', 'created_at']
+
+
+# ============================================================================
+# CODING LAB SERIALIZERS
+# ============================================================================
+
+class CodingTestCaseSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CodingTestCase
+        fields = ['id', 'input_data', 'expected_output', 'explanation', 'is_hidden', 'weight', 'order']
+
+
+class CodingProblemSerializer(serializers.ModelSerializer):
+    test_cases = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CodingProblem
+        fields = [
+            'id',
+            'course',
+            'module',
+            'lesson',
+            'title',
+            'problem_statement',
+            'starter_code',
+            'language',
+            'difficulty',
+            'constraints',
+            'hints',
+            'is_generated',
+            'generation_model',
+            'created_at',
+            'updated_at',
+            'test_cases',
+        ]
+
+    def get_test_cases(self, obj):
+        # Hide hidden tests in learner-facing responses.
+        visible = obj.test_cases.filter(is_hidden=False).order_by('order', 'id')
+        return CodingTestCaseSerializer(visible, many=True).data
+
+
+class GenerateCodingProblemRequestSerializer(serializers.Serializer):
+    enrollment_id = serializers.IntegerField()
+    module_id = serializers.IntegerField()
+    topic_name = serializers.CharField(max_length=255)
+    regenerate = serializers.BooleanField(required=False, default=False)
+
+
+class CreateCodeSubmissionSerializer(serializers.Serializer):
+    enrollment_id = serializers.IntegerField()
+    problem_id = serializers.IntegerField()
+    source_code = serializers.CharField()
+    language = serializers.ChoiceField(choices=CodingProblem.Language.choices, default=CodingProblem.Language.PYTHON)
+
+
+class CodeSubmissionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CodeSubmission
+        fields = '__all__'
+        read_only_fields = [
+            'id',
+            'user',
+            'status',
+            'score_percent',
+            'passed_tests',
+            'total_tests',
+            'feedback',
+            'error_message',
+            'submitted_at',
+            'completed_at',
+        ]
+
+
+class CodeExecutionTaskSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CodeExecutionTask
+        fields = [
+            'id',
+            'submission',
+            'status',
+            'progress_message',
+            'result_data',
+            'error_message',
+            'created_at',
+            'completed_at',
+        ]

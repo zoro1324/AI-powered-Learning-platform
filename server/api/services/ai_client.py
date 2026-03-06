@@ -47,11 +47,16 @@ def _use_featherless_image() -> bool:
 
 # ── Ollama text helper ────────────────────────────────────────────────────────
 
-def _ollama_generate(prompt: str, system_prompt: Optional[str] = None, json_mode: bool = False) -> str:
+def _ollama_generate(
+    prompt: str,
+    system_prompt: Optional[str] = None,
+    json_mode: bool = False,
+    model: Optional[str] = None,
+) -> str:
     """Send a chat request to the local Ollama server."""
     base_url = getattr(settings, 'OLLAMA_API_URL', 'http://localhost:11434/api/generate')
     chat_url = base_url.replace('/api/generate', '/api/chat')
-    model = getattr(settings, 'OLLAMA_MODEL', 'llama3:8b')
+    model_name = model or getattr(settings, 'OLLAMA_MODEL', 'llama3:8b')
     timeout = getattr(settings, 'OLLAMA_TIMEOUT', 600)
 
     messages = []
@@ -60,14 +65,14 @@ def _ollama_generate(prompt: str, system_prompt: Optional[str] = None, json_mode
     messages.append({'role': 'user', 'content': prompt})
 
     payload: dict = {
-        'model': model,
+        'model': model_name,
         'messages': messages,
         'stream': False,
     }
     if json_mode:
         payload['format'] = 'json'
 
-    logger.info("AI Client [DEV] → Ollama model=%s json_mode=%s", model, json_mode)
+    logger.info("AI Client [DEV] → Ollama model=%s json_mode=%s", model_name, json_mode)
     response = requests.post(
         chat_url,
         json=payload,
@@ -82,7 +87,12 @@ def _ollama_generate(prompt: str, system_prompt: Optional[str] = None, json_mode
 
 # ── Featherless text helper ───────────────────────────────────────────────────
 
-def _featherless_generate(prompt: str, system_prompt: Optional[str] = None, json_mode: bool = False) -> str:
+def _featherless_generate(
+    prompt: str,
+    system_prompt: Optional[str] = None,
+    json_mode: bool = False,
+    model: Optional[str] = None,
+) -> str:
     """Send a chat request to the Featherless API via LangChain."""
     llm = get_langchain_llm(temperature=0.7)
 
@@ -101,7 +111,7 @@ def _featherless_generate(prompt: str, system_prompt: Optional[str] = None, json
         )
     messages.append(HumanMessage(content=final_prompt))
 
-    model_name = getattr(settings, 'FEATHERLESS_MODEL', 'openai/gpt-oss-120b')
+    model_name = model or getattr(settings, 'FEATHERLESS_MODEL', 'openai/gpt-oss-120b')
     logger.info("AI Client [PROD] → Featherless model=%s json_mode=%s", model_name, json_mode)
     response = llm.invoke(messages)
     content = (response.content or '') if hasattr(response, 'content') else str(response)
@@ -199,6 +209,7 @@ def generate_text(
     prompt: str,
     system_prompt: Optional[str] = None,
     json_mode: bool = False,
+    model: Optional[str] = None,
 ) -> str:
     """
     Generate text using the configured AI backend.
@@ -212,8 +223,18 @@ def generate_text(
         The model's response as a string.
     """
     if _use_featherless_text():
-        return _featherless_generate(prompt, system_prompt=system_prompt, json_mode=json_mode)
-    return _ollama_generate(prompt, system_prompt=system_prompt, json_mode=json_mode)
+        return _featherless_generate(
+            prompt,
+            system_prompt=system_prompt,
+            json_mode=json_mode,
+            model=model,
+        )
+    return _ollama_generate(
+        prompt,
+        system_prompt=system_prompt,
+        json_mode=json_mode,
+        model=model,
+    )
 
 
 def generate_image(prompt_text: str, output_path: Optional[str] = None) -> Optional[Image.Image]:

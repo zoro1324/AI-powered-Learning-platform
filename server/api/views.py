@@ -19,7 +19,8 @@ from .models import (
     VideoTask, LearningProfile, Course, Module, Lesson, LessonProgress, Resource,
     Enrollment, Question, QuizAttempt, QuizAnswer, ModuleProgress,
     LearningRoadmap, Achievement, UserAchievement, ActivityLog,
-    PersonalizedSyllabus, CoursePlanningTask
+    PersonalizedSyllabus, CoursePlanningTask,
+    CodingProblem, CodingTestCase, CodeSubmission, CodeExecutionTask,
 )
 from .serializers import (
     VideoTaskCreateSerializer, VideoTaskStatusSerializer,
@@ -30,11 +31,16 @@ from .serializers import (
     QuestionSerializer, QuizAttemptSerializer, QuizAnswerSerializer,
     QuizSubmissionSerializer, ModuleProgressSerializer,
     LearningRoadmapSerializer, AchievementSerializer,
-    UserAchievementSerializer, ActivityLogSerializer
+    UserAchievementSerializer, ActivityLogSerializer,
+    GenerateCodingProblemRequestSerializer, CodingProblemSerializer,
+    CreateCodeSubmissionSerializer, CodeExecutionTaskSerializer,
+    CodeSubmissionSerializer,
 )
 from .tasks import generate_video_task
 from .services.assessment_service import get_assessment_service
 from .services.podcast_service import get_podcast_service
+from .services.code_problem_service import get_code_problem_service
+from .services.code_execution_service import get_code_execution_service
 
 User = get_user_model()
 
@@ -1790,6 +1796,221 @@ class GetSyllabusView(APIView):
             'total_topics': syllabus.total_topics,
             'created_at': syllabus.created_at,
         })
+
+
+class GenerateCodingProblemView(APIView):
+    """Generate and persist a coding problem for a specific topic."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = GenerateCodingProblemRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = serializer.validated_data
+
+        enrollment_id = payload['enrollment_id']
+        module_id = payload['module_id']
+        topic_name = payload['topic_name']
+        regenerate = payload.get('regenerate', False)
+
+        try:
+            enrollment = Enrollment.objects.get(pk=enrollment_id, user=request.user)
+            module = Module.objects.get(course=enrollment.course, order=module_id)
+        except Enrollment.DoesNotExist:
+            return Response({'error': 'Enrollment not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Module.DoesNotExist:
+            return Response({'error': 'Module not found for this enrollment/course'}, status=status.HTTP_404_NOT_FOUND)
+
+        lesson_order = module.lessons.count() + 1
+        lesson, _ = Lesson.objects.get_or_create(
+            module=module,
+            title=topic_name,
+            defaults={'order': lesson_order, 'content': ''},
+        )
+
+        existing_problem = CodingProblem.objects.filter(lesson=lesson, language='python').order_by('-created_at').first()
+        if existing_problem and not regenerate:
+            return Response(CodingProblemSerializer(existing_problem).data, status=status.HTTP_200_OK)
+
+        service = get_code_problem_service()
+        generated = service.generate_problem(
+            course_name=enrollment.course.title,
+            topic_name=topic_name,
+            topic_context=lesson.content or '',
+        )
+
+        problem = CodingProblem.objects.create(
+            course=enrollment.course,
+            module=module,
+            lesson=lesson,
+            title=generated.title,
+            problem_statement=generated.problem_statement,
+            starter_code=generated.starter_code,
+            reference_solution=generated.reference_solution,
+            language='python',
+            difficulty=generated.difficulty,
+            constraints=generated.constraints,
+            hints=generated.hints,
+            is_generated=True,
+            generation_model=getattr(settings, 'CODING_MODEL', getattr(settings, 'OLLAMA_MODEL', 'unknown')),
+        )
+
+        for test_data in [*generated.visible_tests, *generated.hidden_tests]:
+            CodingTestCase.objects.create(
+                problem=problem,
+                input_data=test_data.get('input_data', ''),
+                expected_output=test_data.get('expected_output', ''),
+                explanation=test_data.get('explanation', ''),
+                is_hidden=bool(test_data.get('is_hidden', False)),
+                weight=test_data.get('weight', 1.0),
+                order=test_data.get('order', 1),
+            )
+
+        Resource.objects.create(
+            lesson=lesson,
+            resource_type=Resource.ResourceType.CODE_EXERCISE,
+            title=f'{topic_name} - Code Exercise',
+            content_json={'coding_problem_id': problem.id, 'language': problem.language},
+            is_generated=True,
+            generation_model=problem.generation_model,
+        )
+
+        return Response(CodingProblemSerializer(problem).data, status=status.HTTP_201_CREATED)
+
+
+class CodingProblemDetailView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, problem_id):
+        try:
+            problem = CodingProblem.objects.select_related('course').get(pk=problem_id)
+        except CodingProblem.DoesNotExist:
+            return Response({'error': 'Coding problem not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        has_access = Enrollment.objects.filter(user=request.user, course=problem.course).exists()
+        if not has_access:
+            return Response({'error': 'You do not have access to this coding problem'}, status=status.HTTP_403_FORBIDDEN)
+
+        return Response(CodingProblemSerializer(problem).data, status=status.HTTP_200_OK)
+
+
+class CreateCodeSubmissionView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = CreateCodeSubmissionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = serializer.validated_data
+
+        try:
+            enrollment = Enrollment.objects.get(pk=payload['enrollment_id'], user=request.user)
+            problem = CodingProblem.objects.get(pk=payload['problem_id'])
+        except Enrollment.DoesNotExist:
+            return Response({'error': 'Enrollment not found'}, status=status.HTTP_404_NOT_FOUND)
+        except CodingProblem.DoesNotExist:
+            return Response({'error': 'Coding problem not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        if enrollment.course_id != problem.course_id:
+            return Response({'error': 'Problem does not belong to this enrollment course'}, status=status.HTTP_400_BAD_REQUEST)
+
+        submission = CodeSubmission.objects.create(
+            user=request.user,
+            enrollment=enrollment,
+            problem=problem,
+            language=payload['language'],
+            source_code=payload['source_code'],
+            status=CodeSubmission.Status.PENDING,
+        )
+        task = CodeExecutionTask.objects.create(
+            submission=submission,
+            status=CodeExecutionTask.Status.PENDING,
+            progress_message='Submission queued',
+        )
+
+        # Current implementation executes immediately in-process. Task model keeps API contract
+        # compatible with future async workers.
+        task.status = CodeExecutionTask.Status.PROCESSING
+        task.progress_message = 'Running test cases'
+        task.save(update_fields=['status', 'progress_message'])
+        submission.status = CodeSubmission.Status.RUNNING
+        submission.save(update_fields=['status'])
+
+        try:
+            executor = get_code_execution_service()
+            test_cases = list(problem.test_cases.all().order_by('order', 'id'))
+            result = executor.run_python_tests(source_code=submission.source_code, test_cases=test_cases, timeout_seconds=2)
+
+            submission.status = CodeSubmission.Status.COMPLETED
+            submission.score_percent = result['score_percent']
+            submission.passed_tests = result['passed_tests']
+            submission.total_tests = result['total_tests']
+            submission.feedback = {
+                'summary': result['feedback'],
+                'test_results': result['test_results'],
+            }
+            submission.completed_at = timezone.now()
+            submission.save(
+                update_fields=[
+                    'status',
+                    'score_percent',
+                    'passed_tests',
+                    'total_tests',
+                    'feedback',
+                    'completed_at',
+                ]
+            )
+
+            task.status = CodeExecutionTask.Status.COMPLETED
+            task.progress_message = 'Execution complete'
+            task.result_data = {
+                'score_percent': result['score_percent'],
+                'passed_tests': result['passed_tests'],
+                'total_tests': result['total_tests'],
+            }
+            task.completed_at = timezone.now()
+            task.save(update_fields=['status', 'progress_message', 'result_data', 'completed_at'])
+        except Exception as exc:
+            submission.status = CodeSubmission.Status.FAILED
+            submission.error_message = str(exc)
+            submission.completed_at = timezone.now()
+            submission.save(update_fields=['status', 'error_message', 'completed_at'])
+
+            task.status = CodeExecutionTask.Status.FAILED
+            task.error_message = str(exc)
+            task.progress_message = 'Execution failed'
+            task.completed_at = timezone.now()
+            task.save(update_fields=['status', 'error_message', 'progress_message', 'completed_at'])
+
+        return Response(
+            {
+                'submission': CodeSubmissionSerializer(submission).data,
+                'task': CodeExecutionTaskSerializer(task).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class CodeExecutionTaskStatusView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, task_id):
+        try:
+            task = CodeExecutionTask.objects.select_related('submission').get(pk=task_id, submission__user=request.user)
+        except CodeExecutionTask.DoesNotExist:
+            return Response({'error': 'Task not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response(CodeExecutionTaskSerializer(task).data, status=status.HTTP_200_OK)
+
+
+class CodeSubmissionResultView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, submission_id):
+        try:
+            submission = CodeSubmission.objects.select_related('problem').get(pk=submission_id, user=request.user)
+        except CodeSubmission.DoesNotExist:
+            return Response({'error': 'Submission not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response(CodeSubmissionSerializer(submission).data, status=status.HTTP_200_OK)
 
 
 class GenerateTopicContentView(APIView):

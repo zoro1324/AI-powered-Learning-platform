@@ -228,6 +228,8 @@ USE_FEATHERLESS_IMAGE = (
 # --- OLLAMA (development) ---
 OLLAMA_API_URL = os.environ.get('OLLAMA_API_URL', 'http://localhost:11434/api/generate')
 OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'llama3:8b')
+# Dedicated model for coding problem generation.
+CODING_MODEL = os.environ.get('CODING_MODEL', 'qwen2.5-coder:7b')
 OLLAMA_TIMEOUT = int(os.environ.get('OLLAMA_TIMEOUT', '600'))  # seconds
 
 # --- Featherless (production) ---

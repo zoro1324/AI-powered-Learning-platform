@@ -70,7 +70,7 @@ export interface Resource {
   id: number;
   lesson: number;
   title: string;
-  resource_type: 'video' | 'pdf' | 'quiz' | 'mindmap' | 'notes' | 'audio' | 'image' | 'reel' | 'video_script' | 'ppt' | 'external_link';
+  resource_type: 'video' | 'pdf' | 'quiz' | 'mindmap' | 'notes' | 'audio' | 'image' | 'reel' | 'video_script' | 'ppt' | 'external_link' | 'code_exercise';
   file?: string;
   file_url?: string;
   content_text?: string;
@@ -248,4 +248,61 @@ export interface CoursePlanningTask {
   error_message: string;
   created_at: string;
   completed_at: string | null;
+}
+
+export interface CodingTestCase {
+  id: number;
+  input_data: string;
+  expected_output: string;
+  explanation: string;
+  is_hidden: boolean;
+  weight: number;
+  order: number;
+}
+
+export interface CodingProblem {
+  id: number;
+  course: number;
+  module?: number | null;
+  lesson?: number | null;
+  title: string;
+  problem_statement: string;
+  starter_code: string;
+  language: 'python';
+  difficulty: 'easy' | 'intermediate' | 'difficult';
+  constraints: Record<string, any>;
+  hints: string[];
+  is_generated: boolean;
+  generation_model: string;
+  created_at: string;
+  updated_at: string;
+  test_cases: CodingTestCase[];
+}
+
+export interface CodeSubmission {
+  id: string;
+  user: number;
+  enrollment: number;
+  problem: number;
+  language: 'python';
+  source_code: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  score_percent: number;
+  passed_tests: number;
+  total_tests: number;
+  feedback: Record<string, any>;
+  error_message: string;
+  submitted_at: string;
+  completed_at?: string | null;
+}
+
+export interface CodeExecutionTask {
+  id: string;
+  submission: string;
+  status: 'pending' | 'processing' | 'completed' | 'failed';
+  progress_message: string;
+  result_data: Record<string, any>;
+  error_message: string;
+  created_at: string;
+  completed_at?: string | null;
 }

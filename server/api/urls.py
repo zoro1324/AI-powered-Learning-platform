@@ -15,7 +15,9 @@ from .views import (
     GenerateTopicContentView, GenerateTopicQuizView, EvaluateTopicQuizView,
     GenerateTopicMindMapView, GenerateRemediationContentView,
     GeneratePersonaOptionsView, GenerateScenarioOptionsView, GeneratePodcastView,
-    ChatWithContextView, GetChatHistoryView, ClearChatHistoryView
+    ChatWithContextView, GetChatHistoryView, ClearChatHistoryView,
+    GenerateCodingProblemView, CodingProblemDetailView,
+    CreateCodeSubmissionView, CodeExecutionTaskStatusView, CodeSubmissionResultView,
 )
 
 # Create router for ViewSets
@@ -66,6 +68,13 @@ urlpatterns = [
     path('assessment/topic/evaluate/', EvaluateTopicQuizView.as_view(), name='topic-evaluate'),
     path('assessment/topic/remediation/', GenerateRemediationContentView.as_view(), name='topic-remediation'),
     path('assessment/topic/mindmap/', GenerateTopicMindMapView.as_view(), name='topic-mindmap'),
+
+    # Coding Lab
+    path('coding/problems/generate/', GenerateCodingProblemView.as_view(), name='coding-problem-generate'),
+    path('coding/problems/<int:problem_id>/', CodingProblemDetailView.as_view(), name='coding-problem-detail'),
+    path('coding/submissions/', CreateCodeSubmissionView.as_view(), name='coding-submission-create'),
+    path('coding/tasks/<uuid:task_id>/', CodeExecutionTaskStatusView.as_view(), name='coding-task-status'),
+    path('coding/submissions/<uuid:submission_id>/result/', CodeSubmissionResultView.as_view(), name='coding-submission-result'),
     
     # Podcast Generation
     path('podcast/personas/', GeneratePersonaOptionsView.as_view(), name='podcast-personas'),

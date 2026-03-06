@@ -21,6 +21,9 @@ import {
   AuthResponse,
   PaginatedResponse,
   CoursePlanningTask,
+  CodingProblem,
+  CodeSubmission,
+  CodeExecutionTask,
 } from '../types/api';
 
 // Create axios instance
@@ -715,6 +718,53 @@ export const assessmentAPI = {
 };
 
 // ============================================================================
+// CODING LAB API
+// ============================================================================
+
+export const codingAPI = {
+  generateProblem: async (data: {
+    enrollment_id: number;
+    module_id: number;
+    topic_name: string;
+    regenerate?: boolean;
+  }): Promise<CodingProblem> => {
+    const response = await api.post<CodingProblem>('/coding/problems/generate/', data);
+    return response.data;
+  },
+
+  getProblem: async (problemId: number): Promise<CodingProblem> => {
+    const response = await api.get<CodingProblem>(`/coding/problems/${problemId}/`);
+    return response.data;
+  },
+
+  submitCode: async (data: {
+    enrollment_id: number;
+    problem_id: number;
+    source_code: string;
+    language?: 'python';
+  }): Promise<{ submission: CodeSubmission; task: CodeExecutionTask }> => {
+    const response = await api.post<{ submission: CodeSubmission; task: CodeExecutionTask }>(
+      '/coding/submissions/',
+      {
+        ...data,
+        language: data.language || 'python',
+      }
+    );
+    return response.data;
+  },
+
+  getTaskStatus: async (taskId: string): Promise<CodeExecutionTask> => {
+    const response = await api.get<CodeExecutionTask>(`/coding/tasks/${taskId}/`);
+    return response.data;
+  },
+
+  getSubmissionResult: async (submissionId: string): Promise<CodeSubmission> => {
+    const response = await api.get<CodeSubmission>(`/coding/submissions/${submissionId}/result/`);
+    return response.data;
+  },
+};
+
+// ============================================================================
 // PODCAST API
 // ============================================================================
 
@@ -818,6 +868,9 @@ export type {
   LearningRoadmap,
   DashboardData,
   PaginatedResponse,
+  CodingProblem,
+  CodeSubmission,
+  CodeExecutionTask,
 };
 
 export default api;
