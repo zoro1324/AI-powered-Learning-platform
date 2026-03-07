@@ -579,6 +579,37 @@ export interface TopicContentResponse {
   content: string;
 }
 
+export type DynamicScriptBlockType = 'text' | 'code' | 'video' | 'mind_map' | 'quiz';
+
+export interface DynamicScriptBlock {
+  type: DynamicScriptBlockType;
+  prompt: string;
+  payload: Record<string, any>;
+}
+
+export interface DynamicScriptResponse {
+  lesson_id: number;
+  schema_version: string;
+  title: string;
+  overview: string;
+  blocks: DynamicScriptBlock[];
+}
+
+export interface SampleCodeRunResponse {
+  status: 'ok' | 'runtime_error' | 'timeout' | 'internal_error';
+  stdout: string;
+  stderr: string;
+  error_message: string;
+  runtime_ms: number;
+}
+
+export interface InteractiveSampleResponse {
+  session_id: string;
+  output: string;
+  is_running: boolean;
+  exit_code: number | null;
+}
+
 export interface TopicQuizResponse {
   questions: AssessmentQuestion[];
 }
@@ -653,6 +684,19 @@ export const assessmentAPI = {
   }): Promise<TopicQuizResponse> => {
     const response = await api.post<TopicQuizResponse>(
       '/assessment/topic/quiz/',
+      data
+    );
+    return response.data;
+  },
+
+  generateDynamicScript: async (data: {
+    enrollment_id: number;
+    module_id: number;
+    topic_name: string;
+    regenerate?: boolean;
+  }): Promise<DynamicScriptResponse> => {
+    const response = await api.post<DynamicScriptResponse>(
+      '/assessment/topic/dynamic-script/',
       data
     );
     return response.data;
@@ -760,6 +804,46 @@ export const codingAPI = {
 
   getSubmissionResult: async (submissionId: string): Promise<CodeSubmission> => {
     const response = await api.get<CodeSubmission>(`/coding/submissions/${submissionId}/result/`);
+    return response.data;
+  },
+
+  generateSampleCode: async (data: {
+    enrollment_id: number;
+    module_id: number;
+    topic_name: string;
+    regenerate?: boolean;
+  }): Promise<Resource> => {
+    const response = await api.post<Resource>('/coding/samples/generate/', data);
+    return response.data;
+  },
+
+  runSampleCode: async (data: {
+    source_code: string;
+    raw_input?: string;
+  }): Promise<SampleCodeRunResponse> => {
+    const response = await api.post<SampleCodeRunResponse>('/coding/samples/run/', data);
+    return response.data;
+  },
+
+  startInteractiveSampleCode: async (data: {
+    source_code: string;
+  }): Promise<InteractiveSampleResponse> => {
+    const response = await api.post<InteractiveSampleResponse>('/coding/samples/interactive/start/', data);
+    return response.data;
+  },
+
+  sendInteractiveSampleInput: async (data: {
+    session_id: string;
+    user_input?: string;
+  }): Promise<InteractiveSampleResponse> => {
+    const response = await api.post<InteractiveSampleResponse>('/coding/samples/interactive/input/', data);
+    return response.data;
+  },
+
+  stopInteractiveSampleCode: async (data: {
+    session_id: string;
+  }): Promise<InteractiveSampleResponse> => {
+    const response = await api.post<InteractiveSampleResponse>('/coding/samples/interactive/stop/', data);
     return response.data;
   },
 };

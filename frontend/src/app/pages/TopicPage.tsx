@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
 import {
   ChevronLeft,
@@ -28,7 +28,9 @@ import {
   setActiveResourceView,
   createNote,
   selectTopicContentError,
+  selectDynamicScript,
 } from '../../store/slices/syllabusSlice';
+import { codingAPI } from '../../services/api';
 import { Button } from '../components/ui/button';
 import {
   Breadcrumb,
@@ -44,6 +46,7 @@ import { TopicQuizOverlay } from '../components/TopicQuizOverlay';
 import { CourseStructureDialog } from '../components/CourseStructureDialog';
 import ReactMarkdown from 'react-markdown';
 import rehypeHighlight from 'rehype-highlight';
+import Editor from '@monaco-editor/react';
 
 export default function TopicPage() {
   const dispatch = useAppDispatch();
@@ -80,6 +83,9 @@ export default function TopicPage() {
   const error = useAppSelector((state) =>
     selectTopicContentError(state, mIdx, tIdx)
   );
+  const dynamicScript = useAppSelector((state) =>
+    selectDynamicScript(state, mIdx, tIdx)
+  );
 
   // Fetch resources when content is loaded
   useEffect(() => {
@@ -93,12 +99,147 @@ export default function TopicPage() {
     ? resources.find((r) => r.id === activeView.resourceId)
     : null;
 
+  const isSampleCodeResource =
+    activeView?.type === 'code' && activeResource?.content_json?.mode === 'sample_code';
+
+  useEffect(() => {
+    if (isSampleCodeResource && activeResource?.content_json) {
+      setSampleCodeValue(activeResource.content_json.starter_code || '');
+      setSampleCodeInput(activeResource.content_json.sample_input || '');
+      setSampleTerminalHistory(['Ready. Press Run to execute your code.']);
+      setSampleSessionId(null);
+      setSampleSessionRunning(false);
+    }
+  }, [isSampleCodeResource, activeResource?.id]);
+
+  const handleRunSampleCode = async () => {
+    if (!sampleCodeValue.trim()) return;
+    setSampleCodeRunning(true);
+
+    let sessionId = sampleSessionId;
+    let isRunning = sampleSessionRunning;
+    const pendingInput = sampleCodeInput;
+
+    try {
+      if (!sessionId || !isRunning) {
+        setSampleTerminalHistory((prev) => [...prev, '$ python script.py']);
+        const started = await codingAPI.startInteractiveSampleCode({
+          source_code: sampleCodeValue,
+        });
+        sessionId = started.session_id;
+        isRunning = started.is_running;
+
+        setSampleSessionId(started.session_id);
+        setSampleSessionRunning(started.is_running);
+
+        if (started.output) {
+          setSampleTerminalHistory((prev) => [...prev, started.output]);
+        }
+        if (!started.is_running) {
+          setSampleSessionId(null);
+          setSampleSessionRunning(false);
+          if (started.exit_code !== null) {
+            setSampleTerminalHistory((prev) => [...prev, `[process exited with code ${started.exit_code}]`]);
+          }
+          return;
+        }
+      }
+
+      // When already running, Enter/Run sends stdin exactly like a terminal line.
+      if (sessionId && (sampleSessionRunning || pendingInput.length > 0)) {
+        setSampleTerminalHistory((prev) => [...prev, `> ${pendingInput}`]);
+        const result = await codingAPI.sendInteractiveSampleInput({
+          session_id: sessionId,
+          user_input: pendingInput,
+        });
+
+        if (result.output) {
+          setSampleTerminalHistory((prev) => [...prev, result.output]);
+        }
+
+        setSampleSessionRunning(result.is_running);
+        if (!result.is_running) {
+          setSampleSessionId(null);
+          if (result.exit_code !== null) {
+            setSampleTerminalHistory((prev) => [...prev, `[process exited with code ${result.exit_code}]`]);
+          }
+        }
+
+        setSampleCodeInput('');
+      }
+    } catch (err: any) {
+      const errText = err?.response?.data?.error || err?.message || 'Failed to run sample code';
+      setSampleTerminalHistory((prev) => [...prev, `Traceback\n${errText}`]);
+      setSampleSessionId(null);
+      setSampleSessionRunning(false);
+    } finally {
+      setSampleCodeRunning(false);
+    }
+  };
+
+  const handleStopSampleCode = async () => {
+    if (!sampleSessionId) return;
+    setSampleCodeRunning(true);
+    try {
+      const result = await codingAPI.stopInteractiveSampleCode({ session_id: sampleSessionId });
+      if (result.output) {
+        setSampleTerminalHistory((prev) => [...prev, result.output]);
+      }
+      if (result.exit_code !== null) {
+        setSampleTerminalHistory((prev) => [...prev, `[process exited with code ${result.exit_code}]`]);
+      }
+    } catch {
+      // No-op: session cleanup should be best-effort.
+    } finally {
+      setSampleSessionId(null);
+      setSampleSessionRunning(false);
+      setSampleCodeRunning(false);
+    }
+  };
+
   // ─── Create Note state ─────────────────────────────────────────────────────
 
   const [noteTitle, setNoteTitle] = useState('');
   const [noteContent, setNoteContent] = useState('');
   const [noteSaving, setNoteSaving] = useState(false);
   const [structureDialogOpen, setStructureDialogOpen] = useState(false);
+  const [sampleCodeValue, setSampleCodeValue] = useState('');
+  const [sampleCodeInput, setSampleCodeInput] = useState('');
+  const [visibleDynamicBlocks, setVisibleDynamicBlocks] = useState(0);
+  const [sampleCodeRunning, setSampleCodeRunning] = useState(false);
+  const [sampleTerminalHistory, setSampleTerminalHistory] = useState<string[]>(['Ready. Press Run to execute your code.']);
+  const [sampleSessionId, setSampleSessionId] = useState<string | null>(null);
+  const [sampleSessionRunning, setSampleSessionRunning] = useState(false);
+  const [dynamicCodeByBlock, setDynamicCodeByBlock] = useState<Record<number, string>>({});
+  const [dynamicInputByBlock, setDynamicInputByBlock] = useState<Record<number, string>>({});
+  const [dynamicCodeRunningByBlock, setDynamicCodeRunningByBlock] = useState<Record<number, boolean>>({});
+  const [dynamicTerminalHistoryByBlock, setDynamicTerminalHistoryByBlock] = useState<Record<number, string[]>>({});
+  const [dynamicSessionIdByBlock, setDynamicSessionIdByBlock] = useState<Record<number, string>>({});
+  const [dynamicSessionRunningByBlock, setDynamicSessionRunningByBlock] = useState<Record<number, boolean>>({});
+  const [quizRevealByQuestion, setQuizRevealByQuestion] = useState<Record<string, boolean>>({});
+  const sampleSessionIdRef = useRef<string | null>(null);
+  const dynamicSessionIdsRef = useRef<Record<number, string>>({});
+
+  useEffect(() => {
+    sampleSessionIdRef.current = sampleSessionId;
+  }, [sampleSessionId]);
+
+  useEffect(() => {
+    dynamicSessionIdsRef.current = dynamicSessionIdByBlock;
+  }, [dynamicSessionIdByBlock]);
+
+  useEffect(() => {
+    return () => {
+      const sampleId = sampleSessionIdRef.current;
+      if (sampleId) {
+        codingAPI.stopInteractiveSampleCode({ session_id: sampleId }).catch(() => undefined);
+      }
+
+      Object.values(dynamicSessionIdsRef.current).forEach((sessionId) => {
+        codingAPI.stopInteractiveSampleCode({ session_id: sessionId }).catch(() => undefined);
+      });
+    };
+  }, []);
 
   const handleSaveNote = async () => {
     if (!content?.lessonId || !noteTitle.trim() || !noteContent.trim()) return;
@@ -115,8 +256,185 @@ export default function TopicPage() {
     setNoteSaving(false);
     setNoteTitle('');
     setNoteContent('');
-    // Switch to text view after saving
     dispatch(setActiveResourceView({ moduleIndex: mIdx, topicIndex: tIdx, view: null }));
+  };
+
+  useEffect(() => {
+    if (activeView?.type !== 'dynamic-script' || !dynamicScript?.blocks?.length) {
+      setVisibleDynamicBlocks(0);
+      return;
+    }
+
+    setVisibleDynamicBlocks(1);
+    const timer = setInterval(() => {
+      setVisibleDynamicBlocks((prev) => {
+        if (prev >= dynamicScript.blocks.length) {
+          clearInterval(timer);
+          return prev;
+        }
+        return prev + 1;
+      });
+    }, 1200);
+
+    return () => clearInterval(timer);
+  }, [activeView?.type, dynamicScript?.blocks?.length]);
+
+  useEffect(() => {
+    if (!dynamicScript?.blocks?.length) return;
+
+    Object.values(dynamicSessionIdsRef.current).forEach((sessionId) => {
+      codingAPI.stopInteractiveSampleCode({ session_id: sessionId }).catch(() => undefined);
+    });
+
+    const nextCode: Record<number, string> = {};
+    const nextInput: Record<number, string> = {};
+    const nextHistory: Record<number, string[]> = {};
+    dynamicScript.blocks.forEach((block, idx) => {
+      if (block.type === 'code') {
+        nextCode[idx] = block.payload?.starter_code || block.payload?.code || 'def solve(raw_input: str) -> str:\n    return raw_input\n';
+        nextInput[idx] = block.payload?.sample_input || '';
+        nextHistory[idx] = ['Ready. Press Run to execute your code.'];
+      }
+    });
+
+    setDynamicCodeByBlock(nextCode);
+    setDynamicInputByBlock(nextInput);
+    setDynamicCodeRunningByBlock({});
+    setDynamicTerminalHistoryByBlock(nextHistory);
+    setDynamicSessionIdByBlock({});
+    setDynamicSessionRunningByBlock({});
+    setQuizRevealByQuestion({});
+  }, [dynamicScript?.title, dynamicScript?.blocks]);
+
+  const handleRunDynamicCodeBlock = async (blockIdx: number) => {
+    const sourceCode = dynamicCodeByBlock[blockIdx] || '';
+    if (!sourceCode.trim()) return;
+    setDynamicCodeRunningByBlock((prev) => ({ ...prev, [blockIdx]: true }));
+
+    let sessionId = dynamicSessionIdByBlock[blockIdx];
+    let isRunning = !!dynamicSessionRunningByBlock[blockIdx];
+    const pendingInput = dynamicInputByBlock[blockIdx] || '';
+
+    try {
+      if (!sessionId || !isRunning) {
+        setDynamicTerminalHistoryByBlock((prev) => ({
+          ...prev,
+          [blockIdx]: [...(prev[blockIdx] || []), '$ python script.py'],
+        }));
+
+        const started = await codingAPI.startInteractiveSampleCode({
+          source_code: sourceCode,
+        });
+
+        sessionId = started.session_id;
+        isRunning = started.is_running;
+
+        setDynamicSessionIdByBlock((prev) => ({ ...prev, [blockIdx]: started.session_id }));
+        setDynamicSessionRunningByBlock((prev) => ({ ...prev, [blockIdx]: started.is_running }));
+
+        if (started.output) {
+          setDynamicTerminalHistoryByBlock((prev) => ({
+            ...prev,
+            [blockIdx]: [...(prev[blockIdx] || []), started.output],
+          }));
+        }
+
+        if (!started.is_running) {
+          setDynamicSessionIdByBlock((prev) => {
+            const next = { ...prev };
+            delete next[blockIdx];
+            return next;
+          });
+          if (started.exit_code !== null) {
+            setDynamicTerminalHistoryByBlock((prev) => ({
+              ...prev,
+              [blockIdx]: [...(prev[blockIdx] || []), `[process exited with code ${started.exit_code}]`],
+            }));
+          }
+          return;
+        }
+      }
+
+      if (sessionId && (dynamicSessionRunningByBlock[blockIdx] || pendingInput.length > 0)) {
+        setDynamicTerminalHistoryByBlock((prev) => ({
+          ...prev,
+          [blockIdx]: [...(prev[blockIdx] || []), `> ${pendingInput}`],
+        }));
+
+        const result = await codingAPI.sendInteractiveSampleInput({
+          session_id: sessionId,
+          user_input: pendingInput,
+        });
+
+        if (result.output) {
+          setDynamicTerminalHistoryByBlock((prev) => ({
+            ...prev,
+            [blockIdx]: [...(prev[blockIdx] || []), result.output],
+          }));
+        }
+
+        setDynamicSessionRunningByBlock((prev) => ({ ...prev, [blockIdx]: result.is_running }));
+        if (!result.is_running) {
+          setDynamicSessionIdByBlock((prev) => {
+            const next = { ...prev };
+            delete next[blockIdx];
+            return next;
+          });
+          if (result.exit_code !== null) {
+            setDynamicTerminalHistoryByBlock((prev) => ({
+              ...prev,
+              [blockIdx]: [...(prev[blockIdx] || []), `[process exited with code ${result.exit_code}]`],
+            }));
+          }
+        }
+
+        setDynamicInputByBlock((prev) => ({ ...prev, [blockIdx]: '' }));
+      }
+    } catch (err: any) {
+      const errText = err?.response?.data?.error || err?.message || 'Failed to run code';
+      setDynamicSessionIdByBlock((prev) => {
+        const next = { ...prev };
+        delete next[blockIdx];
+        return next;
+      });
+      setDynamicSessionRunningByBlock((prev) => ({ ...prev, [blockIdx]: false }));
+      setDynamicTerminalHistoryByBlock((prev) => ({
+        ...prev,
+        [blockIdx]: [...(prev[blockIdx] || []), `Traceback\n${errText}`],
+      }));
+    } finally {
+      setDynamicCodeRunningByBlock((prev) => ({ ...prev, [blockIdx]: false }));
+    }
+  };
+
+  const handleStopDynamicCodeBlock = async (blockIdx: number) => {
+    const sessionId = dynamicSessionIdByBlock[blockIdx];
+    if (!sessionId) return;
+
+    setDynamicCodeRunningByBlock((prev) => ({ ...prev, [blockIdx]: true }));
+    try {
+      const result = await codingAPI.stopInteractiveSampleCode({ session_id: sessionId });
+      if (result.output) {
+        setDynamicTerminalHistoryByBlock((prev) => ({
+          ...prev,
+          [blockIdx]: [...(prev[blockIdx] || []), result.output],
+        }));
+      }
+      if (result.exit_code !== null) {
+        setDynamicTerminalHistoryByBlock((prev) => ({
+          ...prev,
+          [blockIdx]: [...(prev[blockIdx] || []), `[process exited with code ${result.exit_code}]`],
+        }));
+      }
+    } finally {
+      setDynamicSessionIdByBlock((prev) => {
+        const next = { ...prev };
+        delete next[blockIdx];
+        return next;
+      });
+      setDynamicSessionRunningByBlock((prev) => ({ ...prev, [blockIdx]: false }));
+      setDynamicCodeRunningByBlock((prev) => ({ ...prev, [blockIdx]: false }));
+    }
   };
 
   // ─── Module unlock check ──────────────────────────────────────────────────
@@ -313,10 +631,23 @@ export default function TopicPage() {
 
   useEffect(() => {
     window.scrollTo?.(0, 0);
+    if (sampleSessionIdRef.current) {
+      codingAPI.stopInteractiveSampleCode({ session_id: sampleSessionIdRef.current }).catch(() => undefined);
+    }
+    Object.values(dynamicSessionIdsRef.current).forEach((sessionId) => {
+      codingAPI.stopInteractiveSampleCode({ session_id: sessionId }).catch(() => undefined);
+    });
+
     // Reset active resource view when navigating to a new topic
     dispatch(setActiveResourceView({ moduleIndex: mIdx, topicIndex: tIdx, view: null }));
     setNoteTitle('');
     setNoteContent('');
+    setSampleTerminalHistory(['Ready. Press Run to execute your code.']);
+    setSampleSessionId(null);
+    setSampleSessionRunning(false);
+    setDynamicTerminalHistoryByBlock({});
+    setDynamicSessionIdByBlock({});
+    setDynamicSessionRunningByBlock({});
   }, [mIdx, tIdx, dispatch]);
 
   // ─── Redirect if module is locked ──────────────────────────────────────────
@@ -514,6 +845,55 @@ export default function TopicPage() {
                       {r.title.length > 20 ? r.title.slice(0, 20) + '...' : r.title}
                     </button>
                   ))}
+
+                {dynamicScript && (
+                  <button
+                    onClick={() =>
+                      dispatch(
+                        setActiveResourceView({
+                          moduleIndex: mIdx,
+                          topicIndex: tIdx,
+                          view: { type: 'dynamic-script' },
+                        })
+                      )
+                    }
+                    className={cn(
+                      'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap',
+                      activeView?.type === 'dynamic-script'
+                        ? 'bg-fuchsia-50 text-fuchsia-700'
+                        : 'text-gray-500 hover:bg-gray-50'
+                    )}
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    {dynamicScript.title.length > 25 ? `${dynamicScript.title.slice(0, 25)}...` : dynamicScript.title}
+                  </button>
+                )}
+
+                {resources
+                  .filter((r) => r.resource_type === 'code_exercise')
+                  .map((r) => (
+                    <button
+                      key={`code-${r.id}`}
+                      onClick={() =>
+                        dispatch(
+                          setActiveResourceView({
+                            moduleIndex: mIdx,
+                            topicIndex: tIdx,
+                            view: { type: 'code', resourceId: r.id },
+                          })
+                        )
+                      }
+                      className={cn(
+                        'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap',
+                        activeView?.type === 'code' && activeView.resourceId === r.id
+                          ? 'bg-cyan-50 text-cyan-700'
+                          : 'text-gray-500 hover:bg-gray-50'
+                      )}
+                    >
+                      <Play className="w-3.5 h-3.5" />
+                      {r.title.length > 25 ? `${r.title.slice(0, 25)}...` : r.title}
+                    </button>
+                  ))}
               </div>
             )}
 
@@ -578,6 +958,262 @@ export default function TopicPage() {
                   </Button>
                 </div>
               </div>
+            ) : activeView?.type === 'dynamic-script' && dynamicScript ? (
+              <div className="p-8 space-y-4">
+                <h2 className="text-lg font-semibold text-gray-900">{dynamicScript.title}</h2>
+                {dynamicScript.overview && (
+                  <p className="text-sm text-gray-600">{dynamicScript.overview}</p>
+                )}
+                <div className="space-y-3">
+                  {dynamicScript.blocks.slice(0, visibleDynamicBlocks).map((block, idx) => (
+                    <div key={`${block.type}-${idx}`} className="rounded-xl border border-gray-200 p-4 bg-gray-50">
+                      <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">
+                        {block.type.replace('_', ' ')}
+                      </p>
+                      <p className="text-sm text-gray-800 font-medium mb-2">{block.prompt}</p>
+                      {block.type === 'text' && (
+                        <div className="prose prose-gray max-w-none text-sm">
+                          <ReactMarkdown
+                            rehypePlugins={[rehypeHighlight]}
+                            components={{
+                              h1: ({ ...props }) => <h1 className="text-2xl font-bold text-gray-900 mt-6 mb-3" {...props} />,
+                              h2: ({ ...props }) => <h2 className="text-xl font-bold text-gray-900 mt-5 mb-2" {...props} />,
+                              h3: ({ ...props }) => <h3 className="text-lg font-semibold text-gray-900 mt-4 mb-2" {...props} />,
+                              p: ({ ...props }) => <p className="text-gray-700 leading-relaxed mb-3" {...props} />,
+                              code: ({ ...props }) => {
+                                const { className } = props;
+                                const isInline = !className?.includes('language-');
+                                if (isInline) {
+                                  return <code className="bg-gray-100 text-pink-600 px-1.5 py-0.5 rounded text-sm" {...props} />;
+                                }
+                                return <code className={cn(className, 'font-mono')} {...props} />;
+                              },
+                              pre: ({ ...props }) => (
+                                <pre className="bg-[#1e1e1e] text-[#d4d4d4] rounded-xl p-4 overflow-x-auto my-4 text-sm not-prose border border-gray-800 shadow-lg" {...props} />
+                              ),
+                              ul: ({ ...props }) => <ul className="list-disc ml-6 mb-3 space-y-1 text-gray-700" {...props} />,
+                              ol: ({ ...props }) => <ol className="list-decimal ml-6 mb-3 space-y-1 text-gray-700" {...props} />,
+                              blockquote: ({ ...props }) => <blockquote className="border-l-4 border-gray-200 pl-4 italic my-3 text-gray-600" {...props} />,
+                            }}
+                          >
+                            {block.payload?.markdown || block.payload?.content || ''}
+                          </ReactMarkdown>
+                        </div>
+                      )}
+                      {block.type === 'quiz' && Array.isArray(block.payload?.questions) && (
+                        <div className="space-y-2">
+                          <p className="text-xs text-gray-600">{block.payload.questions.length} questions</p>
+                          {block.payload.questions.map((question: any, qIdx: number) => (
+                            <div key={`${qIdx}-${question?.question || 'question'}`} className="rounded-lg border border-gray-200 bg-white p-3">
+                              <p className="text-sm font-medium text-gray-900">Q{qIdx + 1}. {question?.question || 'Question'}</p>
+                              {Array.isArray(question?.options) && question.options.length > 0 && (
+                                <div className="mt-2 space-y-1.5">
+                                  {question.options.map((option: string, oIdx: number) => (
+                                    <div key={`${oIdx}-${option}`} className="rounded-md border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-sm text-gray-700">
+                                      <span className="font-medium text-gray-500 mr-2">{String.fromCharCode(65 + oIdx)}.</span>
+                                      {option}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {question?.correct_answer && (
+                                <div className="mt-2">
+                                  <button
+                                    onClick={() => setQuizRevealByQuestion((prev) => ({
+                                      ...prev,
+                                      [`${idx}-${qIdx}`]: !prev[`${idx}-${qIdx}`],
+                                    }))}
+                                    className="text-xs text-blue-600 hover:text-blue-500"
+                                  >
+                                    {quizRevealByQuestion[`${idx}-${qIdx}`] ? 'Hide answer' : 'Show answer'}
+                                  </button>
+                                  {quizRevealByQuestion[`${idx}-${qIdx}`] && (
+                                    <p className="text-xs text-emerald-700 mt-1">
+                                      Answer: {question.correct_answer}
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {block.type === 'code' && (
+                        <div className="space-y-3">
+                          <p className="text-sm text-gray-700">
+                            {block.payload?.instructions || 'Edit and run this code directly below.'}
+                          </p>
+                          <div className="rounded-xl border border-gray-200 overflow-hidden h-[520px] bg-white flex flex-col">
+                            <div className="h-[58%] min-h-[220px] flex flex-col border-b border-gray-200">
+                              <div className="px-3 py-2 bg-gray-50 text-xs font-medium text-gray-600">Code</div>
+                              <Editor
+                                height="100%"
+                                defaultLanguage="python"
+                                language="python"
+                                theme="vs-dark"
+                                value={dynamicCodeByBlock[idx] || ''}
+                                onChange={(val) => setDynamicCodeByBlock((prev) => ({ ...prev, [idx]: val || '' }))}
+                                options={{
+                                  minimap: { enabled: false },
+                                  fontSize: 14,
+                                  automaticLayout: true,
+                                  wordWrap: 'on',
+                                }}
+                              />
+                            </div>
+
+                            <div className="h-[42%] min-h-[170px] flex flex-col p-2 bg-[#0b1220] text-[#d5e6ff]">
+                              <div className="text-xs font-semibold text-[#8fb5ff] mb-1">Terminal</div>
+                              <div className="flex-1 overflow-auto rounded-lg border border-[#1f2a44] p-2 bg-[#070d18] text-xs font-mono whitespace-pre-wrap">
+                                {(dynamicTerminalHistoryByBlock[idx] || ['Ready. Press Run to execute your code.']).join('\n')}
+                                <div className="mt-2 flex items-center gap-2 border-t border-[#1f2a44] pt-2">
+                                  <span className="text-[#6de2a1]">$</span>
+                                  <input
+                                    value={dynamicInputByBlock[idx] || ''}
+                                    onChange={(e) => setDynamicInputByBlock((prev) => ({ ...prev, [idx]: e.target.value }))}
+                                    className="flex-1 bg-transparent outline-none text-xs font-mono text-[#d5e6ff]"
+                                    placeholder={dynamicSessionRunningByBlock[idx] ? 'type and send to running process...' : 'optional first input after run...'}
+                                  />
+                                  <button
+                                    onClick={() => handleRunDynamicCodeBlock(idx)}
+                                    disabled={!!dynamicCodeRunningByBlock[idx] || !(dynamicCodeByBlock[idx] || '').trim()}
+                                    className="px-2 py-0.5 rounded bg-[#123a70] hover:bg-[#1a4e93] text-white text-xs disabled:opacity-50"
+                                  >
+                                    {dynamicCodeRunningByBlock[idx] ? 'Working...' : dynamicSessionRunningByBlock[idx] ? 'Send' : 'Run'}
+                                  </button>
+                                  <button
+                                    onClick={() => handleStopDynamicCodeBlock(idx)}
+                                    disabled={!!dynamicCodeRunningByBlock[idx] || !dynamicSessionIdByBlock[idx]}
+                                    className="px-2 py-0.5 rounded border border-[#2a3a5e] text-[#c8d8ff] text-xs disabled:opacity-40"
+                                  >
+                                    Stop
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {block.type === 'video' && (
+                        <div className="space-y-2">
+                          <p className="text-sm font-medium text-gray-900">
+                            {block.payload?.title || 'Video Segment'}
+                          </p>
+                          <p className="text-sm text-gray-700">
+                            {block.payload?.description || 'Video guidance for this step will appear here.'}
+                          </p>
+                          {Array.isArray(block.payload?.key_points) && block.payload.key_points.length > 0 && (
+                            <ul className="list-disc ml-5 text-sm text-gray-700 space-y-1">
+                              {block.payload.key_points.map((point: string, pIdx: number) => (
+                                <li key={`${pIdx}-${point}`}>{point}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
+                      {block.type === 'mind_map' && (
+                        <div className="space-y-2">
+                          <p className="text-sm font-medium text-gray-900">
+                            Root: {block.payload?.root || 'Mind Map'}
+                          </p>
+                          {Array.isArray(block.payload?.nodes) && block.payload.nodes.length > 0 ? (
+                            <div className="space-y-1 text-sm text-gray-700">
+                              {block.payload.nodes.slice(0, 12).map((node: any, nIdx: number) => (
+                                <p key={`${nIdx}-${node?.id || node?.label || 'node'}`}>
+                                  • {node?.label || 'Node'}
+                                  {node?.parent_id ? ` (parent: ${node.parent_id})` : ''}
+                                </p>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-sm text-gray-700">No nodes provided.</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : activeView?.type === 'code' && activeResource ? (
+              isSampleCodeResource ? (
+                <div className="p-6 space-y-4">
+                  <div>
+                    <h2 className="text-lg font-semibold text-gray-900">
+                      {activeResource.content_json?.title || activeResource.title}
+                    </h2>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {activeResource.content_text || activeResource.content_json?.explanation || 'Edit and run the code.'}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-gray-200 overflow-hidden h-[560px] bg-white flex flex-col">
+                    <div className="h-[58%] min-h-[250px] flex flex-col border-b border-gray-200">
+                      <div className="px-3 py-2 bg-gray-50 text-xs font-medium text-gray-600">Code Runner</div>
+                      <Editor
+                        height="100%"
+                        defaultLanguage="python"
+                        language="python"
+                        theme="vs-dark"
+                        value={sampleCodeValue}
+                        onChange={(val) => setSampleCodeValue(val || '')}
+                        options={{
+                          minimap: { enabled: false },
+                          fontSize: 14,
+                          automaticLayout: true,
+                          wordWrap: 'on',
+                        }}
+                      />
+                    </div>
+
+                    <div className="h-[42%] min-h-[190px] flex flex-col p-2 bg-[#0b1220] text-[#d5e6ff]">
+                      <div className="text-xs font-semibold text-[#8fb5ff] mb-1">Terminal</div>
+                      <div className="flex-1 overflow-auto rounded-lg border border-[#1f2a44] p-2 bg-[#070d18] text-xs font-mono whitespace-pre-wrap">
+                        {sampleTerminalHistory.join('\n')}
+                        <div className="mt-2 flex items-center gap-2 border-t border-[#1f2a44] pt-2">
+                          <span className="text-[#6de2a1]">$</span>
+                          <input
+                            value={sampleCodeInput}
+                            onChange={(e) => setSampleCodeInput(e.target.value)}
+                            className="flex-1 bg-transparent outline-none text-xs font-mono text-[#d5e6ff]"
+                            placeholder={sampleSessionRunning ? 'type and send to running process...' : 'optional first input after run...'}
+                          />
+                          <button
+                            onClick={handleRunSampleCode}
+                            disabled={sampleCodeRunning || !sampleCodeValue.trim()}
+                            className="px-2 py-0.5 rounded bg-[#123a70] hover:bg-[#1a4e93] text-white text-xs disabled:opacity-50"
+                          >
+                            {sampleCodeRunning ? 'Working...' : sampleSessionRunning ? 'Send' : 'Run'}
+                          </button>
+                          <button
+                            onClick={handleStopSampleCode}
+                            disabled={sampleCodeRunning || !sampleSessionId}
+                            className="px-2 py-0.5 rounded border border-[#2a3a5e] text-[#c8d8ff] text-xs disabled:opacity-40"
+                          >
+                            Stop
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-8 space-y-4">
+                  <h2 className="text-lg font-semibold text-gray-900">{activeResource.title}</h2>
+                  <p className="text-sm text-gray-600">Try-yourself coding assessment with test cases.</p>
+                  <Button
+                    onClick={() => {
+                      const problemId = activeResource.content_json?.coding_problem_id;
+                      if (problemId) {
+                        navigate(`/course/${enrollmentId}/module/${mIdx}/topic/${tIdx}/coding/${problemId}`);
+                      }
+                    }}
+                    className="gap-2"
+                  >
+                    <Play className="w-4 h-4" />
+                    Open Compiler Page
+                  </Button>
+                </div>
+              )
             ) : activeView?.type === 'video' && activeResource ? (
               /* ── Video player ──────────────────────────────────────── */
               <div className="p-8">
@@ -660,7 +1296,6 @@ export default function TopicPage() {
                       ),
                       ul: ({ ...props }) => <ul className="list-disc ml-6 mb-4 space-y-2 text-gray-700" {...props} />,
                       ol: ({ ...props }) => <ol className="list-decimal ml-6 mb-4 space-y-2 text-gray-700" {...props} />,
-                      li: ({ ...props }) => <li className="leading-relaxed" {...props} />,
                       blockquote: ({ ...props }) => <blockquote className="border-l-4 border-gray-200 pl-4 italic my-4 text-gray-600" {...props} />,
                     }}
                   >
@@ -692,7 +1327,6 @@ export default function TopicPage() {
                       ),
                       ul: ({ ...props }) => <ul className="list-disc ml-6 mb-4 space-y-2 text-gray-700" {...props} />,
                       ol: ({ ...props }) => <ol className="list-decimal ml-6 mb-4 space-y-2 text-gray-700" {...props} />,
-                      li: ({ ...props }) => <li className="leading-relaxed" {...props} />,
                       blockquote: ({ ...props }) => <blockquote className="border-l-4 border-gray-200 pl-4 italic my-4 text-gray-600" {...props} />,
                     }}
                   >

@@ -13,11 +13,13 @@ from .views import (
     UserAchievementViewSet, ActivityLogViewSet, DashboardView,
     InitialAssessmentView, EvaluateAssessmentView, GetSyllabusView,
     GenerateTopicContentView, GenerateTopicQuizView, EvaluateTopicQuizView,
-    GenerateTopicMindMapView, GenerateRemediationContentView,
+    GenerateTopicMindMapView, GenerateRemediationContentView, GenerateDynamicScriptView,
     GeneratePersonaOptionsView, GenerateScenarioOptionsView, GeneratePodcastView,
     ChatWithContextView, GetChatHistoryView, ClearChatHistoryView,
     GenerateCodingProblemView, CodingProblemDetailView,
     CreateCodeSubmissionView, CodeExecutionTaskStatusView, CodeSubmissionResultView,
+    GenerateSampleCodeView, RunSampleCodeView,
+    StartInteractiveSampleCodeView, SendInteractiveSampleInputView, StopInteractiveSampleCodeView,
 )
 
 # Create router for ViewSets
@@ -64,6 +66,7 @@ urlpatterns = [
     path('assessment/evaluate/', EvaluateAssessmentView.as_view(), name='assessment-evaluate'),
     path('assessment/syllabus/<int:enrollment_id>/', GetSyllabusView.as_view(), name='assessment-syllabus'),
     path('assessment/topic/content/', GenerateTopicContentView.as_view(), name='topic-content'),
+    path('assessment/topic/dynamic-script/', GenerateDynamicScriptView.as_view(), name='topic-dynamic-script'),
     path('assessment/topic/quiz/', GenerateTopicQuizView.as_view(), name='topic-quiz'),
     path('assessment/topic/evaluate/', EvaluateTopicQuizView.as_view(), name='topic-evaluate'),
     path('assessment/topic/remediation/', GenerateRemediationContentView.as_view(), name='topic-remediation'),
@@ -75,6 +78,11 @@ urlpatterns = [
     path('coding/submissions/', CreateCodeSubmissionView.as_view(), name='coding-submission-create'),
     path('coding/tasks/<uuid:task_id>/', CodeExecutionTaskStatusView.as_view(), name='coding-task-status'),
     path('coding/submissions/<uuid:submission_id>/result/', CodeSubmissionResultView.as_view(), name='coding-submission-result'),
+    path('coding/samples/generate/', GenerateSampleCodeView.as_view(), name='coding-sample-generate'),
+    path('coding/samples/run/', RunSampleCodeView.as_view(), name='coding-sample-run'),
+    path('coding/samples/interactive/start/', StartInteractiveSampleCodeView.as_view(), name='coding-sample-interactive-start'),
+    path('coding/samples/interactive/input/', SendInteractiveSampleInputView.as_view(), name='coding-sample-interactive-input'),
+    path('coding/samples/interactive/stop/', StopInteractiveSampleCodeView.as_view(), name='coding-sample-interactive-stop'),
     
     # Podcast Generation
     path('podcast/personas/', GeneratePersonaOptionsView.as_view(), name='podcast-personas'),

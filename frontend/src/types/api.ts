@@ -82,6 +82,15 @@ export interface Resource {
   created_at: string;
 }
 
+export interface SampleCodeContentJson {
+  mode: 'sample_code';
+  title: string;
+  explanation: string;
+  language: 'python';
+  starter_code: string;
+  sample_input?: string;
+}
+
 export interface Enrollment {
   id: number;
   user: number;

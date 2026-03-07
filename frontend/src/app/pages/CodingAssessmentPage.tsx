@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { ArrowLeft, Code2, Loader2, Play, Send } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Code2, Loader2, Play, Send } from 'lucide-react';
+import Editor from '@monaco-editor/react';
 import { codingAPI } from '../../services/api';
 import type { CodingProblem, CodeSubmission } from '../../types/api';
 import { Button } from '../components/ui/button';
@@ -17,6 +18,23 @@ export default function CodingAssessmentPage() {
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submission, setSubmission] = useState<CodeSubmission | null>(null);
+
+  const summarizeError = (raw: string): string => {
+    if (!raw) return 'Execution failed.';
+    const syntax = raw.match(/SyntaxError:\s*(.+)/i);
+    if (syntax?.[1]) return `SyntaxError: ${syntax[1]}`;
+
+    const attribute = raw.match(/AttributeError:\s*(.+)/i);
+    if (attribute?.[1]) return `AttributeError: ${attribute[1]}`;
+
+    const typeErr = raw.match(/TypeError:\s*(.+)/i);
+    if (typeErr?.[1]) return `TypeError: ${typeErr[1]}`;
+
+    const valueErr = raw.match(/ValueError:\s*(.+)/i);
+    if (valueErr?.[1]) return `ValueError: ${valueErr[1]}`;
+
+    return raw.split('\n').filter(Boolean).slice(-1)[0] || 'Execution failed.';
+  };
 
   useEffect(() => {
     if (!pId) {
@@ -46,6 +64,11 @@ export default function CodingAssessmentPage() {
     const raw = submission?.feedback?.test_results;
     return Array.isArray(raw) ? raw : [];
   }, [submission]);
+
+  const failedTests = useMemo(
+    () => testResults.filter((t: any) => !t.passed),
+    [testResults]
+  );
 
   const handleRun = async () => {
     if (!eId || !pId || !code.trim()) {
@@ -160,14 +183,32 @@ export default function CodingAssessmentPage() {
                 </div>
               </div>
 
-              <textarea
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
-                title="Python code editor"
-                placeholder="Write your solve(raw_input: str) function here"
-                className="w-full h-[380px] resize-y rounded-xl border border-gray-200 bg-[#0b1220] text-[#e6edf3] p-4 font-mono text-sm leading-6 focus:outline-none focus:ring-2 focus:ring-cyan-500/40"
-                spellCheck={false}
-              />
+              <div className="rounded-xl border border-cyan-400/40 overflow-hidden">
+                <Editor
+                  height="380px"
+                  defaultLanguage="python"
+                  language="python"
+                  theme="vs-dark"
+                  value={code}
+                  onChange={(value) => setCode(value ?? '')}
+                  options={{
+                    minimap: { enabled: false },
+                    fontSize: 16,
+                    lineHeight: 24,
+                    tabSize: 4,
+                    insertSpaces: true,
+                    automaticLayout: true,
+                    scrollBeyondLastLine: false,
+                    wordWrap: 'on',
+                    suggestOnTriggerCharacters: true,
+                    quickSuggestions: {
+                      comments: true,
+                      strings: true,
+                      other: true,
+                    },
+                  }}
+                />
+              </div>
 
               <Button
                 onClick={handleRun}
@@ -191,17 +232,44 @@ export default function CodingAssessmentPage() {
                     </p>
                   </div>
 
+                  {failedTests.length > 0 && (
+                    <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 flex items-start gap-2">
+                      <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                      <div>
+                        <p className="font-semibold">{failedTests.length} test(s) failed</p>
+                        <p className="text-xs mt-0.5">Review concise errors below. Full traceback remains available per failed test.</p>
+                      </div>
+                    </div>
+                  )}
+
                   {testResults.length > 0 && (
-                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                    <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                       {testResults.map((t: any, idx: number) => (
                         <div
                           key={`${t.test_case_id}-${idx}`}
                           className={`rounded-lg border p-2 text-xs ${t.passed ? 'border-emerald-200 bg-emerald-50' : 'border-red-200 bg-red-50'}`}
                         >
                           <p className="font-medium">Test {idx + 1}: {t.passed ? 'Passed' : 'Failed'}</p>
-                          {!t.passed && t.error_message && <p className="mt-1">Error: {t.error_message}</p>}
+                          {!t.passed && t.error_message && (
+                            <p className="mt-1 text-red-700 font-medium break-words">
+                              Error: {summarizeError(t.error_message)}
+                            </p>
+                          )}
+                          {!t.passed && t.error_message && (
+                            <details className="mt-1">
+                              <summary className="cursor-pointer text-[11px] text-red-700/90">Show full traceback</summary>
+                              <pre className="mt-1 p-2 rounded bg-red-100 text-red-900 overflow-x-auto whitespace-pre-wrap">
+                                <code>{t.error_message}</code>
+                              </pre>
+                            </details>
+                          )}
                           {!t.is_hidden && t.actual_output !== undefined && (
-                            <p className="mt-1">Actual: {t.actual_output || '(empty)'}</p>
+                            <div className="mt-1 space-y-1">
+                              <p><span className="font-semibold">Actual:</span> <code>{t.actual_output || '(empty)'}</code></p>
+                              {t.expected_output !== undefined && (
+                                <p><span className="font-semibold">Expected:</span> <code>{t.expected_output || '(empty)'}</code></p>
+                              )}
+                            </div>
                           )}
                         </div>
                       ))}

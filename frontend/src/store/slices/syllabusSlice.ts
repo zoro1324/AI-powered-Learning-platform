@@ -9,6 +9,8 @@ import {
   AssessmentQuestion,
   Resource,
   MindMapData,
+  DynamicScriptResponse,
+  DynamicScriptBlock,
 } from '../../services/api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -33,6 +35,15 @@ interface GeneratedQuiz {
   generatedAt: string;
 }
 
+interface GeneratedDynamicScript {
+  lessonId: number;
+  schemaVersion: string;
+  title: string;
+  overview: string;
+  blocks: DynamicScriptBlock[];
+  generatedAt: string;
+}
+
 interface QuizResult {
   score: string;
   scorePercent: number;
@@ -54,7 +65,7 @@ interface RemediationItem {
   generatedAt: string;
 }
 
-export type ActiveResourceViewType = 'text' | 'video' | 'audio' | 'notes' | 'create-note';
+export type ActiveResourceViewType = 'text' | 'video' | 'audio' | 'notes' | 'create-note' | 'dynamic-script' | 'code';
 
 export interface ActiveResourceView {
   type: ActiveResourceViewType;
@@ -79,6 +90,7 @@ export interface SyllabusState {
   topicCompletion: Record<string, boolean>;
   generatedContent: Record<string, GeneratedContent>;
   generatedQuizzes: Record<string, GeneratedQuiz>;
+  generatedDynamicScripts: Record<string, GeneratedDynamicScript>;
   quizResults: Record<string, QuizResult>;
   videoTasks: Record<string, VideoTask>;
   resources: Record<string, Resource[]>; // lessonId -> resources
@@ -89,6 +101,8 @@ export interface SyllabusState {
   contentLoading: Record<string, boolean>;
   contentErrors: Record<string, string>;
   quizLoading: Record<string, boolean>;
+  dynamicScriptLoading: Record<string, boolean>;
+  dynamicScriptErrors: Record<string, string>;
   quizEvaluating: Record<string, boolean>;
   videoLoading: Record<string, boolean>;
   resourcesLoading: Record<string, boolean>; // lessonId -> loading
@@ -109,6 +123,7 @@ const initialState: SyllabusState = {
   topicCompletion: {},
   generatedContent: {},
   generatedQuizzes: {},
+  generatedDynamicScripts: {},
   quizResults: {},
   videoTasks: {},
   resources: {},
@@ -117,6 +132,8 @@ const initialState: SyllabusState = {
   contentLoading: {},
   contentErrors: {},
   quizLoading: {},
+  dynamicScriptLoading: {},
+  dynamicScriptErrors: {},
   quizEvaluating: {},
   videoLoading: {},
   resourcesLoading: {},
@@ -240,6 +257,39 @@ export const generateTopicQuiz = createAsyncThunk(
     } catch (error: any) {
       return rejectWithValue(
         error.response?.data?.error || 'Failed to generate quiz'
+      );
+    }
+  }
+);
+
+export const generateDynamicScript = createAsyncThunk(
+  'syllabus/generateDynamicScript',
+  async (
+    data: {
+      enrollmentId: number;
+      moduleId: number;
+      topicName: string;
+      moduleIndex: number;
+      topicIndex: number;
+      regenerate?: boolean;
+    },
+    { rejectWithValue }
+  ) => {
+    try {
+      const response: DynamicScriptResponse = await assessmentAPI.generateDynamicScript({
+        enrollment_id: data.enrollmentId,
+        module_id: data.moduleId,
+        topic_name: data.topicName,
+        regenerate: data.regenerate,
+      });
+      return {
+        ...response,
+        moduleIndex: data.moduleIndex,
+        topicIndex: data.topicIndex,
+      };
+    } catch (error: any) {
+      return rejectWithValue(
+        error.response?.data?.error || 'Failed to generate dynamic script'
       );
     }
   }
@@ -582,6 +632,31 @@ const syllabusSlice = createSlice({
         state.quizLoading[key] = false;
       });
 
+    // generateDynamicScript
+    builder
+      .addCase(generateDynamicScript.pending, (state, action) => {
+        const key = topicId(state.enrollmentId, action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
+        state.dynamicScriptLoading[key] = true;
+        delete state.dynamicScriptErrors[key];
+      })
+      .addCase(generateDynamicScript.fulfilled, (state, action) => {
+        const key = topicId(state.enrollmentId, action.payload.moduleIndex, action.payload.topicIndex);
+        state.dynamicScriptLoading[key] = false;
+        state.generatedDynamicScripts[key] = {
+          lessonId: action.payload.lesson_id,
+          schemaVersion: action.payload.schema_version,
+          title: action.payload.title,
+          overview: action.payload.overview,
+          blocks: action.payload.blocks,
+          generatedAt: new Date().toISOString(),
+        };
+      })
+      .addCase(generateDynamicScript.rejected, (state, action) => {
+        const key = topicId(state.enrollmentId, action.meta.arg.moduleIndex, action.meta.arg.topicIndex);
+        state.dynamicScriptLoading[key] = false;
+        state.dynamicScriptErrors[key] = action.payload as string;
+      });
+
     // evaluateTopicQuiz
     builder
       .addCase(evaluateTopicQuiz.pending, (state, action) => {
@@ -805,6 +880,24 @@ export const selectTopicQuiz = (
   moduleIndex: number,
   topicIndex: number
 ) => state.syllabus.generatedQuizzes[topicId(state.syllabus.enrollmentId, moduleIndex, topicIndex)];
+
+export const selectDynamicScript = (
+  state: { syllabus: SyllabusState },
+  moduleIndex: number,
+  topicIndex: number
+) => state.syllabus.generatedDynamicScripts[topicId(state.syllabus.enrollmentId, moduleIndex, topicIndex)] || null;
+
+export const selectDynamicScriptLoading = (
+  state: { syllabus: SyllabusState },
+  moduleIndex: number,
+  topicIndex: number
+) => !!state.syllabus.dynamicScriptLoading[topicId(state.syllabus.enrollmentId, moduleIndex, topicIndex)];
+
+export const selectDynamicScriptError = (
+  state: { syllabus: SyllabusState },
+  moduleIndex: number,
+  topicIndex: number
+) => state.syllabus.dynamicScriptErrors[topicId(state.syllabus.enrollmentId, moduleIndex, topicIndex)] || null;
 
 export const selectQuizResult = (
   state: { syllabus: SyllabusState },
