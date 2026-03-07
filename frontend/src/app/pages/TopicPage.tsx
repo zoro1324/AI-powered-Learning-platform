@@ -20,6 +20,7 @@ import {
 import { useAppDispatch, useAppSelector } from '../../store';
 import {
   generateTopicContent,
+  generateDynamicScript,
   toggleTopicCompletion,
   saveLessonCompletion,
   fetchResources,
@@ -29,6 +30,8 @@ import {
   createNote,
   selectTopicContentError,
   selectDynamicScript,
+  selectDynamicScriptError,
+  selectDynamicScriptLoading,
 } from '../../store/slices/syllabusSlice';
 import { codingAPI } from '../../services/api';
 import { Button } from '../components/ui/button';
@@ -85,6 +88,12 @@ export default function TopicPage() {
   );
   const dynamicScript = useAppSelector((state) =>
     selectDynamicScript(state, mIdx, tIdx)
+  );
+  const isDynamicScriptLoading = useAppSelector((state) =>
+    selectDynamicScriptLoading(state, mIdx, tIdx)
+  );
+  const dynamicScriptError = useAppSelector((state) =>
+    selectDynamicScriptError(state, mIdx, tIdx)
   );
 
   // Fetch resources when content is loaded
@@ -534,6 +543,30 @@ export default function TopicPage() {
     }
   }, [content, isLoading, error, currentTopic, eId, currentModule, handleGenerate]);
 
+  useEffect(() => {
+    if (!dynamicScript && !isDynamicScriptLoading && !dynamicScriptError && currentTopic && eId && currentModule) {
+      dispatch(
+        generateDynamicScript({
+          enrollmentId: eId,
+          moduleId: mIdx + 1,
+          topicName: currentTopic.topic_name,
+          moduleIndex: mIdx,
+          topicIndex: tIdx,
+        })
+      );
+    }
+  }, [
+    dispatch,
+    dynamicScript,
+    isDynamicScriptLoading,
+    dynamicScriptError,
+    currentTopic,
+    eId,
+    currentModule,
+    mIdx,
+    tIdx,
+  ]);
+
   // ─── Auto-generate video on page load (DISABLED) ──────────────────────────
   // Video generation now only happens when user clicks "Generate Video" button
 
@@ -638,8 +671,14 @@ export default function TopicPage() {
       codingAPI.stopInteractiveSampleCode({ session_id: sessionId }).catch(() => undefined);
     });
 
-    // Reset active resource view when navigating to a new topic
-    dispatch(setActiveResourceView({ moduleIndex: mIdx, topicIndex: tIdx, view: null }));
+    // Default to dynamic script view for each topic.
+    dispatch(
+      setActiveResourceView({
+        moduleIndex: mIdx,
+        topicIndex: tIdx,
+        view: { type: 'dynamic-script' },
+      })
+    );
     setNoteTitle('');
     setNoteContent('');
     setSampleTerminalHistory(['Ready. Press Run to execute your code.']);
