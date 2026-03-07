@@ -972,24 +972,23 @@ export default function TopicPage() {
                       </p>
                       <p className="text-sm text-gray-800 font-medium mb-2">{block.prompt}</p>
                       {block.type === 'text' && (
-                        <div className="prose prose-gray max-w-none text-sm">
+                        <div className="prose prose-gray max-w-none text-sm markdown-content">
                           <ReactMarkdown
-                            rehypePlugins={[rehypeHighlight]}
+                            rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true }]]}
                             components={{
                               h1: ({ ...props }) => <h1 className="text-2xl font-bold text-gray-900 mt-6 mb-3" {...props} />,
                               h2: ({ ...props }) => <h2 className="text-xl font-bold text-gray-900 mt-5 mb-2" {...props} />,
                               h3: ({ ...props }) => <h3 className="text-lg font-semibold text-gray-900 mt-4 mb-2" {...props} />,
                               p: ({ ...props }) => <p className="text-gray-700 leading-relaxed mb-3" {...props} />,
-                              code: ({ ...props }) => {
-                                const { className } = props;
-                                const isInline = !className?.includes('language-');
+                              code: ({ className, ...props }) => {
+                                const isInline = !(className?.includes('language-') || className?.includes('hljs'));
                                 if (isInline) {
-                                  return <code className="bg-gray-100 text-pink-600 px-1.5 py-0.5 rounded text-sm" {...props} />;
+                                  return <code className="markdown-inline-code" {...props} />;
                                 }
-                                return <code className={cn(className, 'font-mono')} {...props} />;
+                                return <code className={cn(className, 'markdown-code')} {...props} />;
                               },
                               pre: ({ ...props }) => (
-                                <pre className="bg-[#1e1e1e] text-[#d4d4d4] rounded-xl p-4 overflow-x-auto my-4 text-sm not-prose border border-gray-800 shadow-lg" {...props} />
+                                <pre className="markdown-pre not-prose" {...props} />
                               ),
                               ul: ({ ...props }) => <ul className="list-disc ml-6 mb-3 space-y-1 text-gray-700" {...props} />,
                               ol: ({ ...props }) => <ol className="list-decimal ml-6 mb-3 space-y-1 text-gray-700" {...props} />,
@@ -1275,24 +1274,23 @@ export default function TopicPage() {
                   <FileText className="w-5 h-5 text-emerald-500" />
                   {activeResource.title}
                 </h2>
-                <div className="prose prose-gray max-w-none">
+                <div className="prose prose-gray max-w-none markdown-content">
                   <ReactMarkdown
-                    rehypePlugins={[rehypeHighlight]}
+                    rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true }]]}
                     components={{
                       h1: ({ ...props }) => <h1 className="text-2xl font-bold text-gray-900 mt-8 mb-4" {...props} />,
                       h2: ({ ...props }) => <h2 className="text-xl font-bold text-gray-900 mt-8 mb-3" {...props} />,
                       h3: ({ ...props }) => <h3 className="text-lg font-semibold text-gray-900 mt-6 mb-2" {...props} />,
                       p: ({ ...props }) => <p className="text-gray-700 leading-relaxed mb-4" {...props} />,
-                      code: ({ ...props }) => {
-                        const { className } = props;
-                        const isInline = !className?.includes('language-');
+                      code: ({ className, ...props }) => {
+                        const isInline = !(className?.includes('language-') || className?.includes('hljs'));
                         if (isInline) {
-                          return <code className="bg-gray-100 text-pink-600 px-1.5 py-0.5 rounded text-sm" {...props} />;
+                          return <code className="markdown-inline-code" {...props} />;
                         }
-                        return <code className={cn(className, "font-mono")} {...props} />;
+                        return <code className={cn(className, 'markdown-code')} {...props} />;
                       },
                       pre: ({ ...props }) => (
-                        <pre className="bg-[#1e1e1e] text-[#d4d4d4] rounded-xl p-4 overflow-x-auto my-4 text-sm not-prose border border-gray-800 shadow-lg" {...props} />
+                        <pre className="markdown-pre not-prose" {...props} />
                       ),
                       ul: ({ ...props }) => <ul className="list-disc ml-6 mb-4 space-y-2 text-gray-700" {...props} />,
                       ol: ({ ...props }) => <ol className="list-decimal ml-6 mb-4 space-y-2 text-gray-700" {...props} />,
@@ -1306,24 +1304,23 @@ export default function TopicPage() {
             ) : (
               /* ── Default: text reading view ────────────────────────── */
               <div className="p-8">
-                <div className="prose prose-gray max-w-none">
+                <div className="prose prose-gray max-w-none markdown-content">
                   <ReactMarkdown
-                    rehypePlugins={[rehypeHighlight]}
+                    rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true }]]}
                     components={{
                       h1: ({ ...props }) => <h1 className="text-2xl font-bold text-gray-900 mt-8 mb-4" {...props} />,
                       h2: ({ ...props }) => <h2 className="text-xl font-bold text-gray-900 mt-8 mb-3" {...props} />,
                       h3: ({ ...props }) => <h3 className="text-lg font-semibold text-gray-900 mt-6 mb-2" {...props} />,
                       p: ({ ...props }) => <p className="text-gray-700 leading-relaxed mb-4" {...props} />,
-                      code: ({ ...props }) => {
-                        const { className } = props;
-                        const isInline = !className?.includes('language-');
+                      code: ({ className, ...props }) => {
+                        const isInline = !(className?.includes('language-') || className?.includes('hljs'));
                         if (isInline) {
-                          return <code className="bg-gray-100 text-pink-600 px-1.5 py-0.5 rounded text-sm" {...props} />;
+                          return <code className="markdown-inline-code" {...props} />;
                         }
-                        return <code className={cn(className, "font-mono")} {...props} />;
+                        return <code className={cn(className, 'markdown-code')} {...props} />;
                       },
                       pre: ({ ...props }) => (
-                        <pre className="bg-[#1e1e1e] text-[#d4d4d4] rounded-xl p-4 overflow-x-auto my-4 text-sm not-prose border border-gray-800 shadow-lg" {...props} />
+                        <pre className="markdown-pre not-prose" {...props} />
                       ),
                       ul: ({ ...props }) => <ul className="list-disc ml-6 mb-4 space-y-2 text-gray-700" {...props} />,
                       ol: ({ ...props }) => <ol className="list-decimal ml-6 mb-4 space-y-2 text-gray-700" {...props} />,
