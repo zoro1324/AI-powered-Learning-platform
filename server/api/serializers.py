@@ -446,6 +446,19 @@ class RunSampleCodeRequestSerializer(serializers.Serializer):
     raw_input = serializers.CharField(required=False, allow_blank=True, default='')
 
 
+class StartInteractiveSampleSerializer(serializers.Serializer):
+    source_code = serializers.CharField()
+
+
+class SendInteractiveSampleInputSerializer(serializers.Serializer):
+    session_id = serializers.CharField()
+    user_input = serializers.CharField(required=False, allow_blank=True, default='')
+
+
+class StopInteractiveSampleSerializer(serializers.Serializer):
+    session_id = serializers.CharField()
+
+
 class CreateCodeSubmissionSerializer(serializers.Serializer):
     enrollment_id = serializers.IntegerField()
     problem_id = serializers.IntegerField()

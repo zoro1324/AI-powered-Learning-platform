@@ -1,8 +1,30 @@
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
+import threading
+import time
+import uuid
 from typing import Any
+
+
+class InteractiveSampleSession:
+    def __init__(self, session_id: str, process: subprocess.Popen, tmpdir: str):
+        self.session_id = session_id
+        self.process = process
+        self.tmpdir = tmpdir
+        self.stdout_buffer = ''
+        self.stderr_buffer = ''
+        self.stdout_cursor = 0
+        self.stderr_cursor = 0
+        self.lock = threading.Lock()
+        self.created_at = time.time()
+        self.last_activity = time.time()
+
+
+_interactive_sessions: dict[str, InteractiveSampleSession] = {}
+_interactive_sessions_lock = threading.Lock()
 
 
 class CodeExecutionService:
@@ -56,6 +78,121 @@ class CodeExecutionService:
             "runtime_ms": result.get("runtime_ms", 0),
         }
 
+    def start_interactive_sample(self, source_code: str) -> dict[str, Any]:
+        self._cleanup_expired_sessions()
+
+        tmpdir = tempfile.mkdtemp(prefix="code_exec_live_")
+        script_path = os.path.join(tmpdir, "script.py")
+        with open(script_path, "w", encoding="utf-8") as f:
+            f.write(source_code)
+
+        env = {"PYTHONIOENCODING": "utf-8"}
+        process = subprocess.Popen(
+            [sys.executable, "-u", script_path],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            cwd=tmpdir,
+            env=env,
+            bufsize=0,
+        )
+
+        session_id = str(uuid.uuid4())
+        session = InteractiveSampleSession(session_id=session_id, process=process, tmpdir=tmpdir)
+
+        with _interactive_sessions_lock:
+            _interactive_sessions[session_id] = session
+
+        self._start_stream_reader(session, stream_name='stdout')
+        self._start_stream_reader(session, stream_name='stderr')
+
+        time.sleep(0.12)
+        output = self._consume_new_output(session)
+        is_running = process.poll() is None
+
+        if not is_running:
+            self._finalize_session(session_id)
+
+        return {
+            "session_id": session_id,
+            "output": self._normalize_output(output),
+            "is_running": is_running,
+            "exit_code": process.poll(),
+        }
+
+    def send_interactive_input(self, session_id: str, user_input: str) -> dict[str, Any]:
+        session = self._get_session(session_id)
+        if session is None:
+            return {
+                "session_id": session_id,
+                "output": "Session not found or already closed.",
+                "is_running": False,
+                "exit_code": None,
+            }
+
+        process = session.process
+        if process.poll() is None:
+            try:
+                if process.stdin:
+                    process.stdin.write((user_input or '') + "\n")
+                    process.stdin.flush()
+            except Exception as exc:
+                return {
+                    "session_id": session_id,
+                    "output": f"Traceback\n{str(exc)}",
+                    "is_running": False,
+                    "exit_code": process.poll(),
+                }
+
+        time.sleep(0.12)
+        output = self._consume_new_output(session)
+        is_running = process.poll() is None
+        exit_code = process.poll()
+
+        if not is_running:
+            self._finalize_session(session_id)
+
+        return {
+            "session_id": session_id,
+            "output": self._normalize_output(output),
+            "is_running": is_running,
+            "exit_code": exit_code,
+        }
+
+    def stop_interactive_sample(self, session_id: str) -> dict[str, Any]:
+        session = self._get_session(session_id)
+        if session is None:
+            return {
+                "session_id": session_id,
+                "output": "",
+                "is_running": False,
+                "exit_code": None,
+            }
+
+        process = session.process
+        if process.poll() is None:
+            try:
+                process.terminate()
+                process.wait(timeout=1)
+            except Exception:
+                try:
+                    process.kill()
+                except Exception:
+                    pass
+
+        time.sleep(0.05)
+        output = self._consume_new_output(session)
+        exit_code = process.poll()
+        self._finalize_session(session_id)
+
+        return {
+            "session_id": session_id,
+            "output": self._normalize_output(output),
+            "is_running": False,
+            "exit_code": exit_code,
+        }
+
     def _run_plain_script(self, source_code: str, raw_input: str, timeout_seconds: int) -> dict[str, Any]:
         """Execute source code as a normal Python script (no solve() contract)."""
         with tempfile.TemporaryDirectory(prefix="code_exec_") as tmpdir:
@@ -103,6 +240,68 @@ class CodeExecutionService:
                     "runtime_ms": 0,
                     "error_message": str(exc),
                 }
+
+    def _start_stream_reader(self, session: InteractiveSampleSession, stream_name: str) -> None:
+        stream = session.process.stdout if stream_name == 'stdout' else session.process.stderr
+        if stream is None:
+            return
+
+        def _reader() -> None:
+            while True:
+                ch = stream.read(1)
+                if ch == '':
+                    break
+                with session.lock:
+                    if stream_name == 'stdout':
+                        session.stdout_buffer += ch
+                    else:
+                        session.stderr_buffer += ch
+                    session.last_activity = time.time()
+
+        thread = threading.Thread(target=_reader, daemon=True)
+        thread.start()
+
+    def _consume_new_output(self, session: InteractiveSampleSession) -> str:
+        with session.lock:
+            out_new = session.stdout_buffer[session.stdout_cursor:]
+            err_new = session.stderr_buffer[session.stderr_cursor:]
+            session.stdout_cursor = len(session.stdout_buffer)
+            session.stderr_cursor = len(session.stderr_buffer)
+            session.last_activity = time.time()
+        return f"{out_new}{err_new}"
+
+    def _get_session(self, session_id: str) -> InteractiveSampleSession | None:
+        with _interactive_sessions_lock:
+            return _interactive_sessions.get(session_id)
+
+    def _finalize_session(self, session_id: str) -> None:
+        with _interactive_sessions_lock:
+            session = _interactive_sessions.pop(session_id, None)
+
+        if session is None:
+            return
+
+        try:
+            if session.process.poll() is None:
+                session.process.terminate()
+        except Exception:
+            pass
+
+        try:
+            shutil.rmtree(session.tmpdir, ignore_errors=True)
+        except Exception:
+            pass
+
+    def _cleanup_expired_sessions(self, max_age_seconds: int = 1800) -> None:
+        now = time.time()
+        expired_ids: list[str] = []
+        with _interactive_sessions_lock:
+            for session_id, session in _interactive_sessions.items():
+                if (now - session.last_activity) > max_age_seconds:
+                    expired_ids.append(session_id)
+
+        for session_id in expired_ids:
+            self._finalize_session(session_id)
 
     def _run_single_case(self, source_code: str, raw_input: str, timeout_seconds: int) -> dict[str, Any]:
         with tempfile.TemporaryDirectory(prefix="code_exec_") as tmpdir:
@@ -195,4 +394,10 @@ class CodeExecutionService:
 
 
 def get_code_execution_service() -> CodeExecutionService:
-    return CodeExecutionService()
+    global _code_execution_service
+    if _code_execution_service is None:
+        _code_execution_service = CodeExecutionService()
+    return _code_execution_service
+
+
+_code_execution_service: CodeExecutionService | None = None

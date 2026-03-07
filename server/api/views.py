@@ -37,6 +37,7 @@ from .serializers import (
     CodeSubmissionSerializer,
     GenerateDynamicScriptRequestSerializer, DynamicScriptResponseSerializer,
     GenerateSampleCodeRequestSerializer, RunSampleCodeRequestSerializer,
+    StartInteractiveSampleSerializer, SendInteractiveSampleInputSerializer, StopInteractiveSampleSerializer,
 )
 from .tasks import generate_video_task
 from .services.assessment_service import get_assessment_service
@@ -2095,6 +2096,61 @@ class RunSampleCodeView(APIView):
                 source_code=payload['source_code'],
                 raw_input=payload.get('raw_input', ''),
                 timeout_seconds=3,
+            )
+            return Response(result, status=status.HTTP_200_OK)
+        except Exception as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class StartInteractiveSampleCodeView(APIView):
+    """Start a long-lived sample code process for runtime terminal input."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = StartInteractiveSampleSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = serializer.validated_data
+
+        try:
+            result = get_code_execution_service().start_interactive_sample(
+                source_code=payload['source_code']
+            )
+            return Response(result, status=status.HTTP_200_OK)
+        except Exception as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class SendInteractiveSampleInputView(APIView):
+    """Send stdin to a running interactive sample session."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = SendInteractiveSampleInputSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = serializer.validated_data
+
+        try:
+            result = get_code_execution_service().send_interactive_input(
+                session_id=payload['session_id'],
+                user_input=payload.get('user_input', ''),
+            )
+            return Response(result, status=status.HTTP_200_OK)
+        except Exception as exc:
+            return Response({'error': str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class StopInteractiveSampleCodeView(APIView):
+    """Stop an interactive sample session and release resources."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = StopInteractiveSampleSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = serializer.validated_data
+
+        try:
+            result = get_code_execution_service().stop_interactive_sample(
+                session_id=payload['session_id']
             )
             return Response(result, status=status.HTTP_200_OK)
         except Exception as exc:

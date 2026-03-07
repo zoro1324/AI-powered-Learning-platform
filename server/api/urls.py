@@ -19,6 +19,7 @@ from .views import (
     GenerateCodingProblemView, CodingProblemDetailView,
     CreateCodeSubmissionView, CodeExecutionTaskStatusView, CodeSubmissionResultView,
     GenerateSampleCodeView, RunSampleCodeView,
+    StartInteractiveSampleCodeView, SendInteractiveSampleInputView, StopInteractiveSampleCodeView,
 )
 
 # Create router for ViewSets
@@ -79,6 +80,9 @@ urlpatterns = [
     path('coding/submissions/<uuid:submission_id>/result/', CodeSubmissionResultView.as_view(), name='coding-submission-result'),
     path('coding/samples/generate/', GenerateSampleCodeView.as_view(), name='coding-sample-generate'),
     path('coding/samples/run/', RunSampleCodeView.as_view(), name='coding-sample-run'),
+    path('coding/samples/interactive/start/', StartInteractiveSampleCodeView.as_view(), name='coding-sample-interactive-start'),
+    path('coding/samples/interactive/input/', SendInteractiveSampleInputView.as_view(), name='coding-sample-interactive-input'),
+    path('coding/samples/interactive/stop/', StopInteractiveSampleCodeView.as_view(), name='coding-sample-interactive-stop'),
     
     # Podcast Generation
     path('podcast/personas/', GeneratePersonaOptionsView.as_view(), name='podcast-personas'),

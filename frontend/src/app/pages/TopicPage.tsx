@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useRef, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router';
 import {
   ChevronLeft,
@@ -107,33 +107,93 @@ export default function TopicPage() {
       setSampleCodeValue(activeResource.content_json.starter_code || '');
       setSampleCodeInput(activeResource.content_json.sample_input || '');
       setSampleTerminalHistory(['Ready. Press Run to execute your code.']);
+      setSampleSessionId(null);
+      setSampleSessionRunning(false);
     }
   }, [isSampleCodeResource, activeResource?.id]);
 
   const handleRunSampleCode = async () => {
     if (!sampleCodeValue.trim()) return;
-    const command = `$ ${sampleCodeInput || '<empty>'}`;
     setSampleCodeRunning(true);
-    setSampleTerminalHistory((prev) => [...prev, command]);
-    try {
-      const result = await codingAPI.runSampleCode({
-        source_code: sampleCodeValue,
-        raw_input: sampleCodeInput,
-      });
 
-      if (result.status === 'ok') {
-        const output = result.stdout || '(no output)';
-        setSampleTerminalHistory((prev) => [...prev, output]);
-      } else {
-        const errText = result.error_message || result.stderr || 'Execution failed';
-        setSampleTerminalHistory((prev) => [...prev, `Traceback\n${errText}`]);
+    let sessionId = sampleSessionId;
+    let isRunning = sampleSessionRunning;
+    const pendingInput = sampleCodeInput;
+
+    try {
+      if (!sessionId || !isRunning) {
+        setSampleTerminalHistory((prev) => [...prev, '$ python script.py']);
+        const started = await codingAPI.startInteractiveSampleCode({
+          source_code: sampleCodeValue,
+        });
+        sessionId = started.session_id;
+        isRunning = started.is_running;
+
+        setSampleSessionId(started.session_id);
+        setSampleSessionRunning(started.is_running);
+
+        if (started.output) {
+          setSampleTerminalHistory((prev) => [...prev, started.output]);
+        }
+        if (!started.is_running) {
+          setSampleSessionId(null);
+          setSampleSessionRunning(false);
+          if (started.exit_code !== null) {
+            setSampleTerminalHistory((prev) => [...prev, `[process exited with code ${started.exit_code}]`]);
+          }
+          return;
+        }
+      }
+
+      // When already running, Enter/Run sends stdin exactly like a terminal line.
+      if (sessionId && (sampleSessionRunning || pendingInput.length > 0)) {
+        setSampleTerminalHistory((prev) => [...prev, `> ${pendingInput}`]);
+        const result = await codingAPI.sendInteractiveSampleInput({
+          session_id: sessionId,
+          user_input: pendingInput,
+        });
+
+        if (result.output) {
+          setSampleTerminalHistory((prev) => [...prev, result.output]);
+        }
+
+        setSampleSessionRunning(result.is_running);
+        if (!result.is_running) {
+          setSampleSessionId(null);
+          if (result.exit_code !== null) {
+            setSampleTerminalHistory((prev) => [...prev, `[process exited with code ${result.exit_code}]`]);
+          }
+        }
+
+        setSampleCodeInput('');
       }
     } catch (err: any) {
       const errText = err?.response?.data?.error || err?.message || 'Failed to run sample code';
       setSampleTerminalHistory((prev) => [...prev, `Traceback\n${errText}`]);
+      setSampleSessionId(null);
+      setSampleSessionRunning(false);
     } finally {
       setSampleCodeRunning(false);
-      setSampleCodeInput('');
+    }
+  };
+
+  const handleStopSampleCode = async () => {
+    if (!sampleSessionId) return;
+    setSampleCodeRunning(true);
+    try {
+      const result = await codingAPI.stopInteractiveSampleCode({ session_id: sampleSessionId });
+      if (result.output) {
+        setSampleTerminalHistory((prev) => [...prev, result.output]);
+      }
+      if (result.exit_code !== null) {
+        setSampleTerminalHistory((prev) => [...prev, `[process exited with code ${result.exit_code}]`]);
+      }
+    } catch {
+      // No-op: session cleanup should be best-effort.
+    } finally {
+      setSampleSessionId(null);
+      setSampleSessionRunning(false);
+      setSampleCodeRunning(false);
     }
   };
 
@@ -148,11 +208,38 @@ export default function TopicPage() {
   const [visibleDynamicBlocks, setVisibleDynamicBlocks] = useState(0);
   const [sampleCodeRunning, setSampleCodeRunning] = useState(false);
   const [sampleTerminalHistory, setSampleTerminalHistory] = useState<string[]>(['Ready. Press Run to execute your code.']);
+  const [sampleSessionId, setSampleSessionId] = useState<string | null>(null);
+  const [sampleSessionRunning, setSampleSessionRunning] = useState(false);
   const [dynamicCodeByBlock, setDynamicCodeByBlock] = useState<Record<number, string>>({});
   const [dynamicInputByBlock, setDynamicInputByBlock] = useState<Record<number, string>>({});
   const [dynamicCodeRunningByBlock, setDynamicCodeRunningByBlock] = useState<Record<number, boolean>>({});
   const [dynamicTerminalHistoryByBlock, setDynamicTerminalHistoryByBlock] = useState<Record<number, string[]>>({});
+  const [dynamicSessionIdByBlock, setDynamicSessionIdByBlock] = useState<Record<number, string>>({});
+  const [dynamicSessionRunningByBlock, setDynamicSessionRunningByBlock] = useState<Record<number, boolean>>({});
   const [quizRevealByQuestion, setQuizRevealByQuestion] = useState<Record<string, boolean>>({});
+  const sampleSessionIdRef = useRef<string | null>(null);
+  const dynamicSessionIdsRef = useRef<Record<number, string>>({});
+
+  useEffect(() => {
+    sampleSessionIdRef.current = sampleSessionId;
+  }, [sampleSessionId]);
+
+  useEffect(() => {
+    dynamicSessionIdsRef.current = dynamicSessionIdByBlock;
+  }, [dynamicSessionIdByBlock]);
+
+  useEffect(() => {
+    return () => {
+      const sampleId = sampleSessionIdRef.current;
+      if (sampleId) {
+        codingAPI.stopInteractiveSampleCode({ session_id: sampleId }).catch(() => undefined);
+      }
+
+      Object.values(dynamicSessionIdsRef.current).forEach((sessionId) => {
+        codingAPI.stopInteractiveSampleCode({ session_id: sessionId }).catch(() => undefined);
+      });
+    };
+  }, []);
 
   const handleSaveNote = async () => {
     if (!content?.lessonId || !noteTitle.trim() || !noteContent.trim()) return;
@@ -195,6 +282,10 @@ export default function TopicPage() {
   useEffect(() => {
     if (!dynamicScript?.blocks?.length) return;
 
+    Object.values(dynamicSessionIdsRef.current).forEach((sessionId) => {
+      codingAPI.stopInteractiveSampleCode({ session_id: sessionId }).catch(() => undefined);
+    });
+
     const nextCode: Record<number, string> = {};
     const nextInput: Record<number, string> = {};
     const nextHistory: Record<number, string[]> = {};
@@ -210,48 +301,139 @@ export default function TopicPage() {
     setDynamicInputByBlock(nextInput);
     setDynamicCodeRunningByBlock({});
     setDynamicTerminalHistoryByBlock(nextHistory);
+    setDynamicSessionIdByBlock({});
+    setDynamicSessionRunningByBlock({});
     setQuizRevealByQuestion({});
   }, [dynamicScript?.title, dynamicScript?.blocks]);
 
   const handleRunDynamicCodeBlock = async (blockIdx: number) => {
     const sourceCode = dynamicCodeByBlock[blockIdx] || '';
     if (!sourceCode.trim()) return;
-    const command = `$ ${dynamicInputByBlock[blockIdx] || '<empty>'}`;
-
     setDynamicCodeRunningByBlock((prev) => ({ ...prev, [blockIdx]: true }));
-    setDynamicTerminalHistoryByBlock((prev) => ({
-      ...prev,
-      [blockIdx]: [...(prev[blockIdx] || []), command],
-    }));
+
+    let sessionId = dynamicSessionIdByBlock[blockIdx];
+    let isRunning = !!dynamicSessionRunningByBlock[blockIdx];
+    const pendingInput = dynamicInputByBlock[blockIdx] || '';
 
     try {
-      const result = await codingAPI.runSampleCode({
-        source_code: sourceCode,
-        raw_input: dynamicInputByBlock[blockIdx] || '',
-      });
+      if (!sessionId || !isRunning) {
+        setDynamicTerminalHistoryByBlock((prev) => ({
+          ...prev,
+          [blockIdx]: [...(prev[blockIdx] || []), '$ python script.py'],
+        }));
 
-      if (result.status === 'ok') {
-        const output = result.stdout || '(no output)';
+        const started = await codingAPI.startInteractiveSampleCode({
+          source_code: sourceCode,
+        });
+
+        sessionId = started.session_id;
+        isRunning = started.is_running;
+
+        setDynamicSessionIdByBlock((prev) => ({ ...prev, [blockIdx]: started.session_id }));
+        setDynamicSessionRunningByBlock((prev) => ({ ...prev, [blockIdx]: started.is_running }));
+
+        if (started.output) {
+          setDynamicTerminalHistoryByBlock((prev) => ({
+            ...prev,
+            [blockIdx]: [...(prev[blockIdx] || []), started.output],
+          }));
+        }
+
+        if (!started.is_running) {
+          setDynamicSessionIdByBlock((prev) => {
+            const next = { ...prev };
+            delete next[blockIdx];
+            return next;
+          });
+          if (started.exit_code !== null) {
+            setDynamicTerminalHistoryByBlock((prev) => ({
+              ...prev,
+              [blockIdx]: [...(prev[blockIdx] || []), `[process exited with code ${started.exit_code}]`],
+            }));
+          }
+          return;
+        }
+      }
+
+      if (sessionId && (dynamicSessionRunningByBlock[blockIdx] || pendingInput.length > 0)) {
         setDynamicTerminalHistoryByBlock((prev) => ({
           ...prev,
-          [blockIdx]: [...(prev[blockIdx] || []), output],
+          [blockIdx]: [...(prev[blockIdx] || []), `> ${pendingInput}`],
         }));
-      } else {
-        const errText = result.error_message || result.stderr || 'Execution failed';
-        setDynamicTerminalHistoryByBlock((prev) => ({
-          ...prev,
-          [blockIdx]: [...(prev[blockIdx] || []), `Traceback\n${errText}`],
-        }));
+
+        const result = await codingAPI.sendInteractiveSampleInput({
+          session_id: sessionId,
+          user_input: pendingInput,
+        });
+
+        if (result.output) {
+          setDynamicTerminalHistoryByBlock((prev) => ({
+            ...prev,
+            [blockIdx]: [...(prev[blockIdx] || []), result.output],
+          }));
+        }
+
+        setDynamicSessionRunningByBlock((prev) => ({ ...prev, [blockIdx]: result.is_running }));
+        if (!result.is_running) {
+          setDynamicSessionIdByBlock((prev) => {
+            const next = { ...prev };
+            delete next[blockIdx];
+            return next;
+          });
+          if (result.exit_code !== null) {
+            setDynamicTerminalHistoryByBlock((prev) => ({
+              ...prev,
+              [blockIdx]: [...(prev[blockIdx] || []), `[process exited with code ${result.exit_code}]`],
+            }));
+          }
+        }
+
+        setDynamicInputByBlock((prev) => ({ ...prev, [blockIdx]: '' }));
       }
     } catch (err: any) {
       const errText = err?.response?.data?.error || err?.message || 'Failed to run code';
+      setDynamicSessionIdByBlock((prev) => {
+        const next = { ...prev };
+        delete next[blockIdx];
+        return next;
+      });
+      setDynamicSessionRunningByBlock((prev) => ({ ...prev, [blockIdx]: false }));
       setDynamicTerminalHistoryByBlock((prev) => ({
         ...prev,
         [blockIdx]: [...(prev[blockIdx] || []), `Traceback\n${errText}`],
       }));
     } finally {
       setDynamicCodeRunningByBlock((prev) => ({ ...prev, [blockIdx]: false }));
-      setDynamicInputByBlock((prev) => ({ ...prev, [blockIdx]: '' }));
+    }
+  };
+
+  const handleStopDynamicCodeBlock = async (blockIdx: number) => {
+    const sessionId = dynamicSessionIdByBlock[blockIdx];
+    if (!sessionId) return;
+
+    setDynamicCodeRunningByBlock((prev) => ({ ...prev, [blockIdx]: true }));
+    try {
+      const result = await codingAPI.stopInteractiveSampleCode({ session_id: sessionId });
+      if (result.output) {
+        setDynamicTerminalHistoryByBlock((prev) => ({
+          ...prev,
+          [blockIdx]: [...(prev[blockIdx] || []), result.output],
+        }));
+      }
+      if (result.exit_code !== null) {
+        setDynamicTerminalHistoryByBlock((prev) => ({
+          ...prev,
+          [blockIdx]: [...(prev[blockIdx] || []), `[process exited with code ${result.exit_code}]`],
+        }));
+      }
+    } finally {
+      setDynamicSessionIdByBlock((prev) => {
+        const next = { ...prev };
+        delete next[blockIdx];
+        return next;
+      });
+      setDynamicSessionRunningByBlock((prev) => ({ ...prev, [blockIdx]: false }));
+      setDynamicCodeRunningByBlock((prev) => ({ ...prev, [blockIdx]: false }));
     }
   };
 
@@ -449,12 +631,23 @@ export default function TopicPage() {
 
   useEffect(() => {
     window.scrollTo?.(0, 0);
+    if (sampleSessionIdRef.current) {
+      codingAPI.stopInteractiveSampleCode({ session_id: sampleSessionIdRef.current }).catch(() => undefined);
+    }
+    Object.values(dynamicSessionIdsRef.current).forEach((sessionId) => {
+      codingAPI.stopInteractiveSampleCode({ session_id: sessionId }).catch(() => undefined);
+    });
+
     // Reset active resource view when navigating to a new topic
     dispatch(setActiveResourceView({ moduleIndex: mIdx, topicIndex: tIdx, view: null }));
     setNoteTitle('');
     setNoteContent('');
     setSampleTerminalHistory(['Ready. Press Run to execute your code.']);
+    setSampleSessionId(null);
+    setSampleSessionRunning(false);
     setDynamicTerminalHistoryByBlock({});
+    setDynamicSessionIdByBlock({});
+    setDynamicSessionRunningByBlock({});
   }, [mIdx, tIdx, dispatch]);
 
   // ─── Redirect if module is locked ──────────────────────────────────────────
@@ -879,14 +1072,21 @@ export default function TopicPage() {
                                     value={dynamicInputByBlock[idx] || ''}
                                     onChange={(e) => setDynamicInputByBlock((prev) => ({ ...prev, [idx]: e.target.value }))}
                                     className="flex-1 bg-transparent outline-none text-xs font-mono text-[#d5e6ff]"
-                                    placeholder="type stdin..."
+                                    placeholder={dynamicSessionRunningByBlock[idx] ? 'type and send to running process...' : 'optional first input after run...'}
                                   />
                                   <button
                                     onClick={() => handleRunDynamicCodeBlock(idx)}
                                     disabled={!!dynamicCodeRunningByBlock[idx] || !(dynamicCodeByBlock[idx] || '').trim()}
                                     className="px-2 py-0.5 rounded bg-[#123a70] hover:bg-[#1a4e93] text-white text-xs disabled:opacity-50"
                                   >
-                                    {dynamicCodeRunningByBlock[idx] ? 'Running...' : 'Run'}
+                                    {dynamicCodeRunningByBlock[idx] ? 'Working...' : dynamicSessionRunningByBlock[idx] ? 'Send' : 'Run'}
+                                  </button>
+                                  <button
+                                    onClick={() => handleStopDynamicCodeBlock(idx)}
+                                    disabled={!!dynamicCodeRunningByBlock[idx] || !dynamicSessionIdByBlock[idx]}
+                                    className="px-2 py-0.5 rounded border border-[#2a3a5e] text-[#c8d8ff] text-xs disabled:opacity-40"
+                                  >
+                                    Stop
                                   </button>
                                 </div>
                               </div>
@@ -975,14 +1175,21 @@ export default function TopicPage() {
                             value={sampleCodeInput}
                             onChange={(e) => setSampleCodeInput(e.target.value)}
                             className="flex-1 bg-transparent outline-none text-xs font-mono text-[#d5e6ff]"
-                            placeholder="type stdin..."
+                            placeholder={sampleSessionRunning ? 'type and send to running process...' : 'optional first input after run...'}
                           />
                           <button
                             onClick={handleRunSampleCode}
                             disabled={sampleCodeRunning || !sampleCodeValue.trim()}
                             className="px-2 py-0.5 rounded bg-[#123a70] hover:bg-[#1a4e93] text-white text-xs disabled:opacity-50"
                           >
-                            {sampleCodeRunning ? 'Running...' : 'Run'}
+                            {sampleCodeRunning ? 'Working...' : sampleSessionRunning ? 'Send' : 'Run'}
+                          </button>
+                          <button
+                            onClick={handleStopSampleCode}
+                            disabled={sampleCodeRunning || !sampleSessionId}
+                            className="px-2 py-0.5 rounded border border-[#2a3a5e] text-[#c8d8ff] text-xs disabled:opacity-40"
+                          >
+                            Stop
                           </button>
                         </div>
                       </div>

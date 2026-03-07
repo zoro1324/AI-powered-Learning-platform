@@ -603,6 +603,13 @@ export interface SampleCodeRunResponse {
   runtime_ms: number;
 }
 
+export interface InteractiveSampleResponse {
+  session_id: string;
+  output: string;
+  is_running: boolean;
+  exit_code: number | null;
+}
+
 export interface TopicQuizResponse {
   questions: AssessmentQuestion[];
 }
@@ -815,6 +822,28 @@ export const codingAPI = {
     raw_input?: string;
   }): Promise<SampleCodeRunResponse> => {
     const response = await api.post<SampleCodeRunResponse>('/coding/samples/run/', data);
+    return response.data;
+  },
+
+  startInteractiveSampleCode: async (data: {
+    source_code: string;
+  }): Promise<InteractiveSampleResponse> => {
+    const response = await api.post<InteractiveSampleResponse>('/coding/samples/interactive/start/', data);
+    return response.data;
+  },
+
+  sendInteractiveSampleInput: async (data: {
+    session_id: string;
+    user_input?: string;
+  }): Promise<InteractiveSampleResponse> => {
+    const response = await api.post<InteractiveSampleResponse>('/coding/samples/interactive/input/', data);
+    return response.data;
+  },
+
+  stopInteractiveSampleCode: async (data: {
+    session_id: string;
+  }): Promise<InteractiveSampleResponse> => {
+    const response = await api.post<InteractiveSampleResponse>('/coding/samples/interactive/stop/', data);
     return response.data;
   },
 };
