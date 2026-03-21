@@ -204,24 +204,24 @@ CELERY_RESULT_SERIALIZER = 'json'
 # AI Backend Configuration
 # ─────────────────────────────────────────────────────────────────────────────
 
-# Set IS_PRODUCTION=True in your .env (or shell env) to use Featherless API.
+# Set IS_PRODUCTION=True in your .env (or shell env) to use OpenRouter API.
 # Defaults to False so local development uses OLLAMA + Stable Diffusion.
 IS_PRODUCTION = os.environ.get('IS_PRODUCTION', 'False').strip().lower() in ('1', 'true', 'yes')
 
-# Fine-grained overrides — USE_FEATHERLESS_TEXT / USE_FEATHERLESS_IMAGE take precedence
-# over IS_PRODUCTION so you can mix backends (e.g. Featherless text + SD images).
+# Fine-grained overrides — USE_OPENROUTER_TEXT / USE_OPENROUTER_IMAGE take precedence
+# over IS_PRODUCTION so you can mix backends (e.g. OpenRouter text + SD images).
 # Leave them unset (or empty) to inherit from IS_PRODUCTION.
-_use_featherless_text_raw = os.environ.get('USE_FEATHERLESS_TEXT', '').strip().lower()
-_use_featherless_image_raw = os.environ.get('USE_FEATHERLESS_IMAGE', '').strip().lower()
+_use_openrouter_text_raw = os.environ.get('USE_OPENROUTER_TEXT', '').strip().lower()
+_use_openrouter_image_raw = os.environ.get('USE_OPENROUTER_IMAGE', '').strip().lower()
 
-USE_FEATHERLESS_TEXT = (
-    _use_featherless_text_raw in ('1', 'true', 'yes')
-    if _use_featherless_text_raw
+USE_OPENROUTER_TEXT = (
+    _use_openrouter_text_raw in ('1', 'true', 'yes')
+    if _use_openrouter_text_raw
     else IS_PRODUCTION
 )
-USE_FEATHERLESS_IMAGE = (
-    _use_featherless_image_raw in ('1', 'true', 'yes')
-    if _use_featherless_image_raw
+USE_OPENROUTER_IMAGE = (
+    _use_openrouter_image_raw in ('1', 'true', 'yes')
+    if _use_openrouter_image_raw
     else IS_PRODUCTION
 )
 
@@ -232,7 +232,7 @@ OLLAMA_MODEL = os.environ.get('OLLAMA_MODEL', 'llama3:8b')
 CODING_MODEL = os.environ.get('CODING_MODEL', 'qwen2.5-coder:7b')
 OLLAMA_TIMEOUT = int(os.environ.get('OLLAMA_TIMEOUT', '600'))  # seconds
 
-# --- Featherless (production) ---
-FEATHERLESS_API_KEY = os.environ.get('FEATHERLESS_API_KEY', '')
-FEATHERLESS_BASE_URL = os.environ.get('FEATHERLESS_BASE_URL', 'https://api.featherless.ai/v1')
-FEATHERLESS_MODEL = os.environ.get('FEATHERLESS_MODEL', 'openai/gpt-oss-120b')  # text / chat
+# --- OpenRouter (production) ---
+OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY', '')
+OPENROUTER_BASE_URL = os.environ.get('OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1')
+OPENROUTER_MODEL = os.environ.get('OPENROUTER_MODEL', 'openai/gpt-3.5-turbo')  # text / chat

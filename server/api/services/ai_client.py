@@ -4,7 +4,7 @@ Unified AI Client
 This module is the single source of truth for all AI calls in the server.
 
 IS_PRODUCTION=False  → OLLAMA (text/chat)  + Stable Diffusion (images)
-IS_PRODUCTION=True   → Featherless API via LangChain (text/chat)
+IS_PRODUCTION=True   → OpenRouter API via LangChain (text/chat)
 
 Usage
 -----
@@ -16,7 +16,7 @@ Usage
     # Image generation — returns a PIL.Image or saves to disk
     img  = generate_image("A futuristic city skyline", output_path="/tmp/out.png")
 
-    # LangChain-compatible LLM (for services that use LangChain chains)
+    # LangChain-compatible LLM
     llm  = get_langchain_llm(temperature=0.7)
 """
 
@@ -35,69 +35,26 @@ logger = logging.getLogger(__name__)
 # Internal helpers
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _use_featherless_text() -> bool:
-    """Return True when text / chat generation should use Featherless."""
-    return getattr(settings, 'USE_FEATHERLESS_TEXT', getattr(settings, 'IS_PRODUCTION', False))
+def _use_openrouter_text() -> bool:
+    """Return True when text / chat generation should use OpenRouter."""
+    return getattr(settings, 'USE_OPENROUTER_TEXT', getattr(settings, 'IS_PRODUCTION', False))
 
 
-def _use_featherless_image() -> bool:
-    """Return True when image generation should use Featherless backend."""
-    return getattr(settings, 'USE_FEATHERLESS_IMAGE', getattr(settings, 'IS_PRODUCTION', False))
+def _use_openrouter_image() -> bool:
+    """Return True when image generation should use OpenRouter backend."""
+    return getattr(settings, 'USE_OPENROUTER_IMAGE', getattr(settings, 'IS_PRODUCTION', False))
 
 
-# ── Ollama text helper ────────────────────────────────────────────────────────
+# ── Unified Text Helper ───────────────────────────────────────────────────────
 
-def _ollama_generate(
+def _langchain_generate(
     prompt: str,
     system_prompt: Optional[str] = None,
     json_mode: bool = False,
     model: Optional[str] = None,
 ) -> str:
-    """Send a chat request to the local Ollama server."""
-    base_url = getattr(settings, 'OLLAMA_API_URL', 'http://localhost:11434/api/generate')
-    chat_url = base_url.replace('/api/generate', '/api/chat')
-    model_name = model or getattr(settings, 'OLLAMA_MODEL', 'llama3:8b')
-    timeout = getattr(settings, 'OLLAMA_TIMEOUT', 600)
-
-    messages = []
-    if system_prompt:
-        messages.append({'role': 'system', 'content': system_prompt})
-    messages.append({'role': 'user', 'content': prompt})
-
-    payload: dict = {
-        'model': model_name,
-        'messages': messages,
-        'stream': False,
-    }
-    if json_mode:
-        payload['format'] = 'json'
-
-    logger.info("AI Client [DEV] → Ollama model=%s json_mode=%s", model_name, json_mode)
-    response = requests.post(
-        chat_url,
-        json=payload,
-        headers={'Content-Type': 'application/json'},
-        timeout=timeout,
-    )
-    response.raise_for_status()
-    content = response.json().get('message', {}).get('content', '')
-    logger.info("AI Client [DEV] ← Ollama response length=%d", len(content))
-    return content
-
-
-# ── Featherless text helper ───────────────────────────────────────────────────
-
-def _featherless_generate(
-    prompt: str,
-    system_prompt: Optional[str] = None,
-    json_mode: bool = False,
-    model: Optional[str] = None,
-) -> str:
-    """Send a chat request to the Featherless API via LangChain."""
-    llm = get_langchain_llm(temperature=0.7)
-
-    if json_mode:
-        llm = llm.bind(response_format={"type": "json_object"})
+    """Send a chat request using the configured LangChain backend."""
+    llm = get_langchain_llm(temperature=0.7, json_mode=json_mode, model_override=model)
 
     messages = []
     if system_prompt:
@@ -111,16 +68,19 @@ def _featherless_generate(
         )
     messages.append(HumanMessage(content=final_prompt))
 
-    model_name = model or getattr(settings, 'FEATHERLESS_MODEL', 'openai/gpt-oss-120b')
-    logger.info("AI Client [PROD] → Featherless model=%s json_mode=%s", model_name, json_mode)
+    backend_name = "OpenRouter" if _use_openrouter_text() else "Ollama"
+    logger.info("AI Client [%s] → Generating text with json_mode=%s", backend_name, json_mode)
+    
     response = llm.invoke(messages)
     content = (response.content or '') if hasattr(response, 'content') else str(response)
+    
     if isinstance(content, list):
         content = ''.join(
             chunk.get('text', '') if isinstance(chunk, dict) else str(chunk)
             for chunk in content
         )
-    logger.info("AI Client [PROD] ← Featherless response length=%d", len(content))
+        
+    logger.info("AI Client [%s] ← Response length=%d", backend_name, len(content))
     return content
 
 
@@ -188,16 +148,16 @@ def _sd_generate(prompt_text: str, output_path: Optional[str] = None) -> Optiona
         return None
 
 
-# ── Featherless image helper ──────────────────────────────────────────────────
+# ── OpenRouter image helper ──────────────────────────────────────────────────
 
-def _featherless_generate_image(prompt_text: str, output_path: Optional[str] = None) -> Optional[Image.Image]:
+def _openrouter_generate_image(prompt_text: str, output_path: Optional[str] = None) -> Optional[Image.Image]:
     """
     Generate an image for production mode.
 
-    Featherless is currently wired for text inference in this project,
+    OpenRouter is currently wired for text inference in this project,
     so image generation falls back to Stable Diffusion.
     """
-    logger.info("AI Client [PROD] Featherless image route → Stable Diffusion fallback")
+    logger.info("AI Client [PROD] OpenRouter image route → Stable Diffusion fallback")
     return _sd_generate(prompt_text, output_path=output_path)
 
 
@@ -212,24 +172,18 @@ def generate_text(
     model: Optional[str] = None,
 ) -> str:
     """
-    Generate text using the configured AI backend.
+    Generate text using the configured AI backend (OpenRouter or Ollama via LangChain).
 
     Args:
         prompt:        User-facing prompt.
         system_prompt: Optional system-level instruction.
         json_mode:     If True, instruct the model to return valid JSON.
+        model:         Optional model override.
 
     Returns:
         The model's response as a string.
     """
-    if _use_featherless_text():
-        return _featherless_generate(
-            prompt,
-            system_prompt=system_prompt,
-            json_mode=json_mode,
-            model=model,
-        )
-    return _ollama_generate(
+    return _langchain_generate(
         prompt,
         system_prompt=system_prompt,
         json_mode=json_mode,
@@ -248,25 +202,27 @@ def generate_image(prompt_text: str, output_path: Optional[str] = None) -> Optio
     Returns:
         PIL.Image object, or None on failure.
     """
-    if _use_featherless_image():
-        return _featherless_generate_image(prompt_text, output_path=output_path)
+    if _use_openrouter_image():
+        return _openrouter_generate_image(prompt_text, output_path=output_path)
     return _sd_generate(prompt_text, output_path=output_path)
 
 
-def get_langchain_llm(temperature: float = 0.7):
+def get_langchain_llm(temperature: float = 0.7, json_mode: bool = False, model_override: Optional[str] = None):
     """
     Return a LangChain-compatible chat model for the current environment.
 
-    Production → ChatOpenAI (Featherless base URL)
+    Production → ChatOpenAI (OpenRouter base URL)
     Development → ChatOllama
 
     Args:
         temperature: Sampling temperature (0.0 – 1.0).
+        json_mode:   Whether to use json formatting (if supported).
+        model_override: Optional model name to override the default.
 
     Returns:
         A LangChain BaseChatModel instance.
     """
-    if _use_featherless_text():
+    if _use_openrouter_text():
         try:
             from langchain_openai import ChatOpenAI
         except ImportError as exc:
@@ -275,22 +231,34 @@ def get_langchain_llm(temperature: float = 0.7):
                 "Run: pip install langchain-openai"
             ) from exc
 
-        api_key = getattr(settings, 'FEATHERLESS_API_KEY', '')
+        api_key = getattr(settings, 'OPENROUTER_API_KEY', '')
         if not api_key:
-            raise RuntimeError("FEATHERLESS_API_KEY is not set. Add it to your .env file.")
+            raise RuntimeError("OPENROUTER_API_KEY is not set. Add it to your .env file.")
 
-        model_name = getattr(settings, 'FEATHERLESS_MODEL', 'openai/gpt-oss-120b')
-        base_url = getattr(settings, 'FEATHERLESS_BASE_URL', 'https://api.featherless.ai/v1')
+        model_name = model_override or getattr(settings, 'OPENROUTER_MODEL', 'openai/gpt-3.5-turbo')
+        base_url = getattr(settings, 'OPENROUTER_BASE_URL', 'https://openrouter.ai/api/v1')
 
-        logger.info("AI Client [PROD] LangChain LLM → ChatOpenAI(Featherless) model=%s", model_name)
-        return ChatOpenAI(
+        logger.info("AI Client [PROD] LangChain LLM → ChatOpenAI(OpenRouter) model=%s", model_name)
+        llm = ChatOpenAI(
             model=model_name,
             api_key=api_key,
             base_url=base_url,
             temperature=temperature,
         )
+        if json_mode:
+            llm = llm.bind(response_format={"type": "json_object"})
+        return llm
     else:
         from langchain_ollama import ChatOllama
-        model_name = getattr(settings, 'OLLAMA_MODEL', 'llama3:8b')
+        model_name = model_override or getattr(settings, 'OLLAMA_MODEL', 'llama3:8b')
         logger.info("AI Client [DEV] LangChain LLM → ChatOllama model=%s", model_name)
-        return ChatOllama(model=model_name, temperature=temperature)
+        
+        kwargs = {
+            "model": model_name,
+            "temperature": temperature,
+        }
+        if json_mode:
+            kwargs["format"] = "json"
+            
+        return ChatOllama(**kwargs)
+
