@@ -180,9 +180,21 @@ Analyze whether this topic is broad or narrow, then create an appropriate course
         Convert CoursePlan to dictionary for JSON serialization.
         
         Args:
-            plan: CoursePlan object
+            plan: CoursePlan object or dictionary
             
         Returns:
             Dictionary representation of the course plan
         """
-        return plan.model_dump()
+        import json
+        if isinstance(plan, dict):
+            # If Langchain returned a raw dictionary (can happen with JSON mode fallback)
+            if "parsed" in plan and hasattr(plan["parsed"], "model_dump"):
+                return json.loads(plan["parsed"].model_dump_json())
+            return plan
+            
+        # Use model_dump_json() and loads to avoid Pydantic v2 warnings related to 
+        # Langchain's internal "_OutputFormatter.parsed" wrapper schemas.
+        if hasattr(plan, "model_dump_json"):
+            return json.loads(plan.model_dump_json())
+            
+        return plan.model_dump(warnings=False)
