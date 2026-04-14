@@ -77,8 +77,8 @@ export default function LoginPage() {
 
         <div className="bg-white border border-neutral-200 rounded-3xl shadow-sm p-8">
           <div className="mb-8">
-            <h2 className="text-2xl font-semibold text-gray-900 mb-2">Welcome Back</h2>
-            <p className="text-gray-600">Login to continue your personalized learning journey</p>
+            <h2 className="text-2xl font-semibold text-neutral-900 mb-2">Welcome Back</h2>
+            <p className="text-neutral-600">Login to continue your personalized learning journey</p>
           </div>
 
           {/* Error Messages */}
@@ -111,7 +111,7 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Enter your email"
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-neutral-900/20 focus:border-transparent transition-all"
                 required
               />
             </div>
@@ -128,13 +128,13 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="Enter your password"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-neutral-900/20 focus:border-transparent transition-all"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-gray-700"
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -143,7 +143,7 @@ export default function LoginPage() {
 
             {/* Forgot Password */}
             <div className="text-right">
-              <Link to="/forgot-password" className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+              <Link to="/forgot-password" className="text-sm text-neutral-700 hover:text-neutral-900 font-medium">
                 Forgot Password?
               </Link>
             </div>
@@ -152,7 +152,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-xl font-medium hover:from-blue-600 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-neutral-900 text-white py-3 rounded-xl font-medium hover:bg-neutral-800 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Logging in...' : 'Login'}
             </button>
@@ -160,9 +160,9 @@ export default function LoginPage() {
 
           {/* Create Account Link */}
           <div className="mt-6 text-center">
-            <p className="text-gray-600">
+            <p className="text-neutral-600">
               Don't have an account?{' '}
-              <Link to="/signup" className="text-blue-600 hover:text-blue-700 font-medium">
+              <Link to="/signup" className="text-neutral-700 hover:text-neutral-900 font-medium">
                 Create Account
               </Link>
             </p>

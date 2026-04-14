@@ -131,23 +131,23 @@ export default function FinalQuizPage() {
 
   if (showResults) {
     return (
-      <div className="flex min-h-screen bg-gray-50">
+      <div className="app-shell">
         <Sidebar />
         
-        <main className="flex-1 ml-64">
+        <main className="app-main">
           <div className="min-h-screen py-12 px-8">
             <div className="max-w-4xl mx-auto">
               {/* Results Header */}
-              <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl p-8 mb-8 text-white text-center">
+              <div className="bg-neutral-900 rounded-2xl p-8 mb-8 text-white text-center">
                 <Award className="w-16 h-16 mx-auto mb-4" />
                 <h1 className="text-4xl font-semibold mb-4">Quiz Complete!</h1>
                 <div className="flex items-center justify-center gap-8">
                   <div>
-                    <p className="text-blue-100 mb-1">Your Score</p>
+                    <p className="text-neutral-200 mb-1">Your Score</p>
                     <p className="text-5xl font-bold">{Math.round(scorePercentage)}%</p>
                   </div>
                   <div>
-                    <p className="text-blue-100 mb-1">Correct Answers</p>
+                    <p className="text-neutral-200 mb-1">Correct Answers</p>
                     <p className="text-3xl font-bold">{correctAnswersCount} / {totalQuestions}</p>
                   </div>
                 </div>
@@ -183,8 +183,8 @@ export default function FinalQuizPage() {
 
               {/* Incorrect Topics Section */}
               {incorrectAnswers.length > 0 && (
-                <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
-                  <h2 className="text-2xl font-semibold text-gray-900 mb-6">
+                <div className="surface-card p-8 mb-8">
+                  <h2 className="text-2xl font-semibold text-neutral-900 mb-6">
                     Topics to Review
                   </h2>
                   
@@ -196,7 +196,7 @@ export default function FinalQuizPage() {
                           <div className="flex items-start gap-3 mb-3">
                             <XCircle className="w-6 h-6 text-red-600 flex-shrink-0 mt-1" />
                             <div className="flex-1">
-                              <p className="font-semibold text-gray-900 mb-3">{question?.question}</p>
+                              <p className="font-semibold text-neutral-900 mb-3">{question?.question}</p>
                               <div className="space-y-2">
                                 <div className="flex items-center gap-2">
                                   <span className="text-sm text-red-700">Your answer:</span>
@@ -219,14 +219,14 @@ export default function FinalQuizPage() {
                   </div>
 
                   {/* Auto-generated Summary */}
-                  <div className="mt-6 p-6 bg-blue-50 rounded-xl">
-                    <h3 className="font-semibold text-gray-900 mb-3">📝 Summary of Topics to Review:</h3>
+                  <div className="mt-6 p-6 bg-neutral-100 rounded-xl">
+                    <h3 className="font-semibold text-neutral-900 mb-3">📝 Summary of Topics to Review:</h3>
                     <ul className="space-y-2">
                       {incorrectAnswers.slice(0, 3).map((ans, idx) => {
                         const question = quizQuestions.find(q => q.id === ans.questionId);
                         return (
                           <li key={idx} className="flex items-start gap-2 text-gray-700">
-                            <span className="text-blue-500 font-bold">{idx + 1}.</span>
+                            <span className="text-neutral-700 font-bold">{idx + 1}.</span>
                             <span>Review concepts related to: {question?.question.split('?')[0]}?</span>
                           </li>
                         );
@@ -234,7 +234,7 @@ export default function FinalQuizPage() {
                     </ul>
                   </div>
 
-                  <button className="w-full mt-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl font-medium hover:from-blue-600 hover:to-purple-700 transition-all flex items-center justify-center gap-2">
+                  <button className="w-full mt-6 py-3 bg-neutral-900 text-white rounded-xl font-medium hover:bg-neutral-800 transition-all flex items-center justify-center gap-2">
                     <RefreshCw className="w-5 h-5" />
                     Suggest Revision Module
                   </button>
@@ -243,12 +243,12 @@ export default function FinalQuizPage() {
 
               {/* All Correct */}
               {incorrectAnswers.length === 0 && (
-                <div className="bg-white rounded-2xl shadow-lg p-8 text-center">
+                <div className="surface-card p-8 text-center">
                   <CheckCircle2 className="w-16 h-16 text-green-600 mx-auto mb-4" />
-                  <h2 className="text-2xl font-semibold text-gray-900 mb-2">
+                  <h2 className="text-2xl font-semibold text-neutral-900 mb-2">
                     Perfect Score!
                   </h2>
-                  <p className="text-gray-600">
+                  <p className="text-neutral-600">
                     You answered all questions correctly. Excellent mastery of the material!
                   </p>
                 </div>
@@ -258,11 +258,11 @@ export default function FinalQuizPage() {
               <div className="flex gap-4 justify-center mt-8">
                 <button 
                   onClick={() => window.location.reload()}
-                  className="px-8 py-3 bg-white border-2 border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-gray-50 transition-all"
+                  className="px-8 py-3 bg-white border-2 border-gray-300 text-gray-700 rounded-xl font-medium hover:bg-neutral-50 transition-all"
                 >
                   Retake Quiz
                 </button>
-                <button className="px-8 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl font-medium hover:from-blue-600 hover:to-purple-700 transition-all">
+                <button className="px-8 py-3 bg-neutral-900 text-white rounded-xl font-medium hover:bg-neutral-800 transition-all">
                   Continue Learning
                 </button>
               </div>
@@ -274,18 +274,18 @@ export default function FinalQuizPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="app-shell">
       <Sidebar />
       
-      <main className="flex-1 ml-64">
+      <main className="app-main">
         <div className="min-h-screen py-12 px-8">
           <div className="max-w-4xl mx-auto">
             {/* Header */}
             <div className="text-center mb-8">
-              <h1 className="text-4xl font-semibold text-gray-900 mb-4">
+              <h1 className="text-4xl font-semibold text-neutral-900 mb-4">
                 Test Your Understanding
               </h1>
-              <p className="text-gray-600 text-lg">
+              <p className="text-neutral-600 text-lg">
                 Final assessment for {courseName}
               </p>
             </div>
@@ -293,24 +293,24 @@ export default function FinalQuizPage() {
             {/* Progress Bar */}
             <div className="mb-8">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-600">
+                <span className="text-sm font-medium text-neutral-600">
                   Question {currentQuestionIndex + 1} of {totalQuestions}
                 </span>
-                <span className="text-sm font-medium text-gray-600">
+                <span className="text-sm font-medium text-neutral-600">
                   {Math.round(progress)}% Complete
                 </span>
               </div>
               <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-blue-500 to-purple-600 transition-all duration-300"
+                  className="h-full bg-neutral-900 transition-all duration-300"
                   style={{ width: `${progress}%` }}
                 />
               </div>
             </div>
 
             {/* Question Card */}
-            <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-6">
+            <div className="surface-card p-8 mb-6">
+              <h2 className="text-2xl font-semibold text-neutral-900 mb-6">
                 {currentQuestion.question}
               </h2>
 
@@ -321,14 +321,14 @@ export default function FinalQuizPage() {
                     onClick={() => handleAnswerSelect(index)}
                     className={`w-full text-left px-6 py-4 rounded-xl border-2 transition-all font-medium ${
                       selectedOption === index
-                        ? 'border-blue-500 bg-blue-50 text-gray-900'
-                        : 'border-gray-200 text-gray-700 hover:border-blue-300 hover:bg-blue-50'
+                        ? 'border-neutral-700 bg-neutral-100 text-neutral-900'
+                        : 'border-neutral-200 text-gray-700 hover:border-neutral-300 hover:bg-neutral-100'
                     }`}
                   >
                     <span className={`inline-flex items-center justify-center w-8 h-8 rounded-lg mr-4 font-semibold ${
                       selectedOption === index
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-100 text-gray-600'
+                        ? 'bg-neutral-900 text-white'
+                        : 'bg-gray-100 text-neutral-600'
                     }`}>
                       {String.fromCharCode(65 + index)}
                     </span>
@@ -340,7 +340,7 @@ export default function FinalQuizPage() {
               <button
                 onClick={handleNext}
                 disabled={selectedOption === null}
-                className="w-full py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl font-medium hover:from-blue-600 hover:to-purple-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-3 bg-neutral-900 text-white rounded-xl font-medium hover:bg-neutral-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {currentQuestionIndex < totalQuestions - 1 ? 'Next Question' : 'Submit Quiz'}
               </button>
