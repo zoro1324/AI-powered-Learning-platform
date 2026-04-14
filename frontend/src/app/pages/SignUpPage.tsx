@@ -99,7 +99,7 @@ export default function SignUpPage() {
   const errorMessages = error ? parseApiErrors(error) : [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#f7f5f1] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Back Button */}
         <Link to="/" className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors">
@@ -109,14 +109,14 @@ export default function SignUpPage() {
 
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mb-4 shadow-lg">
-            <BookOpen className="w-8 h-8 text-white" />
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-neutral-900 rounded-full mb-4 shadow-md">
+            <BookOpen className="w-7 h-7 text-white" />
           </div>
-          <h1 className="text-3xl font-semibold text-gray-900 mb-2">LearnPath</h1>
+          <h1 className="text-3xl font-semibold text-neutral-900 mb-2">LearnPath</h1>
+          <p className="text-sm text-neutral-600">Build your learning identity.</p>
         </div>
 
-        {/* Sign Up Card */}
-        <div className="bg-white rounded-3xl shadow-xl p-8">
+        <div className="bg-white border border-neutral-200 rounded-3xl shadow-sm p-8">
           <div className="mb-8">
             <h2 className="text-2xl font-semibold text-gray-900 mb-2">Create Account</h2>
             <p className="text-gray-600">Start your personalized learning journey today</p>

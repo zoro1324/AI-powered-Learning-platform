@@ -709,7 +709,7 @@ export default function TopicPage() {
   // ─── Main render ───────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-background p-8">
+    <div className="min-h-screen bg-[#f7f5f1] p-8">
       <div className="flex items-center justify-between mb-6">
         <Breadcrumb>
           <BreadcrumbList>
@@ -747,14 +747,14 @@ export default function TopicPage() {
 
       {/* Topic Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
+        <h1 className="text-2xl font-semibold text-neutral-900 mb-2">
           {currentTopic.topic_name}
         </h1>
-        <p className="text-gray-500">{currentTopic.description}</p>
+        <p className="text-neutral-600">{currentTopic.description}</p>
       </div>
 
       {/* Content Area — switches between text, video, audio, notes based on activeView */}
-      <div className="bg-white rounded-2xl border border-gray-200 min-h-[400px]">
+      <div className="surface-card min-h-[400px]">
         {isLoading ? (
           /* Loading state */
           <div className="flex flex-col items-center justify-center py-20">
