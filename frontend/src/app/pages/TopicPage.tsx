@@ -709,9 +709,10 @@ export default function TopicPage() {
   // ─── Main render ───────────────────────────────────────────────────────────
 
   return (
-    <div className="min-h-screen bg-[#f7f5f1] p-8">
-      <div className="flex items-center justify-between mb-6">
-        <Breadcrumb>
+    <div className="min-h-full bg-transparent p-6 lg:p-8">
+      <div className="mb-4 rounded-2xl border border-black/10 bg-white/80 px-4 py-3 backdrop-blur">
+        <div className="flex items-center justify-between gap-4">
+          <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>
               <BreadcrumbLink asChild>
@@ -731,30 +732,31 @@ export default function TopicPage() {
               <BreadcrumbPage>{currentTopic.topic_name}</BreadcrumbPage>
             </BreadcrumbItem>
           </BreadcrumbList>
-        </Breadcrumb>
+          </Breadcrumb>
 
-        {syllabus && eId && (
-          <Button
-            onClick={() => setStructureDialogOpen(true)}
-            variant="outline"
-            size="sm"
-          >
-            <ListTree className="w-4 h-4 mr-2" />
-            Structure
-          </Button>
-        )}
+          {syllabus && eId && (
+            <Button
+              onClick={() => setStructureDialogOpen(true)}
+              variant="outline"
+              size="sm"
+            >
+              <ListTree className="w-4 h-4 mr-2" />
+              Structure
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Topic Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-semibold text-neutral-900 mb-2">
+      <div className="mb-6 rounded-2xl border border-black/10 bg-white px-6 py-5">
+        <h1 className="text-3xl font-semibold text-neutral-900 mb-1">
           {currentTopic.topic_name}
         </h1>
-        <p className="text-neutral-600">{currentTopic.description}</p>
+        <p className="text-neutral-600 leading-relaxed">{currentTopic.description}</p>
       </div>
 
       {/* Content Area — switches between text, video, audio, notes based on activeView */}
-      <div className="surface-card min-h-[400px]">
+      <div className="surface-card min-h-[400px] overflow-hidden">
         {isLoading ? (
           /* Loading state */
           <div className="flex flex-col items-center justify-center py-20">
