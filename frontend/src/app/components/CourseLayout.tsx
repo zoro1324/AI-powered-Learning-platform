@@ -42,10 +42,10 @@ export function CourseLayout() {
 
   if (loading) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gray-50">
+      <div className="h-screen flex items-center justify-center bg-[#f7f5f1]">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-500 mx-auto mb-3" />
-          <p className="text-gray-500 text-sm">Loading your course...</p>
+          <Loader2 className="w-8 h-8 animate-spin text-neutral-800 mx-auto mb-3" />
+          <p className="text-neutral-600 text-sm">Loading your course...</p>
         </div>
       </div>
     );
@@ -53,15 +53,15 @@ export function CourseLayout() {
 
   if (error) {
     return (
-      <div className="h-screen flex items-center justify-center bg-gray-50">
+      <div className="h-screen flex items-center justify-center bg-[#f7f5f1]">
         <div className="text-center max-w-md">
-          <p className="text-red-500 font-medium mb-2">
+          <p className="text-red-700 font-medium mb-2">
             Failed to load course
           </p>
-          <p className="text-gray-500 text-sm mb-4">{error}</p>
+          <p className="text-neutral-600 text-sm mb-4">{error}</p>
           <button
             onClick={() => eId && dispatch(fetchSyllabus(eId))}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors text-sm"
+            className="px-4 py-2 bg-neutral-900 text-white rounded-lg hover:bg-neutral-800 transition-colors text-sm"
           >
             Try Again
           </button>
@@ -71,7 +71,7 @@ export function CourseLayout() {
   }
 
   return (
-    <div className="h-screen flex overflow-hidden bg-gray-50">
+    <div className="h-screen flex overflow-hidden bg-[#f7f5f1]">
       {/* Left: Course Outline Sidebar */}
       <CourseOutlineSidebar
         collapsed={leftCollapsed}
