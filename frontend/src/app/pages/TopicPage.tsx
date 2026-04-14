@@ -700,7 +700,7 @@ export default function TopicPage() {
   if (!syllabus || !currentModule || !currentTopic) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-gray-500">Topic not found</p>
+        <p className="text-neutral-500">Topic not found</p>
       </div>
     );
   }
@@ -758,8 +758,8 @@ export default function TopicPage() {
         {isLoading ? (
           /* Loading state */
           <div className="flex flex-col items-center justify-center py-20">
-            <Loader2 className="w-8 h-8 animate-spin text-blue-500 mb-4" />
-            <p className="text-gray-500 text-sm">
+            <Loader2 className="w-8 h-8 animate-spin text-neutral-700 mb-4" />
+            <p className="text-neutral-500 text-sm">
               Generating personalized content...
             </p>
             <p className="text-gray-400 text-xs mt-1">
@@ -772,10 +772,10 @@ export default function TopicPage() {
             <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mb-4">
               <AlertCircle className="w-8 h-8 text-red-500" />
             </div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">
+            <h2 className="text-lg font-semibold text-neutral-900 mb-2">
               Failed to generate content
             </h2>
-            <p className="text-gray-500 text-sm mb-6 max-w-md">
+            <p className="text-neutral-500 text-sm mb-6 max-w-md">
               {error}
             </p>
             <Button onClick={handleGenerate} size="lg" variant="outline">
@@ -795,8 +795,8 @@ export default function TopicPage() {
                   className={cn(
                     'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap',
                     !activeView
-                      ? 'bg-blue-50 text-blue-700'
-                      : 'text-gray-500 hover:bg-gray-50'
+                      ? 'bg-neutral-100 text-neutral-800'
+                      : 'text-neutral-500 hover:bg-neutral-50'
                   )}
                 >
                   <FileText className="w-3.5 h-3.5" />
@@ -821,8 +821,8 @@ export default function TopicPage() {
                       className={cn(
                         'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap',
                         activeView?.type === 'video' && activeView.resourceId === r.id
-                          ? 'bg-purple-50 text-purple-700'
-                          : 'text-gray-500 hover:bg-gray-50'
+                          ? 'bg-neutral-100 text-neutral-900'
+                          : 'text-neutral-500 hover:bg-neutral-50'
                       )}
                     >
                       <Play className="w-3.5 h-3.5" />
@@ -848,8 +848,8 @@ export default function TopicPage() {
                       className={cn(
                         'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap',
                         activeView?.type === 'audio' && activeView.resourceId === r.id
-                          ? 'bg-blue-50 text-blue-700'
-                          : 'text-gray-500 hover:bg-gray-50'
+                          ? 'bg-neutral-100 text-neutral-800'
+                          : 'text-neutral-500 hover:bg-neutral-50'
                       )}
                     >
                       <Headphones className="w-3.5 h-3.5" />
@@ -876,8 +876,8 @@ export default function TopicPage() {
                       className={cn(
                         'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap',
                         activeView?.type === 'notes' && activeView.resourceId === r.id
-                          ? 'bg-emerald-50 text-emerald-700'
-                          : 'text-gray-500 hover:bg-gray-50'
+                          ? 'bg-neutral-100 text-neutral-900'
+                          : 'text-neutral-500 hover:bg-neutral-50'
                       )}
                     >
                       <FileText className="w-3.5 h-3.5" />
@@ -899,8 +899,8 @@ export default function TopicPage() {
                     className={cn(
                       'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap',
                       activeView?.type === 'dynamic-script'
-                        ? 'bg-fuchsia-50 text-fuchsia-700'
-                        : 'text-gray-500 hover:bg-gray-50'
+                        ? 'bg-neutral-100 text-neutral-900'
+                        : 'text-neutral-500 hover:bg-neutral-50'
                     )}
                   >
                     <Sparkles className="w-3.5 h-3.5" />
@@ -925,8 +925,8 @@ export default function TopicPage() {
                       className={cn(
                         'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap',
                         activeView?.type === 'code' && activeView.resourceId === r.id
-                          ? 'bg-cyan-50 text-cyan-700'
-                          : 'text-gray-500 hover:bg-gray-50'
+                          ? 'bg-neutral-100 text-neutral-900'
+                          : 'text-neutral-500 hover:bg-neutral-50'
                       )}
                     >
                       <Play className="w-3.5 h-3.5" />
@@ -942,8 +942,8 @@ export default function TopicPage() {
             {activeView?.type === 'create-note' ? (
               <div className="p-8 space-y-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-emerald-500" />
+                  <h2 className="text-lg font-semibold text-neutral-900 flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-neutral-700" />
                     Create New Note
                   </h2>
                   <Button
@@ -963,14 +963,14 @@ export default function TopicPage() {
                   placeholder="Note title..."
                   value={noteTitle}
                   onChange={(e) => setNoteTitle(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400"
+                  className="w-full px-4 py-2.5 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900/20 focus:border-neutral-400"
                 />
                 <textarea
                   placeholder="Write your note in Markdown..."
                   value={noteContent}
                   onChange={(e) => setNoteContent(e.target.value)}
                   rows={14}
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 resize-y font-mono"
+                  className="w-full px-4 py-3 border border-neutral-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900/20 focus:border-neutral-400 resize-y font-mono"
                 />
                 <div className="flex items-center gap-3">
                   <Button
@@ -999,14 +999,14 @@ export default function TopicPage() {
               </div>
             ) : activeView?.type === 'dynamic-script' && dynamicScript ? (
               <div className="p-8 space-y-4">
-                <h2 className="text-lg font-semibold text-gray-900">{dynamicScript.title}</h2>
+                <h2 className="text-lg font-semibold text-neutral-900">{dynamicScript.title}</h2>
                 {dynamicScript.overview && (
-                  <p className="text-sm text-gray-600">{dynamicScript.overview}</p>
+                  <p className="text-sm text-neutral-600">{dynamicScript.overview}</p>
                 )}
                 <div className="space-y-3">
                   {dynamicScript.blocks.slice(0, visibleDynamicBlocks).map((block, idx) => (
-                    <div key={`${block.type}-${idx}`} className="rounded-xl border border-gray-200 p-4 bg-gray-50">
-                      <p className="text-[11px] uppercase tracking-wide text-gray-500 mb-1">
+                    <div key={`${block.type}-${idx}`} className="rounded-xl border border-neutral-200 p-4 bg-neutral-50">
+                      <p className="text-[11px] uppercase tracking-wide text-neutral-500 mb-1">
                         {block.type.replace('_', ' ')}
                       </p>
                       <p className="text-sm text-gray-800 font-medium mb-2">{block.prompt}</p>
@@ -1015,9 +1015,9 @@ export default function TopicPage() {
                           <ReactMarkdown
                             rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true }]]}
                             components={{
-                              h1: ({ ...props }) => <h1 className="text-2xl font-bold text-gray-900 mt-6 mb-3" {...props} />,
-                              h2: ({ ...props }) => <h2 className="text-xl font-bold text-gray-900 mt-5 mb-2" {...props} />,
-                              h3: ({ ...props }) => <h3 className="text-lg font-semibold text-gray-900 mt-4 mb-2" {...props} />,
+                              h1: ({ ...props }) => <h1 className="text-2xl font-bold text-neutral-900 mt-6 mb-3" {...props} />,
+                              h2: ({ ...props }) => <h2 className="text-xl font-bold text-neutral-900 mt-5 mb-2" {...props} />,
+                              h3: ({ ...props }) => <h3 className="text-lg font-semibold text-neutral-900 mt-4 mb-2" {...props} />,
                               p: ({ ...props }) => <p className="text-gray-700 leading-relaxed mb-3" {...props} />,
                               code: ({ className, ...props }) => {
                                 const isInline = !(className?.includes('language-') || className?.includes('hljs'));
@@ -1031,7 +1031,7 @@ export default function TopicPage() {
                               ),
                               ul: ({ ...props }) => <ul className="list-disc ml-6 mb-3 space-y-1 text-gray-700" {...props} />,
                               ol: ({ ...props }) => <ol className="list-decimal ml-6 mb-3 space-y-1 text-gray-700" {...props} />,
-                              blockquote: ({ ...props }) => <blockquote className="border-l-4 border-gray-200 pl-4 italic my-3 text-gray-600" {...props} />,
+                              blockquote: ({ ...props }) => <blockquote className="border-l-4 border-neutral-200 pl-4 italic my-3 text-neutral-600" {...props} />,
                             }}
                           >
                             {block.payload?.markdown || block.payload?.content || ''}
@@ -1040,15 +1040,15 @@ export default function TopicPage() {
                       )}
                       {block.type === 'quiz' && Array.isArray(block.payload?.questions) && (
                         <div className="space-y-2">
-                          <p className="text-xs text-gray-600">{block.payload.questions.length} questions</p>
+                          <p className="text-xs text-neutral-600">{block.payload.questions.length} questions</p>
                           {block.payload.questions.map((question: any, qIdx: number) => (
-                            <div key={`${qIdx}-${question?.question || 'question'}`} className="rounded-lg border border-gray-200 bg-white p-3">
-                              <p className="text-sm font-medium text-gray-900">Q{qIdx + 1}. {question?.question || 'Question'}</p>
+                            <div key={`${qIdx}-${question?.question || 'question'}`} className="rounded-lg border border-neutral-200 bg-white p-3">
+                              <p className="text-sm font-medium text-neutral-900">Q{qIdx + 1}. {question?.question || 'Question'}</p>
                               {Array.isArray(question?.options) && question.options.length > 0 && (
                                 <div className="mt-2 space-y-1.5">
                                   {question.options.map((option: string, oIdx: number) => (
-                                    <div key={`${oIdx}-${option}`} className="rounded-md border border-gray-200 bg-gray-50 px-2.5 py-1.5 text-sm text-gray-700">
-                                      <span className="font-medium text-gray-500 mr-2">{String.fromCharCode(65 + oIdx)}.</span>
+                                    <div key={`${oIdx}-${option}`} className="rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-1.5 text-sm text-gray-700">
+                                      <span className="font-medium text-neutral-500 mr-2">{String.fromCharCode(65 + oIdx)}.</span>
                                       {option}
                                     </div>
                                   ))}
@@ -1061,12 +1061,12 @@ export default function TopicPage() {
                                       ...prev,
                                       [`${idx}-${qIdx}`]: !prev[`${idx}-${qIdx}`],
                                     }))}
-                                    className="text-xs text-blue-600 hover:text-blue-500"
+                                    className="text-xs text-neutral-700 hover:text-neutral-700"
                                   >
                                     {quizRevealByQuestion[`${idx}-${qIdx}`] ? 'Hide answer' : 'Show answer'}
                                   </button>
                                   {quizRevealByQuestion[`${idx}-${qIdx}`] && (
-                                    <p className="text-xs text-emerald-700 mt-1">
+                                    <p className="text-xs text-neutral-800 mt-1">
                                       Answer: {question.correct_answer}
                                     </p>
                                   )}
@@ -1081,9 +1081,9 @@ export default function TopicPage() {
                           <p className="text-sm text-gray-700">
                             {block.payload?.instructions || 'Edit and run this code directly below.'}
                           </p>
-                          <div className="rounded-xl border border-gray-200 overflow-hidden h-[520px] bg-white flex flex-col">
-                            <div className="h-[58%] min-h-[220px] flex flex-col border-b border-gray-200">
-                              <div className="px-3 py-2 bg-gray-50 text-xs font-medium text-gray-600">Code</div>
+                          <div className="rounded-xl border border-neutral-200 overflow-hidden h-[520px] bg-white flex flex-col">
+                            <div className="h-[58%] min-h-[220px] flex flex-col border-b border-neutral-200">
+                              <div className="px-3 py-2 bg-neutral-50 text-xs font-medium text-neutral-600">Code</div>
                               <Editor
                                 height="100%"
                                 defaultLanguage="python"
@@ -1134,7 +1134,7 @@ export default function TopicPage() {
                       )}
                       {block.type === 'video' && (
                         <div className="space-y-2">
-                          <p className="text-sm font-medium text-gray-900">
+                          <p className="text-sm font-medium text-neutral-900">
                             {block.payload?.title || 'Video Segment'}
                           </p>
                           <p className="text-sm text-gray-700">
@@ -1151,7 +1151,7 @@ export default function TopicPage() {
                       )}
                       {block.type === 'mind_map' && (
                         <div className="space-y-2">
-                          <p className="text-sm font-medium text-gray-900">
+                          <p className="text-sm font-medium text-neutral-900">
                             Root: {block.payload?.root || 'Mind Map'}
                           </p>
                           {Array.isArray(block.payload?.nodes) && block.payload.nodes.length > 0 ? (
@@ -1176,17 +1176,17 @@ export default function TopicPage() {
               isSampleCodeResource ? (
                 <div className="p-6 space-y-4">
                   <div>
-                    <h2 className="text-lg font-semibold text-gray-900">
+                    <h2 className="text-lg font-semibold text-neutral-900">
                       {activeResource.content_json?.title || activeResource.title}
                     </h2>
-                    <p className="text-sm text-gray-600 mt-1">
+                    <p className="text-sm text-neutral-600 mt-1">
                       {activeResource.content_text || activeResource.content_json?.explanation || 'Edit and run the code.'}
                     </p>
                   </div>
 
-                  <div className="rounded-xl border border-gray-200 overflow-hidden h-[560px] bg-white flex flex-col">
-                    <div className="h-[58%] min-h-[250px] flex flex-col border-b border-gray-200">
-                      <div className="px-3 py-2 bg-gray-50 text-xs font-medium text-gray-600">Code Runner</div>
+                  <div className="rounded-xl border border-neutral-200 overflow-hidden h-[560px] bg-white flex flex-col">
+                    <div className="h-[58%] min-h-[250px] flex flex-col border-b border-neutral-200">
+                      <div className="px-3 py-2 bg-neutral-50 text-xs font-medium text-neutral-600">Code Runner</div>
                       <Editor
                         height="100%"
                         defaultLanguage="python"
@@ -1236,8 +1236,8 @@ export default function TopicPage() {
                 </div>
               ) : (
                 <div className="p-8 space-y-4">
-                  <h2 className="text-lg font-semibold text-gray-900">{activeResource.title}</h2>
-                  <p className="text-sm text-gray-600">Try-yourself coding assessment with test cases.</p>
+                  <h2 className="text-lg font-semibold text-neutral-900">{activeResource.title}</h2>
+                  <p className="text-sm text-neutral-600">Try-yourself coding assessment with test cases.</p>
                   <Button
                     onClick={() => {
                       const problemId = activeResource.content_json?.coding_problem_id;
@@ -1255,8 +1255,8 @@ export default function TopicPage() {
             ) : activeView?.type === 'video' && activeResource ? (
               /* ── Video player ──────────────────────────────────────── */
               <div className="p-8">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <Play className="w-5 h-5 text-purple-500" />
+                <h2 className="text-lg font-semibold text-neutral-900 mb-4 flex items-center gap-2">
+                  <Play className="w-5 h-5 text-neutral-700" />
                   {activeResource.title}
                 </h2>
                 <video
@@ -1277,16 +1277,16 @@ export default function TopicPage() {
             ) : activeView?.type === 'audio' && activeResource ? (
               /* ── Audio player ──────────────────────────────────────── */
               <div className="p-8">
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 text-center">
-                  <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Headphones className="w-10 h-10 text-blue-600" />
+                <div className="bg-neutral-100 rounded-2xl p-8 text-center">
+                  <div className="w-20 h-20 bg-neutral-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Headphones className="w-10 h-10 text-neutral-700" />
                   </div>
-                  <h2 className="text-lg font-semibold text-gray-900 mb-1">
+                  <h2 className="text-lg font-semibold text-neutral-900 mb-1">
                     {activeResource.title}
                   </h2>
                   {activeResource.content_json?.person1 &&
                     activeResource.content_json?.person2 && (
-                      <p className="text-sm text-gray-500 mb-4">
+                      <p className="text-sm text-neutral-500 mb-4">
                         {activeResource.content_json.person1} &{' '}
                         {activeResource.content_json.person2}
                       </p>
@@ -1309,17 +1309,17 @@ export default function TopicPage() {
             ) : activeView?.type === 'notes' && activeResource ? (
               /* ── Note resource view ────────────────────────────────── */
               <div className="p-8">
-                <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-emerald-500" />
+                <h2 className="text-lg font-semibold text-neutral-900 mb-4 flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-neutral-700" />
                   {activeResource.title}
                 </h2>
                 <div className="prose prose-gray max-w-none markdown-content">
                   <ReactMarkdown
                     rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true }]]}
                     components={{
-                      h1: ({ ...props }) => <h1 className="text-2xl font-bold text-gray-900 mt-8 mb-4" {...props} />,
-                      h2: ({ ...props }) => <h2 className="text-xl font-bold text-gray-900 mt-8 mb-3" {...props} />,
-                      h3: ({ ...props }) => <h3 className="text-lg font-semibold text-gray-900 mt-6 mb-2" {...props} />,
+                      h1: ({ ...props }) => <h1 className="text-2xl font-bold text-neutral-900 mt-8 mb-4" {...props} />,
+                      h2: ({ ...props }) => <h2 className="text-xl font-bold text-neutral-900 mt-8 mb-3" {...props} />,
+                      h3: ({ ...props }) => <h3 className="text-lg font-semibold text-neutral-900 mt-6 mb-2" {...props} />,
                       p: ({ ...props }) => <p className="text-gray-700 leading-relaxed mb-4" {...props} />,
                       code: ({ className, ...props }) => {
                         const isInline = !(className?.includes('language-') || className?.includes('hljs'));
@@ -1333,7 +1333,7 @@ export default function TopicPage() {
                       ),
                       ul: ({ ...props }) => <ul className="list-disc ml-6 mb-4 space-y-2 text-gray-700" {...props} />,
                       ol: ({ ...props }) => <ol className="list-decimal ml-6 mb-4 space-y-2 text-gray-700" {...props} />,
-                      blockquote: ({ ...props }) => <blockquote className="border-l-4 border-gray-200 pl-4 italic my-4 text-gray-600" {...props} />,
+                      blockquote: ({ ...props }) => <blockquote className="border-l-4 border-neutral-200 pl-4 italic my-4 text-neutral-600" {...props} />,
                     }}
                   >
                     {activeResource.content_text || ''}
@@ -1347,9 +1347,9 @@ export default function TopicPage() {
                   <ReactMarkdown
                     rehypePlugins={[[rehypeHighlight, { detect: true, ignoreMissing: true }]]}
                     components={{
-                      h1: ({ ...props }) => <h1 className="text-2xl font-bold text-gray-900 mt-8 mb-4" {...props} />,
-                      h2: ({ ...props }) => <h2 className="text-xl font-bold text-gray-900 mt-8 mb-3" {...props} />,
-                      h3: ({ ...props }) => <h3 className="text-lg font-semibold text-gray-900 mt-6 mb-2" {...props} />,
+                      h1: ({ ...props }) => <h1 className="text-2xl font-bold text-neutral-900 mt-8 mb-4" {...props} />,
+                      h2: ({ ...props }) => <h2 className="text-xl font-bold text-neutral-900 mt-8 mb-3" {...props} />,
+                      h3: ({ ...props }) => <h3 className="text-lg font-semibold text-neutral-900 mt-6 mb-2" {...props} />,
                       p: ({ ...props }) => <p className="text-gray-700 leading-relaxed mb-4" {...props} />,
                       code: ({ className, ...props }) => {
                         const isInline = !(className?.includes('language-') || className?.includes('hljs'));
@@ -1363,7 +1363,7 @@ export default function TopicPage() {
                       ),
                       ul: ({ ...props }) => <ul className="list-disc ml-6 mb-4 space-y-2 text-gray-700" {...props} />,
                       ol: ({ ...props }) => <ol className="list-decimal ml-6 mb-4 space-y-2 text-gray-700" {...props} />,
-                      blockquote: ({ ...props }) => <blockquote className="border-l-4 border-gray-200 pl-4 italic my-4 text-gray-600" {...props} />,
+                      blockquote: ({ ...props }) => <blockquote className="border-l-4 border-neutral-200 pl-4 italic my-4 text-neutral-600" {...props} />,
                     }}
                   >
                     {content.content}
@@ -1375,13 +1375,13 @@ export default function TopicPage() {
         ) : (
           /* Generate CTA */
           <div className="flex flex-col items-center justify-center py-20">
-            <div className="w-16 h-16 bg-blue-50 rounded-2xl flex items-center justify-center mb-4">
-              <BookOpen className="w-8 h-8 text-blue-500" />
+            <div className="w-16 h-16 bg-neutral-100 rounded-2xl flex items-center justify-center mb-4">
+              <BookOpen className="w-8 h-8 text-neutral-700" />
             </div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-2">
+            <h2 className="text-lg font-semibold text-neutral-900 mb-2">
               Ready to learn?
             </h2>
-            <p className="text-gray-500 text-sm mb-6 text-center max-w-md">
+            <p className="text-neutral-500 text-sm mb-6 text-center max-w-md">
               Generate AI-powered content personalized to your learning level
               and style for &quot;{currentTopic.topic_name}&quot;.
             </p>
@@ -1422,7 +1422,7 @@ export default function TopicPage() {
               className={cn(
                 'gap-2',
                 isComplete &&
-                'border-green-300 text-green-700 hover:bg-green-50'
+                'border-neutral-300 text-neutral-800 hover:bg-neutral-100'
               )}
             >
               {isComplete ? (
