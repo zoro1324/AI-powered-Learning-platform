@@ -58,17 +58,17 @@ export default function LearningPreferencePage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="app-shell">
       <Sidebar />
       
-      <main className="flex-1 ml-64">
+      <main className="app-main">
         <div className="min-h-screen py-12 px-8">
           <div className="max-w-5xl mx-auto">
             <div className="text-center mb-12">
-              <h1 className="text-4xl font-semibold text-gray-900 mb-4">
+              <h1 className="text-4xl font-semibold text-neutral-900 mb-4">
                 How Do You Prefer to Learn?
               </h1>
-              <p className="text-gray-600 text-lg">
+              <p className="text-neutral-600 text-lg">
                 Choose your preferred learning style for {courseName}
               </p>
             </div>
@@ -84,21 +84,21 @@ export default function LearningPreferencePage() {
                     onClick={() => setSelectedStyle(pref.id)}
                     className={`bg-white rounded-2xl p-6 border-2 transition-all hover:shadow-lg ${
                       isSelected
-                        ? 'border-blue-500 shadow-lg scale-105'
-                        : 'border-gray-200 hover:border-blue-300'
+                        ? 'border-neutral-700 shadow-lg scale-105'
+                        : 'border-neutral-200 hover:border-neutral-300'
                     }`}
                   >
                     <div
                       className={`w-16 h-16 rounded-xl flex items-center justify-center mb-4 transition-all ${
                         isSelected
-                          ? 'bg-gradient-to-br from-blue-500 to-purple-600'
+                          ? 'bg-neutral-900'
                           : 'bg-gray-100'
                       }`}
                     >
-                      <Icon className={`w-8 h-8 ${isSelected ? 'text-white' : 'text-gray-600'}`} />
+                      <Icon className={`w-8 h-8 ${isSelected ? 'text-white' : 'text-neutral-600'}`} />
                     </div>
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">{pref.title}</h3>
-                    <p className="text-gray-600 text-sm">{pref.description}</p>
+                    <h3 className="text-xl font-semibold text-neutral-900 mb-2">{pref.title}</h3>
+                    <p className="text-neutral-600 text-sm">{pref.description}</p>
                   </button>
                 );
               })}
@@ -108,7 +108,7 @@ export default function LearningPreferencePage() {
               <button
                 onClick={handleContinue}
                 disabled={!selectedStyle}
-                className="px-12 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-xl font-medium hover:from-blue-600 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-12 py-4 bg-neutral-900 text-white rounded-xl font-medium hover:bg-neutral-800 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Continue to Assessment
               </button>

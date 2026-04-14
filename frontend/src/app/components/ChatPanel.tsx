@@ -216,7 +216,7 @@ export function ChatPanel({
                 className={cn(
                   "w-full text-left px-3 py-2 rounded-lg text-xs transition-colors",
                   !selectedTopic
-                    ? "bg-blue-100 text-blue-700 font-medium"
+                    ? "bg-neutral-200 text-neutral-900 font-medium"
                     : "hover:bg-gray-100 text-gray-700"
                 )}
               >
@@ -232,7 +232,7 @@ export function ChatPanel({
                   className={cn(
                     "w-full text-left px-3 py-2 rounded-lg text-xs transition-colors",
                     selectedTopic === topic
-                      ? "bg-blue-100 text-blue-700 font-medium"
+                      ? "bg-neutral-200 text-neutral-900 font-medium"
                       : "hover:bg-gray-100 text-gray-700"
                   )}
                 >
@@ -278,7 +278,7 @@ export function ChatPanel({
               )}
               {!selectedTopic && messages.length > 0 && (
                 <>
-                  <Bot className="w-4 h-4 text-blue-600" />
+                  <Bot className="w-4 h-4 text-neutral-700" />
                   <span className="text-xs font-medium text-gray-700">Chat</span>
                   <span className="text-xs text-gray-500">({messages.length} messages)</span>
                 </>
@@ -308,14 +308,14 @@ export function ChatPanel({
         <div className="p-3 space-y-3">
           {isLoadingHistory && (
             <div className="text-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-blue-600 mx-auto mb-2" />
+              <Loader2 className="w-6 h-6 animate-spin text-neutral-700 mx-auto mb-2" />
               <p className="text-xs text-gray-500">Loading chat history...</p>
             </div>
           )}
           
           {!isLoadingHistory && messages.length === 0 && (
             <div className="text-center py-8">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center mx-auto mb-3">
+              <div className="w-12 h-12 bg-neutral-900 rounded-xl flex items-center justify-center mx-auto mb-3">
                 <Bot className="w-6 h-6 text-white" />
               </div>
               <p className="text-sm text-gray-900 font-medium mb-1">
@@ -372,7 +372,7 @@ export function ChatPanel({
                     }}
                     className="w-full text-left px-3 py-2 rounded-lg bg-gray-50 hover:bg-gray-100 border border-gray-200 text-xs text-gray-700 transition-colors flex items-center gap-2"
                   >
-                    <Sparkles className="w-3 h-3 text-blue-600 shrink-0" />
+                    <Sparkles className="w-3 h-3 text-neutral-700 shrink-0" />
                     {suggestion}
                   </button>
                 ))}
@@ -389,7 +389,7 @@ export function ChatPanel({
               )}
             >
               {msg.role === 'assistant' && (
-                <div className="w-6 h-6 rounded-md bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center shrink-0 mt-0.5">
+                <div className="w-6 h-6 rounded-md bg-neutral-900 flex items-center justify-center shrink-0 mt-0.5">
                   <Bot className="w-3.5 h-3.5 text-white" />
                 </div>
               )}
@@ -397,7 +397,7 @@ export function ChatPanel({
                 className={cn(
                   'max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed',
                   msg.role === 'user'
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-neutral-900 text-white'
                     : 'bg-gray-100 text-gray-900 border border-gray-200'
                 )}
               >
@@ -443,11 +443,11 @@ export function ChatPanel({
 
           {isLoading && (
             <div className="flex gap-2 justify-start">
-              <div className="w-6 h-6 rounded-md bg-gradient-to-br from-blue-600 to-purple-600 flex items-center justify-center shrink-0 mt-0.5">
+              <div className="w-6 h-6 rounded-md bg-neutral-900 flex items-center justify-center shrink-0 mt-0.5">
                 <Bot className="w-3.5 h-3.5 text-white" />
               </div>
               <div className="bg-gray-100 rounded-xl px-3 py-2 flex items-center gap-2 border border-gray-200">
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-blue-600" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-neutral-700" />
                 <span className="text-xs text-gray-500">Thinking...</span>
               </div>
             </div>
@@ -467,13 +467,13 @@ export function ChatPanel({
             onKeyDown={handleKeyDown}
             placeholder="Ask about this topic..."
             rows={1}
-            className="flex-1 bg-gray-50 text-gray-900 border border-gray-200 text-xs rounded-xl px-3 py-2.5 resize-none outline-none focus:ring-1 focus:ring-blue-500 placeholder-gray-500 max-h-[120px]"
+            className="flex-1 bg-gray-50 text-gray-900 border border-gray-200 text-xs rounded-xl px-3 py-2.5 resize-none outline-none focus:ring-1 focus:ring-neutral-900/20 placeholder-gray-500 max-h-[120px]"
           />
           <Button
             size="icon"
             onClick={handleSend}
             disabled={!input.trim() || isLoading}
-            className="h-9 w-9 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 shrink-0"
+            className="h-9 w-9 rounded-xl bg-neutral-900 hover:bg-neutral-800 disabled:opacity-40 shrink-0"
           >
             <Send className="w-4 h-4" />
           </Button>

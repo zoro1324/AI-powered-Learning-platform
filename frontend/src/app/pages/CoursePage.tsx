@@ -70,15 +70,15 @@ export default function CoursePage() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8">
+    <div className="max-w-5xl mx-auto px-6 py-8">
       {/* Course Header */}
       <div className="mb-8">
-        <div className="flex items-center gap-2 text-sm text-gray-500 mb-3">
-          <Sparkles className="w-4 h-4 text-blue-500" />
+        <div className="flex items-center gap-2 text-sm text-neutral-500 mb-3">
+          <Sparkles className="w-4 h-4 text-neutral-700" />
           <span>AI-Personalized Course</span>
         </div>
         <div className="flex items-start justify-between gap-4 mb-2">
-          <h1 className="text-3xl font-bold text-gray-900 flex-1">{courseName}</h1>
+          <h1 className="text-3xl font-semibold text-neutral-900 flex-1">{courseName}</h1>
           <Button
             onClick={() => setStructureDialogOpen(true)}
             variant="outline"
@@ -88,7 +88,7 @@ export default function CoursePage() {
             View Course Structure
           </Button>
         </div>
-        <div className="flex items-center gap-4 text-sm text-gray-500">
+        <div className="flex items-center gap-4 text-sm text-neutral-500">
           <Badge
             className={cn(
               'text-xs capitalize',
@@ -109,15 +109,15 @@ export default function CoursePage() {
       </div>
 
       {/* Overall Progress */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-8">
+      <div className="surface-card p-6 mb-8">
         <div className="flex items-center justify-between mb-3">
-          <h2 className="font-semibold text-gray-900">Your Progress</h2>
-          <span className="text-sm text-gray-500">
+          <h2 className="font-semibold text-neutral-900">Your Progress</h2>
+          <span className="text-sm text-neutral-600">
             {completedTopics}/{totalTopics} topics completed
           </span>
         </div>
         <Progress value={overallProgress} className="h-3" />
-        <p className="text-sm text-gray-500 mt-2">{overallProgress}% complete</p>
+        <p className="text-sm text-neutral-600 mt-2">{overallProgress}% complete</p>
       </div>
 
       {/* Module Cards */}
@@ -137,12 +137,12 @@ export default function CoursePage() {
               }}
               disabled={!unlocked}
               className={cn(
-                'w-full bg-white rounded-2xl border p-6 transition-all text-left group',
-                unlocked
-                  ? 'border-gray-200 hover:border-blue-300 hover:shadow-md cursor-pointer'
-                  : 'border-gray-200 opacity-60 cursor-not-allowed'
-              )}
-            >
+                 'w-full bg-white rounded-2xl border p-6 transition-all text-left group',
+                 unlocked
+                   ? 'border-neutral-200 hover:border-neutral-300 hover:shadow-md cursor-pointer'
+                   : 'border-neutral-200 opacity-60 cursor-not-allowed'
+               )}
+             >
               <div className="flex items-start justify-between mb-4">
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-2">
@@ -150,37 +150,37 @@ export default function CoursePage() {
                       className={cn(
                         'w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
                         !unlocked
-                          ? 'bg-gray-100'
-                          : progress === 100
-                            ? 'bg-green-100'
-                            : progress > 0
-                              ? 'bg-blue-100'
-                              : 'bg-gray-100'
-                      )}
-                    >
-                      {!unlocked ? (
-                        <Lock className="w-5 h-5 text-gray-400" />
-                      ) : progress === 100 ? (
-                        <GraduationCap className="w-5 h-5 text-green-600" />
-                      ) : (
-                        <BookOpen
-                          className={cn(
-                            'w-5 h-5',
-                            progress > 0 ? 'text-blue-600' : 'text-gray-400'
-                          )}
-                        />
-                      )}
+                           ? 'bg-neutral-100'
+                           : progress === 100
+                             ? 'bg-green-100'
+                             : progress > 0
+                               ? 'bg-neutral-100'
+                               : 'bg-neutral-100'
+                       )}
+                     >
+                       {!unlocked ? (
+                         <Lock className="w-5 h-5 text-neutral-400" />
+                       ) : progress === 100 ? (
+                         <GraduationCap className="w-5 h-5 text-green-600" />
+                       ) : (
+                         <BookOpen
+                           className={cn(
+                             'w-5 h-5',
+                             progress > 0 ? 'text-neutral-700' : 'text-neutral-400'
+                           )}
+                         />
+                       )}
                     </div>
                     <div>
                       <h3 className={cn(
-                        'font-semibold transition-colors',
-                        unlocked
-                          ? 'text-gray-900 group-hover:text-blue-600'
-                          : 'text-gray-400'
-                      )}>
+                         'font-semibold transition-colors',
+                         unlocked
+                           ? 'text-neutral-900 group-hover:text-neutral-700'
+                           : 'text-neutral-400'
+                       )}>
                         Module {mIdx + 1}: {mod.module_name}
                       </h3>
-                      <p className="text-sm text-gray-500 mt-0.5">
+                      <p className="text-sm text-neutral-600 mt-0.5">
                         {!unlocked
                           ? 'Complete all topics in the previous module to unlock'
                           : mod.description}
@@ -189,10 +189,10 @@ export default function CoursePage() {
                   </div>
                 </div>
                 {unlocked ? (
-                  <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-blue-500 transition-colors mt-2 shrink-0" />
-                ) : (
-                  <Lock className="w-5 h-5 text-gray-300 mt-2 shrink-0" />
-                )}
+                   <ChevronRight className="w-5 h-5 text-neutral-400 group-hover:text-neutral-700 transition-colors mt-2 shrink-0" />
+                 ) : (
+                   <Lock className="w-5 h-5 text-neutral-300 mt-2 shrink-0" />
+                 )}
               </div>
 
               {/* Module meta */}
@@ -205,11 +205,11 @@ export default function CoursePage() {
                 >
                   {mod.difficulty_level || syllabus.difficulty_level || 'Beginner'}
                 </Badge>
-                <span className="text-xs text-gray-400 flex items-center gap-1">
+                 <span className="text-xs text-neutral-500 flex items-center gap-1">
                   <BookOpen className="w-3 h-3" />
                   {mod.topics.length} topics
                 </span>
-                <span className="text-xs text-gray-400 flex items-center gap-1">
+                 <span className="text-xs text-neutral-500 flex items-center gap-1">
                   <Clock className="w-3 h-3" />
                   {mod.estimated_duration_minutes} min
                 </span>
@@ -218,7 +218,7 @@ export default function CoursePage() {
               {/* Module progress bar */}
               <div className="ml-13">
                 <Progress value={progress} className="h-2" />
-                <p className="text-xs text-gray-400 mt-1">
+                 <p className="text-xs text-neutral-500 mt-1">
                   {progress}% complete
                 </p>
               </div>

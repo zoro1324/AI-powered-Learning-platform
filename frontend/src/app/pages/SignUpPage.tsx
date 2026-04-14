@@ -99,27 +99,27 @@ export default function SignUpPage() {
   const errorMessages = error ? parseApiErrors(error) : [];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#f7f5f1] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Back Button */}
-        <Link to="/" className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors">
+        <Link to="/" className="inline-flex items-center gap-2 text-neutral-600 hover:text-neutral-900 mb-4 transition-colors">
           <ArrowLeft className="w-5 h-5" />
           <span>Back to Login</span>
         </Link>
 
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mb-4 shadow-lg">
-            <BookOpen className="w-8 h-8 text-white" />
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-neutral-900 rounded-full mb-4 shadow-md">
+            <BookOpen className="w-7 h-7 text-white" />
           </div>
-          <h1 className="text-3xl font-semibold text-gray-900 mb-2">LearnPath</h1>
+          <h1 className="text-3xl font-semibold text-neutral-900 mb-2">LearnPath</h1>
+          <p className="text-sm text-neutral-600">Build your learning identity.</p>
         </div>
 
-        {/* Sign Up Card */}
-        <div className="bg-white rounded-3xl shadow-xl p-8">
+        <div className="bg-white border border-neutral-200 rounded-3xl shadow-sm p-8">
           <div className="mb-8">
-            <h2 className="text-2xl font-semibold text-gray-900 mb-2">Create Account</h2>
-            <p className="text-gray-600">Start your personalized learning journey today</p>
+            <h2 className="text-2xl font-semibold text-neutral-900 mb-2">Create Account</h2>
+            <p className="text-neutral-600">Start your personalized learning journey today</p>
           </div>
 
           {/* Error Messages */}
@@ -155,7 +155,7 @@ export default function SignUpPage() {
                 value={formData.firstName}
                 onChange={handleChange}
                 placeholder="Enter your first name"
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-neutral-900/20 focus:border-transparent transition-all"
                 required
               />
             </div>
@@ -172,7 +172,7 @@ export default function SignUpPage() {
                 value={formData.lastName}
                 onChange={handleChange}
                 placeholder="Enter your last name"
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-neutral-900/20 focus:border-transparent transition-all"
                 required
               />
             </div>
@@ -189,7 +189,7 @@ export default function SignUpPage() {
                 value={formData.email}
                 onChange={handleChange}
                 placeholder="Enter your email"
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-neutral-900/20 focus:border-transparent transition-all"
                 required
               />
             </div>
@@ -207,14 +207,14 @@ export default function SignUpPage() {
                   value={formData.password}
                   onChange={handleChange}
                   placeholder="Create a password"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-neutral-900/20 focus:border-transparent transition-all"
                   required
                   minLength={8}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-gray-700"
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -234,14 +234,14 @@ export default function SignUpPage() {
                   value={formData.confirmPassword}
                   onChange={handleChange}
                   placeholder="Confirm your password"
-                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-neutral-900/20 focus:border-transparent transition-all"
                   required
                   minLength={8}
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-gray-700"
                 >
                   {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -252,7 +252,7 @@ export default function SignUpPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-xl font-medium hover:from-blue-600 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-neutral-900 text-white py-3 rounded-xl font-medium hover:bg-neutral-800 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Creating Account...' : 'Create Account'}
             </button>
@@ -260,9 +260,9 @@ export default function SignUpPage() {
 
           {/* Login Link */}
           <div className="mt-6 text-center">
-            <p className="text-gray-600">
+            <p className="text-neutral-600">
               Already have an account?{' '}
-              <Link to="/" className="text-blue-600 hover:text-blue-700 font-medium">
+              <Link to="/" className="text-neutral-700 hover:text-neutral-900 font-medium">
                 Login
               </Link>
             </p>

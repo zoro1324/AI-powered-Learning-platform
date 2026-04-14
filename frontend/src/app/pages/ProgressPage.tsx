@@ -27,10 +27,10 @@ export default function ProgressPage() {
 
   if (loading && !dashboard) {
     return (
-      <div className="flex min-h-screen bg-gray-50">
+      <div className="app-shell">
         <Sidebar />
-        <main className="flex-1 ml-64 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <main className="app-main flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-neutral-700" />
         </main>
       </div>
     );
@@ -50,31 +50,31 @@ export default function ProgressPage() {
 
   // Color palette for course progress bars
   const progressColors = [
-    { from: 'from-blue-500', to: 'to-blue-600', bg: 'bg-blue-500' },
-    { from: 'from-purple-500', to: 'to-purple-600', bg: 'bg-purple-500' },
-    { from: 'from-green-500', to: 'to-green-600', bg: 'bg-green-500' },
+    { from: 'from-neutral-700', to: 'to-neutral-800', bg: 'bg-neutral-900' },
+    { from: 'from-neutral-700', to: 'to-neutral-800', bg: 'bg-purple-500' },
+    { from: 'from-neutral-700', to: 'to-neutral-800', bg: 'bg-green-500' },
     { from: 'from-orange-500', to: 'to-orange-600', bg: 'bg-orange-500' },
     { from: 'from-pink-500', to: 'to-pink-600', bg: 'bg-pink-500' },
   ];
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="app-shell">
       <Sidebar />
 
-      <main className="flex-1 ml-64">
-        <div className="p-8">
+      <main className="app-main">
+        <div className="app-content">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-4xl font-semibold text-gray-900 mb-2">Your Progress</h1>
-            <p className="text-gray-600 text-lg">Track your learning journey and achievements</p>
+            <h1 className="text-4xl font-semibold text-neutral-900 mb-2">Your Progress</h1>
+            <p className="text-neutral-600 text-lg">Track your learning journey and achievements</p>
           </div>
 
           {/* Overall Progress Card */}
-          <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl p-8 mb-8 text-white">
+          <div className="bg-neutral-900 rounded-2xl p-8 mb-8 text-white">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-3xl font-semibold mb-2">Overall Progress</h2>
-                <p className="text-blue-100">
+                <p className="text-neutral-200">
                   {overallProgress >= 80
                     ? 'Outstanding work! Almost there!'
                     : overallProgress >= 50
@@ -86,7 +86,7 @@ export default function ProgressPage() {
               </div>
               <div className="text-right">
                 <p className="text-5xl font-bold">{Math.round(overallProgress)}%</p>
-                <p className="text-blue-100">Complete</p>
+                <p className="text-neutral-200">Complete</p>
               </div>
             </div>
             <div className="w-full h-4 bg-white bg-opacity-20 rounded-full overflow-hidden">
@@ -99,50 +99,50 @@ export default function ProgressPage() {
 
           {/* Stats Grid */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white rounded-2xl shadow-lg p-6">
+            <div className="surface-card p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
                   <CheckCircle2 className="w-6 h-6 text-green-600" />
                 </div>
               </div>
-              <p className="text-gray-600 text-sm mb-1">Modules Completed</p>
-              <p className="text-3xl font-bold text-gray-900">{completedModules}</p>
+              <p className="text-neutral-600 text-sm mb-1">Modules Completed</p>
+              <p className="text-3xl font-bold text-neutral-900">{completedModules}</p>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-lg p-6">
+            <div className="surface-card p-6">
               <div className="flex items-center justify-between mb-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                  <Clock className="w-6 h-6 text-blue-600" />
+                <div className="w-12 h-12 bg-neutral-200 rounded-xl flex items-center justify-center">
+                  <Clock className="w-6 h-6 text-neutral-700" />
                 </div>
               </div>
-              <p className="text-gray-600 text-sm mb-1">Study Time</p>
-              <p className="text-3xl font-bold text-gray-900">{stats?.study_time_hours || 0}h</p>
+              <p className="text-neutral-600 text-sm mb-1">Study Time</p>
+              <p className="text-3xl font-bold text-neutral-900">{stats?.study_time_hours || 0}h</p>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-lg p-6">
+            <div className="surface-card p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
                   <Target className="w-6 h-6 text-purple-600" />
                 </div>
               </div>
-              <p className="text-gray-600 text-sm mb-1">Active Courses</p>
-              <p className="text-3xl font-bold text-gray-900">{stats?.active_courses || 0}</p>
+              <p className="text-neutral-600 text-sm mb-1">Active Courses</p>
+              <p className="text-3xl font-bold text-neutral-900">{stats?.active_courses || 0}</p>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-lg p-6">
+            <div className="surface-card p-6">
               <div className="flex items-center justify-between mb-4">
                 <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
                   <TrendingUp className="w-6 h-6 text-orange-600" />
                 </div>
               </div>
-              <p className="text-gray-600 text-sm mb-1">Streak Days</p>
-              <p className="text-3xl font-bold text-gray-900">{stats?.streak_days || 0}</p>
+              <p className="text-neutral-600 text-sm mb-1">Streak Days</p>
+              <p className="text-3xl font-bold text-neutral-900">{stats?.streak_days || 0}</p>
             </div>
           </div>
 
           {/* Course Progress */}
-          <div className="bg-white rounded-2xl shadow-lg p-8 mb-8">
-            <h2 className="text-2xl font-semibold text-gray-900 mb-6">Course Progress</h2>
+          <div className="surface-card p-8 mb-8">
+            <h2 className="text-2xl font-semibold text-neutral-900 mb-6">Course Progress</h2>
             {activeEnrollments.length > 0 ? (
               <div className="space-y-6">
                 {activeEnrollments.map((enrollment, idx) => {
@@ -161,14 +161,14 @@ export default function ProgressPage() {
                   return (
                     <div key={enrollment.id}>
                       <div className="flex items-center justify-between mb-2">
-                        <h3 className="font-semibold text-gray-900">{courseName}</h3>
+                        <h3 className="font-semibold text-neutral-900">{courseName}</h3>
                         <div className="flex items-center gap-4">
                           {totalCount > 0 && (
-                            <span className="text-sm text-gray-600">
+                            <span className="text-sm text-neutral-600">
                               {completedCount}/{totalCount} modules
                             </span>
                           )}
-                          <span className="text-sm font-medium text-gray-900">{Math.round(progress)}%</span>
+                          <span className="text-sm font-medium text-neutral-900">{Math.round(progress)}%</span>
                         </div>
                       </div>
                       <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
@@ -182,12 +182,12 @@ export default function ProgressPage() {
                 })}
               </div>
             ) : (
-              <div className="text-center py-8 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+              <div className="text-center py-8 bg-neutral-50 rounded-xl border-2 border-dashed border-neutral-200">
                 <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500 mb-4">No courses enrolled yet.</p>
+                <p className="text-neutral-500 mb-4">No courses enrolled yet.</p>
                 <button
                   onClick={() => navigate('/courses/popular')}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  className="px-6 py-2 bg-neutral-900 text-white rounded-lg hover:bg-neutral-800 transition-colors font-medium"
                 >
                   Browse Courses
                 </button>
@@ -196,22 +196,22 @@ export default function ProgressPage() {
           </div>
 
           {/* Achievements */}
-          <div className="bg-white rounded-2xl shadow-lg p-8">
-            <h2 className="text-2xl font-semibold text-gray-900 mb-6">Achievements</h2>
+          <div className="surface-card p-8">
+            <h2 className="text-2xl font-semibold text-neutral-900 mb-6">Achievements</h2>
             {achievements.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {achievements.map((userAchievement) => (
                   <div
                     key={userAchievement.id}
-                    className="border border-gray-200 rounded-xl p-6 text-center hover:shadow-lg transition-all"
+                    className="border border-neutral-200 rounded-xl p-6 text-center hover:shadow-lg transition-all"
                   >
                     <div className="text-5xl mb-4">
                       {userAchievement.achievement?.icon || '🏆'}
                     </div>
-                    <h3 className="font-semibold text-gray-900 mb-2">
+                    <h3 className="font-semibold text-neutral-900 mb-2">
                       {userAchievement.achievement?.name || 'Achievement'}
                     </h3>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-neutral-600">
                       {userAchievement.achievement?.description || 'Keep learning to earn more!'}
                     </p>
                     <p className="text-xs text-gray-400 mt-2">
@@ -221,9 +221,9 @@ export default function ProgressPage() {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-8 bg-gray-50 rounded-xl border-2 border-dashed border-gray-200">
+              <div className="text-center py-8 bg-neutral-50 rounded-xl border-2 border-dashed border-neutral-200">
                 <Award className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-500 mb-2">No achievements yet</p>
+                <p className="text-neutral-500 mb-2">No achievements yet</p>
                 <p className="text-sm text-gray-400">Complete modules and courses to earn achievements!</p>
               </div>
             )}

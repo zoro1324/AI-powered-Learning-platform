@@ -66,7 +66,7 @@ const DIFFICULTY_COLORS: Record<string, string> = {
 
 const KNOWLEDGE_COLORS: Record<string, string> = {
   None: 'bg-gray-100 text-gray-700',
-  Basic: 'bg-blue-100 text-blue-700',
+  Basic: 'bg-neutral-200 text-neutral-800',
   Intermediate: 'bg-purple-100 text-purple-700',
   Advanced: 'bg-pink-100 text-pink-700',
 };
@@ -172,10 +172,10 @@ export default function CourseDetailsPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen bg-gray-50">
+      <div className="app-shell">
         <Sidebar />
-        <main className="flex-1 ml-64 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <main className="app-main flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-neutral-700" />
         </main>
       </div>
     );
@@ -183,9 +183,9 @@ export default function CourseDetailsPage() {
 
   if (error || !course) {
     return (
-      <div className="flex min-h-screen bg-gray-50">
+      <div className="app-shell">
         <Sidebar />
-        <main className="flex-1 ml-64 flex items-center justify-center">
+        <main className="app-main flex items-center justify-center">
           <div className="text-center">
             <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
             <p className="text-red-600 mb-4">{error || 'Course not found'}</p>
@@ -199,10 +199,10 @@ export default function CourseDetailsPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="app-shell">
       <Sidebar />
 
-      <main className="flex-1 ml-64 p-8">
+      <main className="app-main p-8">
         {/* Course Header */}
         <Card className="mb-8">
           <CardHeader>
@@ -228,7 +228,7 @@ export default function CourseDetailsPage() {
               )}
             </div>
 
-            <div className="flex items-center gap-6 mt-4 text-sm text-gray-600">
+            <div className="flex items-center gap-6 mt-4 text-sm text-neutral-600">
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4" />
                 <span>{course.estimated_duration} minutes</span>
@@ -248,7 +248,7 @@ export default function CourseDetailsPage() {
 
           <CardContent>
             <Button
-              className="bg-blue-600 hover:bg-blue-700 text-white"
+              className="bg-neutral-900 hover:bg-neutral-800 text-white"
               onClick={() => setAssessmentDialogOpen(true)}
             >
               <GraduationCap className="w-4 h-4 mr-2" />
@@ -259,10 +259,10 @@ export default function CourseDetailsPage() {
 
         {/* Personalized Curricula Section */}
         <div className="mb-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
+          <h2 className="text-2xl font-bold text-neutral-900 mb-2">
             Personalized Learning Paths
           </h2>
-          <p className="text-gray-600">
+          <p className="text-neutral-600">
             Explore how other students structured their learning journey. You can adopt any curriculum that fits your goals.
           </p>
         </div>
@@ -271,10 +271,10 @@ export default function CourseDetailsPage() {
           <Card>
             <CardContent className="py-12 text-center">
               <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              <h3 className="text-lg font-semibold text-neutral-900 mb-2">
                 No Enrollments Yet
               </h3>
-              <p className="text-gray-600">
+              <p className="text-neutral-600">
                 Be the first to create a personalized curriculum for this course!
               </p>
             </CardContent>
@@ -287,7 +287,7 @@ export default function CourseDetailsPage() {
               return (
                 <Card key={curriculum.id} className="overflow-hidden">
                   <CardHeader
-                    className="cursor-pointer hover:bg-gray-50 transition-colors"
+                    className="cursor-pointer hover:bg-neutral-50 transition-colors"
                     onClick={() => toggleCurriculum(curriculum.id)}
                   >
                     <div className="flex items-start justify-between">
@@ -295,9 +295,9 @@ export default function CourseDetailsPage() {
                         <div className="flex items-center gap-3 mb-2">
                           <CardTitle className="text-xl flex items-center gap-2">
                             {isExpanded ? (
-                              <ChevronDown className="w-5 h-5 text-gray-500" />
+                              <ChevronDown className="w-5 h-5 text-neutral-500" />
                             ) : (
-                              <ChevronRight className="w-5 h-5 text-gray-500" />
+                              <ChevronRight className="w-5 h-5 text-neutral-500" />
                             )}
                             {curriculum.user_identifier}
                           </CardTitle>
@@ -306,7 +306,7 @@ export default function CourseDetailsPage() {
                           </Badge>
                         </div>
 
-                        <div className="flex items-center gap-6 text-sm text-gray-600">
+                        <div className="flex items-center gap-6 text-sm text-neutral-600">
                           <div className="flex items-center gap-2">
                             <Calendar className="w-4 h-4" />
                             <span>Enrolled {formatDate(curriculum.enrolled_at)}</span>
@@ -341,7 +341,7 @@ export default function CourseDetailsPage() {
                   </CardHeader>
 
                   {isExpanded && (
-                    <CardContent className="border-t bg-gray-50">
+                    <CardContent className="border-t bg-neutral-50">
                       <div className="space-y-4 mt-4">
                         {curriculum.syllabus.modules.map((module, moduleIndex) => {
                           const moduleKey = `${curriculum.id}-${moduleIndex}`;
@@ -354,16 +354,16 @@ export default function CourseDetailsPage() {
                           return (
                             <Card key={moduleIndex} className="bg-white">
                               <CardHeader
-                                className="cursor-pointer hover:bg-gray-50 transition-colors py-4"
+                                className="cursor-pointer hover:bg-neutral-50 transition-colors py-4"
                                 onClick={() => toggleModule(moduleKey)}
                               >
                                 <div className="flex items-start justify-between">
                                   <div className="flex-1">
                                     <CardTitle className="text-lg flex items-center gap-2">
                                       {isModuleExpanded ? (
-                                        <ChevronDown className="w-4 h-4 text-gray-500" />
+                                        <ChevronDown className="w-4 h-4 text-neutral-500" />
                                       ) : (
-                                        <ChevronRight className="w-4 h-4 text-gray-500" />
+                                        <ChevronRight className="w-4 h-4 text-neutral-500" />
                                       )}
                                       Module {moduleIndex + 1}: {module.module_name}
                                     </CardTitle>
@@ -371,7 +371,7 @@ export default function CourseDetailsPage() {
                                       {module.module_description}
                                     </CardDescription>
                                   </div>
-                                  <div className="flex items-center gap-2 text-sm text-gray-600">
+                                  <div className="flex items-center gap-2 text-sm text-neutral-600">
                                     <Clock className="w-4 h-4" />
                                     <span>{formatHours(totalMinutes)}</span>
                                   </div>
@@ -384,20 +384,20 @@ export default function CourseDetailsPage() {
                                     {module.topics.map((topic, topicIndex) => (
                                       <div
                                         key={topicIndex}
-                                        className="flex items-start justify-between p-3 bg-gray-50 rounded-lg"
+                                        className="flex items-start justify-between p-3 bg-neutral-50 rounded-lg"
                                       >
                                         <div className="flex-1">
                                           <div className="flex items-center gap-2 mb-1">
                                             <CheckCircle className="w-4 h-4 text-green-600" />
-                                            <h4 className="font-medium text-gray-900">
+                                            <h4 className="font-medium text-neutral-900">
                                               {topic.topic_name}
                                             </h4>
                                           </div>
-                                          <p className="text-sm text-gray-600 ml-6">
+                                          <p className="text-sm text-neutral-600 ml-6">
                                             {topic.short_description}
                                           </p>
                                         </div>
-                                        <span className="text-sm text-gray-500 whitespace-nowrap ml-4">
+                                        <span className="text-sm text-neutral-500 whitespace-nowrap ml-4">
                                           {topic.estimated_duration_minutes} min
                                         </span>
                                       </div>
@@ -430,17 +430,17 @@ export default function CourseDetailsPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            <p className="text-sm text-gray-600 mb-3">
+            <p className="text-sm text-neutral-600 mb-3">
               <strong>Note:</strong> You'll still take the pre-assessment, but the system will
               consider this curriculum structure when generating your personalized syllabus.
             </p>
             {curriculumToCopy && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-center gap-2 text-blue-900 mb-2">
+              <div className="bg-neutral-100 border border-neutral-300 rounded-lg p-4">
+                <div className="flex items-center gap-2 text-neutral-900 mb-2">
                   <BookOpen className="w-5 h-5" />
                   <span className="font-medium">Curriculum Preview</span>
                 </div>
-                <ul className="text-sm text-blue-800 space-y-1 ml-7">
+                <ul className="text-sm text-neutral-800 space-y-1 ml-7">
                   <li>• {curriculumToCopy.syllabus.modules.length} modules</li>
                   <li>• ~{calculateTotalHours(curriculumToCopy.syllabus)} hours total</li>
                   <li>• {curriculumToCopy.study_method} approach</li>
@@ -453,7 +453,7 @@ export default function CourseDetailsPage() {
             <Button variant="outline" onClick={() => setShowCopyDialog(false)}>
               Cancel
             </Button>
-            <Button onClick={confirmUseCurriculum} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={confirmUseCurriculum} className="bg-neutral-900 hover:bg-neutral-800">
               Continue to Assessment
             </Button>
           </DialogFooter>

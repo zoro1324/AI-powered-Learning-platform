@@ -16,30 +16,30 @@ export default function ForgotPasswordPage() {
 
   if (isSubmitted) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[#f7f5f1] flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           {/* Back Button */}
-          <Link to="/" className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors">
+          <Link to="/" className="inline-flex items-center gap-2 text-neutral-600 hover:text-neutral-900 mb-4 transition-colors">
             <ArrowLeft className="w-5 h-5" />
             <span>Back to Login</span>
           </Link>
 
           {/* Success Card */}
-          <div className="bg-white rounded-3xl shadow-xl p-8 text-center">
+          <div className="bg-white border border-neutral-200 rounded-3xl shadow-sm p-8 text-center">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-6">
               <CheckCircle2 className="w-8 h-8 text-green-600" />
             </div>
             
-            <h2 className="text-2xl font-semibold text-gray-900 mb-3">Check Your Email</h2>
-            <p className="text-gray-600 mb-6">
-              We've sent a password reset link to <span className="font-medium text-gray-900">{email}</span>
+            <h2 className="text-2xl font-semibold text-neutral-900 mb-3">Check Your Email</h2>
+            <p className="text-neutral-600 mb-6">
+              We've sent a password reset link to <span className="font-medium text-neutral-900">{email}</span>
             </p>
             
-            <div className="bg-blue-50 rounded-xl p-4 mb-6 text-left">
-              <p className="text-sm text-blue-900 mb-2">
+            <div className="bg-neutral-100 rounded-xl p-4 mb-6 text-left">
+              <p className="text-sm text-neutral-900 mb-2">
                 <strong>Next steps:</strong>
               </p>
-              <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+              <ul className="text-sm text-neutral-800 space-y-1 list-disc list-inside">
                 <li>Check your email inbox</li>
                 <li>Click the reset link in the email</li>
                 <li>Create a new password</li>
@@ -48,7 +48,7 @@ export default function ForgotPasswordPage() {
 
             <Link
               to="/"
-              className="inline-block w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-xl font-medium hover:from-blue-600 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
+              className="inline-block w-full bg-neutral-900 text-white py-3 rounded-xl font-medium hover:bg-neutral-800 transition-all shadow-lg hover:shadow-xl"
             >
               Back to Login
             </Link>
@@ -59,27 +59,28 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#f7f5f1] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Back Button */}
-        <Link to="/" className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors">
+        <Link to="/" className="inline-flex items-center gap-2 text-neutral-600 hover:text-neutral-900 mb-4 transition-colors">
           <ArrowLeft className="w-5 h-5" />
           <span>Back to Login</span>
         </Link>
 
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mb-4 shadow-lg">
-            <BookOpen className="w-8 h-8 text-white" />
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-neutral-900 rounded-full mb-4 shadow-md">
+            <BookOpen className="w-7 h-7 text-white" />
           </div>
-          <h1 className="text-3xl font-semibold text-gray-900 mb-2">LearnPath</h1>
+          <h1 className="text-3xl font-semibold text-neutral-900 mb-2">LearnPath</h1>
+          <p className="text-sm text-neutral-600">Securely recover access to your workspace.</p>
         </div>
 
         {/* Forgot Password Card */}
-        <div className="bg-white rounded-3xl shadow-xl p-8">
+        <div className="bg-white border border-neutral-200 rounded-3xl shadow-sm p-8">
           <div className="mb-8">
-            <h2 className="text-2xl font-semibold text-gray-900 mb-2">Forgot Password?</h2>
-            <p className="text-gray-600">No worries! Enter your email and we'll send you a reset link.</p>
+            <h2 className="text-2xl font-semibold text-neutral-900 mb-2">Forgot Password?</h2>
+            <p className="text-neutral-600">No worries! Enter your email and we'll send you a reset link.</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -96,7 +97,7 @@ export default function ForgotPasswordPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email"
-                  className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                  className="w-full pl-12 pr-4 py-3 rounded-xl border border-gray-300 focus:outline-none focus:ring-2 focus:ring-neutral-900/20 focus:border-transparent transition-all"
                   required
                 />
               </div>
@@ -105,7 +106,7 @@ export default function ForgotPasswordPage() {
             {/* Submit Button */}
             <button
               type="submit"
-              className="w-full bg-gradient-to-r from-blue-500 to-purple-600 text-white py-3 rounded-xl font-medium hover:from-blue-600 hover:to-purple-700 transition-all shadow-lg hover:shadow-xl"
+              className="w-full bg-neutral-900 text-white py-3 rounded-xl font-medium hover:bg-neutral-800 transition-all shadow-lg hover:shadow-xl"
             >
               Send Reset Link
             </button>
@@ -113,9 +114,9 @@ export default function ForgotPasswordPage() {
 
           {/* Additional Help */}
           <div className="mt-6 text-center">
-            <p className="text-gray-600 text-sm">
+            <p className="text-neutral-600 text-sm">
               Remember your password?{' '}
-              <Link to="/" className="text-blue-600 hover:text-blue-700 font-medium">
+              <Link to="/" className="text-neutral-700 hover:text-neutral-900 font-medium">
                 Login
               </Link>
             </p>

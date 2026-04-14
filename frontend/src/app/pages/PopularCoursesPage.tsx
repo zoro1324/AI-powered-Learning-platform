@@ -277,10 +277,10 @@ export default function PopularCoursesPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen bg-gray-50">
+      <div className="app-shell">
         <Sidebar />
-        <main className="flex-1 ml-64 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <main className="app-main flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-neutral-700" />
         </main>
       </div>
     );
@@ -288,9 +288,9 @@ export default function PopularCoursesPage() {
 
   if (error) {
     return (
-      <div className="flex min-h-screen bg-gray-50">
+      <div className="app-shell">
         <Sidebar />
-        <main className="flex-1 ml-64 flex items-center justify-center">
+        <main className="app-main flex items-center justify-center">
           <div className="text-center">
             <p className="text-red-600 mb-4">{error}</p>
             <Button onClick={fetchCourses}>Retry</Button>
@@ -301,19 +301,19 @@ export default function PopularCoursesPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="app-shell">
       <Sidebar />
 
-      <main className="flex-1 ml-64">
+      <main className="app-main">
         <div className="p-8">
           {/* Header */}
           <div className="mb-8 flex items-center justify-between">
             <div>
-              <h1 className="text-4xl font-semibold text-gray-900 mb-2 flex items-center gap-2">
-                <TrendingUp className="w-10 h-10 text-blue-600" />
+              <h1 className="text-4xl font-semibold text-neutral-900 mb-2 flex items-center gap-2">
+                <TrendingUp className="w-10 h-10 text-neutral-700" />
                 Popular Courses
               </h1>
-              <p className="text-gray-600 text-lg">
+              <p className="text-neutral-600 text-lg">
                 Discover the most popular courses across all categories
               </p>
             </div>
@@ -322,7 +322,7 @@ export default function PopularCoursesPage() {
             {isAuthenticated && (
               <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                 <DialogTrigger asChild>
-                  <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                  <Button className="bg-neutral-900 hover:bg-neutral-800 text-white">
                     <Plus className="w-5 h-5 mr-2" />
                     Create New Course
                   </Button>
@@ -351,7 +351,7 @@ export default function PopularCoursesPage() {
                         <Label htmlFor="description">Description *</Label>
                         <textarea
                           id="description"
-                          className="flex min-h-[120px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="flex min-h-[120px] w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-neutral-900/20 disabled:cursor-not-allowed disabled:opacity-50"
                           value={formData.description}
                           onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                           placeholder="Describe what students will learn..."
@@ -423,7 +423,7 @@ export default function PopularCoursesPage() {
 
                     {/* Show planning status when creating */}
                     {creating && planningStatus && (
-                      <div className="flex items-center gap-2 text-sm text-blue-600 bg-blue-50 p-3 rounded-md">
+                      <div className="flex items-center gap-2 text-sm text-neutral-700 bg-neutral-100 p-3 rounded-md">
                         <Loader2 className="w-4 h-4 animate-spin" />
                         <span>{planningStatus}</span>
                       </div>
@@ -486,7 +486,7 @@ export default function PopularCoursesPage() {
 
           {/* Stats */}
           <div className="mb-6 flex items-center justify-between">
-            <div className="text-gray-600">
+            <div className="text-neutral-600">
               Showing {filteredCourses.length} course{filteredCourses.length !== 1 ? 's' : ''} in {Object.keys(groupedCourses).length} group{Object.keys(groupedCourses).length !== 1 ? 's' : ''}
             </div>
             <div className="flex gap-2">
@@ -523,8 +523,8 @@ export default function PopularCoursesPage() {
           {Object.keys(groupedCourses).length === 0 ? (
             <div className="text-center py-12">
               <BookOpen className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">No courses found</h3>
-              <p className="text-gray-600">
+              <h3 className="text-xl font-semibold text-neutral-900 mb-2">No courses found</h3>
+              <p className="text-neutral-600">
                 {searchQuery || categoryFilter !== 'all'
                   ? 'Try adjusting your filters'
                   : 'Be the first to create a course!'}
@@ -543,19 +543,19 @@ export default function PopularCoursesPage() {
                 const isExpanded = expandedGroups.has(groupKey);
 
                 return (
-                  <div key={groupKey} className="bg-white rounded-lg shadow-sm border border-gray-200">
+                  <div key={groupKey} className="bg-white rounded-lg shadow-sm border border-neutral-200">
                     {/* Group Header */}
                     <div
-                      className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                      className="flex items-center justify-between p-4 cursor-pointer hover:bg-neutral-50 transition-colors"
                       onClick={() => toggleGroup(groupKey)}
                     >
                       <div className="flex items-center gap-3">
                         {isExpanded ? (
-                          <ChevronDown className="w-5 h-5 text-gray-600" />
+                          <ChevronDown className="w-5 h-5 text-neutral-600" />
                         ) : (
-                          <ChevronRight className="w-5 h-5 text-gray-600" />
+                          <ChevronRight className="w-5 h-5 text-neutral-600" />
                         )}
-                        <h2 className="text-xl font-semibold text-gray-900">{displayName}</h2>
+                        <h2 className="text-xl font-semibold text-neutral-900">{displayName}</h2>
                         <Badge variant="secondary" className="ml-2">
                           {groupCourses.length} {groupCourses.length === 1 ? 'course' : 'courses'}
                         </Badge>
@@ -605,7 +605,7 @@ export default function PopularCoursesPage() {
                                   {course.description}
                                 </CardDescription>
 
-                                <div className="flex items-center gap-4 text-sm text-gray-600">
+                                <div className="flex items-center gap-4 text-sm text-neutral-600">
                                   <div className="flex items-center gap-1">
                                     <Clock className="w-4 h-4" />
                                     <span>{course.estimated_duration} min</span>
@@ -623,7 +623,7 @@ export default function PopularCoursesPage() {
                                 {isAuthenticated ? (
                                   <>
                                     <Button
-                                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                                      className="flex-1 bg-neutral-900 hover:bg-neutral-800 text-white"
                                       onClick={(e) => handleEnrollClick(e, course)}
                                       disabled={course.is_sub_topic === false && !course.parent_topic_name}
                                     >

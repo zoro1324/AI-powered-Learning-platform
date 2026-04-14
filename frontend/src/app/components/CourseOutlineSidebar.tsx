@@ -89,7 +89,7 @@ export function CourseOutlineSidebar({
 
   if (collapsed) {
     return (
-      <div className="w-12 bg-white border-r border-gray-200 flex flex-col items-center pt-4 shrink-0">
+      <div className="w-14 bg-[#fcfbf9] border-r border-black/10 flex flex-col items-center pt-4 shrink-0">
         <Button variant="ghost" size="icon" onClick={onToggle}>
           <Menu className="w-5 h-5" />
         </Button>
@@ -99,7 +99,7 @@ export function CourseOutlineSidebar({
 
   if (!syllabus) {
     return (
-      <div className="w-72 bg-white border-r border-gray-200 flex items-center justify-center">
+      <div className="w-80 bg-[#fcfbf9] border-r border-black/10 flex items-center justify-center">
         <div className="animate-pulse text-gray-400">Loading...</div>
       </div>
     );
@@ -111,19 +111,22 @@ export function CourseOutlineSidebar({
     : ['module-0'];
 
   return (
-    <aside className="w-72 bg-white border-r border-gray-200 flex flex-col h-full shrink-0">
+    <aside className="w-80 bg-[#fcfbf9] border-r border-black/10 flex flex-col h-full shrink-0">
       {/* Logo - Clickable to Dashboard */}
-      <Link to="/dashboard" className="px-4 pt-4 pb-2 border-b border-gray-200 hover:bg-gray-50 transition-colors">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+      <Link to="/dashboard" className="px-5 pt-5 pb-3 border-b border-black/10 hover:bg-black/[0.02] transition-colors">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 bg-neutral-900 rounded-xl flex items-center justify-center">
             <BookOpen className="w-5 h-5 text-white" />
           </div>
-          <span className="font-semibold text-lg text-gray-900">LearnPath</span>
+          <div>
+            <p className="font-semibold text-lg text-gray-900 leading-none">LearnPath</p>
+            <p className="text-[11px] uppercase tracking-[0.14em] text-neutral-500 mt-1">Course Workspace</p>
+          </div>
         </div>
       </Link>
       
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="px-5 py-4 border-b border-black/10">
         <div className="flex items-center justify-between mb-3">
           <Button
             variant="ghost"
@@ -135,7 +138,7 @@ export function CourseOutlineSidebar({
             <span className="text-xs">Hide menu</span>
           </Button>
         </div>
-        <h2 className="font-semibold text-gray-900 text-sm leading-tight">
+        <h2 className="font-semibold text-gray-900 text-sm leading-tight line-clamp-2">
           {courseName}
         </h2>
       </div>
@@ -145,7 +148,7 @@ export function CourseOutlineSidebar({
         <Accordion
           type="multiple"
           defaultValue={defaultOpenModules}
-          className="px-2 py-2"
+          className="px-3 py-3"
         >
           {syllabus.modules.map((mod, mIdx) => {
             const completedCount = getModuleCompletionCount(mIdx, mod.topics.length);
@@ -161,19 +164,19 @@ export function CourseOutlineSidebar({
               >
                 <AccordionTrigger
                   className={cn(
-                    'px-3 py-3 hover:no-underline rounded-lg text-left',
-                    unlocked ? 'hover:bg-gray-50' : 'opacity-60 cursor-not-allowed'
+                    'px-3 py-3 hover:no-underline rounded-xl text-left',
+                    unlocked ? 'hover:bg-black/[0.03]' : 'opacity-60 cursor-not-allowed'
                   )}
                   disabled={!unlocked}
                 >
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1.5">
                       {!unlocked ? (
                         <Lock className="w-4 h-4 text-gray-400 shrink-0" />
                       ) : allComplete ? (
-                        <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                        <CheckCircle2 className="w-4 h-4 text-neutral-700 shrink-0" />
                       ) : (
-                        <BookOpen className="w-4 h-4 text-blue-500 shrink-0" />
+                        <BookOpen className="w-4 h-4 text-neutral-700 shrink-0" />
                       )}
                       <span className={cn(
                         'font-medium text-sm truncate',
@@ -183,10 +186,7 @@ export function CourseOutlineSidebar({
                       </span>
                     </div>
                     <div className="flex items-center gap-2 ml-6">
-                      <Badge
-                        variant="secondary"
-                        className="text-[10px] px-1.5 py-0"
-                      >
+                      <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                         {mod.difficulty_level}
                       </Badge>
                       {unlocked ? (
@@ -203,7 +203,7 @@ export function CourseOutlineSidebar({
                 </AccordionTrigger>
                 {unlocked && (
                 <AccordionContent className="pb-1">
-                  <div className="space-y-0.5 ml-2">
+                  <div className="space-y-1 ml-2">
                     {mod.topics.map((topic, tIdx) => {
                       const isActive =
                         currentModuleIdx === mIdx && currentTopicIdx === tIdx;
@@ -215,18 +215,18 @@ export function CourseOutlineSidebar({
                           key={`topic-${mIdx}-${tIdx}`}
                           to={`/course/${enrollmentId}/module/${mIdx}/topic/${tIdx}`}
                           className={cn(
-                            'flex items-start gap-2.5 px-3 py-2.5 rounded-lg transition-colors text-sm group',
+                            'flex items-start gap-2.5 px-3 py-2.5 rounded-xl transition-colors text-sm group',
                             isActive
-                              ? 'bg-blue-50 border-l-2 border-blue-500'
-                              : 'hover:bg-gray-50 border-l-2 border-transparent'
+                              ? 'bg-black/[0.04] border-l-2 border-neutral-900'
+                              : 'hover:bg-black/[0.02] border-l-2 border-transparent'
                           )}
                         >
                           {/* Status Icon */}
                           <div className="mt-0.5 shrink-0">
                             {completed ? (
-                              <CheckCircle2 className="w-4 h-4 text-green-500" />
+                              <CheckCircle2 className="w-4 h-4 text-neutral-700" />
                             ) : isActive || started ? (
-                              <PlayCircle className="w-4 h-4 text-blue-500" />
+                              <PlayCircle className="w-4 h-4 text-neutral-700" />
                             ) : (
                               <Circle className="w-4 h-4 text-gray-300" />
                             )}
@@ -238,7 +238,7 @@ export function CourseOutlineSidebar({
                               className={cn(
                                 'text-sm leading-tight',
                                 isActive
-                                  ? 'text-blue-700 font-medium'
+                                  ? 'text-neutral-900 font-medium'
                                   : completed
                                   ? 'text-gray-500'
                                   : 'text-gray-700'
@@ -264,7 +264,7 @@ export function CourseOutlineSidebar({
       </ScrollArea>
 
       {/* Back to Dashboard */}
-      <div className="p-3 border-t border-gray-200">
+       <div className="p-4 border-t border-black/10">
         <Button
           variant="ghost"
           size="sm"

@@ -99,34 +99,34 @@ export default function CodingAssessmentPage() {
       : '/modules';
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6 md:p-8">
+    <div className="min-h-screen bg-neutral-50 p-6 md:p-8">
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <Button variant="outline" onClick={() => navigate(backPath)} className="gap-2">
             <ArrowLeft className="w-4 h-4" />
             Back to Topic
           </Button>
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-neutral-500">
             Model: <span className="font-medium">qwen2.5-coder:7b</span>
           </div>
         </div>
 
         {loading ? (
-          <div className="bg-white rounded-2xl border border-gray-200 p-12 flex items-center justify-center">
+          <div className="bg-white rounded-2xl border border-neutral-200 p-12 flex items-center justify-center">
             <Loader2 className="w-7 h-7 animate-spin text-cyan-600" />
           </div>
         ) : error && !problem ? (
           <div className="bg-white rounded-2xl border border-red-200 p-6 text-red-700">{error}</div>
         ) : problem ? (
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-            <section className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
+            <section className="bg-white rounded-2xl border border-neutral-200 p-6 space-y-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-xl bg-cyan-100 flex items-center justify-center">
                   <Code2 className="w-5 h-5 text-cyan-700" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-semibold text-gray-900">{problem.title}</h1>
-                  <p className="text-sm text-gray-500">Difficulty: {problem.difficulty}</p>
+                  <h1 className="text-2xl font-semibold text-neutral-900">{problem.title}</h1>
+                  <p className="text-sm text-neutral-500">Difficulty: {problem.difficulty}</p>
                 </div>
               </div>
 
@@ -149,8 +149,8 @@ export default function CodingAssessmentPage() {
                   <h2 className="text-sm font-semibold text-gray-800 mb-2">Sample Tests</h2>
                   <div className="space-y-2">
                     {problem.test_cases.map((test, idx) => (
-                      <div key={test.id} className="rounded-lg border border-gray-200 p-3 bg-gray-50">
-                        <p className="text-xs text-gray-500 font-medium mb-1">Case {idx + 1}</p>
+                      <div key={test.id} className="rounded-lg border border-neutral-200 p-3 bg-neutral-50">
+                        <p className="text-xs text-neutral-500 font-medium mb-1">Case {idx + 1}</p>
                         <p className="text-xs text-gray-700"><span className="font-semibold">Input:</span> {test.input_data || '(empty)'}</p>
                         <p className="text-xs text-gray-700"><span className="font-semibold">Expected:</span> {test.expected_output || '(empty)'}</p>
                       </div>
@@ -160,7 +160,7 @@ export default function CodingAssessmentPage() {
               )}
             </section>
 
-            <section className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
+            <section className="bg-white rounded-2xl border border-neutral-200 p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-semibold text-gray-800">Compiler (Python)</h2>
                 <div className="flex items-center gap-2">
@@ -224,10 +224,10 @@ export default function CodingAssessmentPage() {
               )}
 
               {submission && (
-                <div className="rounded-xl border border-gray-200 p-4 space-y-3">
+                <div className="rounded-xl border border-neutral-200 p-4 space-y-3">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-semibold text-gray-800">Result</p>
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-neutral-600">
                       {submission.passed_tests}/{submission.total_tests} passed ({submission.score_percent}%)
                     </p>
                   </div>
