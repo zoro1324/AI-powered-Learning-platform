@@ -115,18 +115,18 @@ export default function AssessmentPage() {
   }, {} as Record<Difficulty, number[]>);
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="app-shell">
       <Sidebar />
       
-      <main className="flex-1 ml-64">
+      <main className="app-main">
         <div className="min-h-screen py-12 px-8">
           <div className="max-w-4xl mx-auto">
             {/* Header */}
             <div className="text-center mb-8">
-              <h1 className="text-4xl font-semibold text-gray-900 mb-4">
+              <h1 className="text-4xl font-semibold text-neutral-900 mb-4">
                 Let's Understand Your Level
               </h1>
-              <p className="text-gray-600 text-lg">
+              <p className="text-neutral-600 text-lg">
                 Answer the following questions to personalize your learning path
               </p>
             </div>
@@ -134,16 +134,16 @@ export default function AssessmentPage() {
             {/* Progress Bar */}
             <div className="mb-8">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-600">
+                <span className="text-sm font-medium text-neutral-600">
                   Question {currentQuestionIndex + 1} of {totalQuestions}
                 </span>
-                <span className="text-sm font-medium text-gray-600">
+                <span className="text-sm font-medium text-neutral-600">
                   {Math.round(progress)}% Complete
                 </span>
               </div>
               <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-blue-500 to-purple-600 transition-all duration-300"
+                  className="h-full bg-neutral-900 transition-all duration-300"
                   style={{ width: `${progress}%` }}
                 />
               </div>
@@ -151,8 +151,8 @@ export default function AssessmentPage() {
 
             {/* Difficulty Indicator */}
             <div className="mb-6">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-gray-200">
-                <span className="text-sm font-medium text-gray-600">Difficulty:</span>
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-neutral-200">
+                <span className="text-sm font-medium text-neutral-600">Difficulty:</span>
                 <span
                   className={`text-sm font-semibold px-3 py-1 rounded-lg ${
                     currentQuestion.difficulty === 'Easy'
@@ -168,8 +168,8 @@ export default function AssessmentPage() {
             </div>
 
             {/* Question Card */}
-            <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-6">
+            <div className="surface-card p-8 mb-6">
+              <h2 className="text-2xl font-semibold text-neutral-900 mb-6">
                 {currentQuestion.question}
               </h2>
 
@@ -178,9 +178,9 @@ export default function AssessmentPage() {
                   <button
                     key={index}
                     onClick={() => handleAnswer(index)}
-                    className="w-full text-left px-6 py-4 rounded-xl border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 transition-all font-medium text-gray-700 hover:text-gray-900"
+                    className="w-full text-left px-6 py-4 rounded-xl border-2 border-neutral-200 hover:border-neutral-700 hover:bg-neutral-100 transition-all font-medium text-gray-700 hover:text-neutral-900"
                   >
-                    <span className="inline-flex items-center justify-center w-8 h-8 bg-gray-100 rounded-lg mr-4 font-semibold text-gray-600">
+                    <span className="inline-flex items-center justify-center w-8 h-8 bg-gray-100 rounded-lg mr-4 font-semibold text-neutral-600">
                       {String.fromCharCode(65 + index)}
                     </span>
                     {option}
@@ -193,7 +193,7 @@ export default function AssessmentPage() {
             <div className="text-center">
               <button
                 onClick={() => handleAnswer(null)}
-                className="text-gray-600 hover:text-gray-900 font-medium underline"
+                className="text-neutral-600 hover:text-neutral-900 font-medium underline"
               >
                 I Don't Know This Question
               </button>
