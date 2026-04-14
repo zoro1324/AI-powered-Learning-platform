@@ -16,7 +16,7 @@ export default function ForgotPasswordPage() {
 
   if (isSubmitted) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-[#f7f5f1] flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           {/* Back Button */}
           <Link to="/" className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors">
@@ -25,7 +25,7 @@ export default function ForgotPasswordPage() {
           </Link>
 
           {/* Success Card */}
-          <div className="bg-white rounded-3xl shadow-xl p-8 text-center">
+          <div className="bg-white border border-neutral-200 rounded-3xl shadow-sm p-8 text-center">
             <div className="inline-flex items-center justify-center w-16 h-16 bg-green-100 rounded-full mb-6">
               <CheckCircle2 className="w-8 h-8 text-green-600" />
             </div>
@@ -59,7 +59,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#f7f5f1] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Back Button */}
         <Link to="/" className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors">
@@ -69,14 +69,15 @@ export default function ForgotPasswordPage() {
 
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mb-4 shadow-lg">
-            <BookOpen className="w-8 h-8 text-white" />
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-neutral-900 rounded-full mb-4 shadow-md">
+            <BookOpen className="w-7 h-7 text-white" />
           </div>
-          <h1 className="text-3xl font-semibold text-gray-900 mb-2">LearnPath</h1>
+          <h1 className="text-3xl font-semibold text-neutral-900 mb-2">LearnPath</h1>
+          <p className="text-sm text-neutral-600">Securely recover access to your workspace.</p>
         </div>
 
         {/* Forgot Password Card */}
-        <div className="bg-white rounded-3xl shadow-xl p-8">
+        <div className="bg-white border border-neutral-200 rounded-3xl shadow-sm p-8">
           <div className="mb-8">
             <h2 className="text-2xl font-semibold text-gray-900 mb-2">Forgot Password?</h2>
             <p className="text-gray-600">No worries! Enter your email and we'll send you a reset link.</p>
