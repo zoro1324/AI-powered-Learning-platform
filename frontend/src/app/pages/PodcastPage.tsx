@@ -91,12 +91,12 @@ const PodcastPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8 px-4">
+    <div className="min-h-screen bg-neutral-50 py-8 px-4">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Podcast Generator</h1>
-          <p className="text-gray-600">
+          <h1 className="text-3xl font-bold text-neutral-900 mb-2">Podcast Generator</h1>
+          <p className="text-neutral-600">
             Transform your content into engaging audio conversations
           </p>
         </div>
@@ -119,15 +119,15 @@ const PodcastPage: React.FC = () => {
                         isCompleted
                           ? 'bg-green-500 text-white'
                           : isActive
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-200 text-gray-600'
+                          ? 'bg-neutral-900 text-white'
+                          : 'bg-gray-200 text-neutral-600'
                       }`}
                     >
                       {isCompleted ? '✓' : index + 1}
                     </div>
                     <span
                       className={`mt-2 text-sm font-medium ${
-                        isActive ? 'text-blue-600' : 'text-gray-600'
+                        isActive ? 'text-neutral-700' : 'text-neutral-600'
                       }`}
                     >
                       {step}
@@ -157,19 +157,19 @@ const PodcastPage: React.FC = () => {
         {/* Step 1: Input Content */}
         {currentStep === 'input' && (
           <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Enter Your Content</h2>
-            <p className="text-gray-600 mb-4">
+            <h2 className="text-xl font-bold text-neutral-900 mb-4">Enter Your Content</h2>
+            <p className="text-neutral-600 mb-4">
               Paste the text content you want to convert into a podcast conversation.
             </p>
             <textarea
-              className="w-full h-64 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full h-64 p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-neutral-900/20 focus:border-transparent"
               placeholder="Enter your content here..."
               value={content}
               onChange={(e) => setContent(e.target.value)}
             />
             <div className="mt-4 flex justify-end">
               <button
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                className="px-6 py-2 bg-neutral-900 text-white rounded-lg hover:bg-neutral-800 disabled:bg-gray-400 disabled:cursor-not-allowed"
                 onClick={handleContentSubmit}
                 disabled={loading || !content.trim()}
               >
@@ -182,21 +182,21 @@ const PodcastPage: React.FC = () => {
         {/* Step 2: Select Personas */}
         {currentStep === 'personas' && (
           <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Choose Conversation Style</h2>
-            <p className="text-gray-600 mb-6">
+            <h2 className="text-xl font-bold text-neutral-900 mb-4">Choose Conversation Style</h2>
+            <p className="text-neutral-600 mb-6">
               Select the pair of personas that will have the conversation
             </p>
             <div className="space-y-4">
               {personaOptions.map((option, index) => (
                 <button
                   key={index}
-                  className="w-full p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors text-left"
+                  className="w-full p-4 border-2 border-neutral-200 rounded-lg hover:border-neutral-700 hover:bg-neutral-100 transition-colors text-left"
                   onClick={() => handlePersonaSelect(option)}
                   disabled={loading}
                 >
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-semibold text-gray-900">
+                      <p className="font-semibold text-neutral-900">
                         {option.person1} ↔ {option.person2}
                       </p>
                     </div>
@@ -219,7 +219,7 @@ const PodcastPage: React.FC = () => {
             </div>
             <div className="mt-6 flex justify-between">
               <button
-                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-neutral-50"
                 onClick={() => setCurrentStep('input')}
               >
                 Back
@@ -231,22 +231,22 @@ const PodcastPage: React.FC = () => {
         {/* Step 3: Select Scenario */}
         {currentStep === 'scenarios' && (
           <div className="bg-white rounded-lg shadow-sm p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Choose Conversation Topic</h2>
-            <p className="text-gray-600 mb-2">
+            <h2 className="text-xl font-bold text-neutral-900 mb-4">Choose Conversation Topic</h2>
+            <p className="text-neutral-600 mb-2">
               Selected: <span className="font-semibold">{selectedPersonas?.person1}</span> and{' '}
               <span className="font-semibold">{selectedPersonas?.person2}</span>
             </p>
-            <p className="text-gray-600 mb-6">Select the conversation style or focus</p>
+            <p className="text-neutral-600 mb-6">Select the conversation style or focus</p>
             <div className="space-y-4">
               {scenarioOptions.map((option, index) => (
                 <button
                   key={index}
-                  className="w-full p-4 border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors text-left"
+                  className="w-full p-4 border-2 border-neutral-200 rounded-lg hover:border-neutral-700 hover:bg-neutral-100 transition-colors text-left"
                   onClick={() => handleScenarioSelect(option)}
                   disabled={loading}
                 >
                   <div className="flex items-center justify-between">
-                    <p className="font-semibold text-gray-900">{option}</p>
+                    <p className="font-semibold text-neutral-900">{option}</p>
                     <svg
                       className="w-6 h-6 text-gray-400"
                       fill="none"
@@ -266,7 +266,7 @@ const PodcastPage: React.FC = () => {
             </div>
             <div className="mt-6 flex justify-between">
               <button
-                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-neutral-50"
                 onClick={() => setCurrentStep('personas')}
               >
                 Back
@@ -279,9 +279,9 @@ const PodcastPage: React.FC = () => {
         {currentStep === 'generating' && (
           <div className="bg-white rounded-lg shadow-sm p-6">
             <div className="flex flex-col items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600 mb-4"></div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">Generating Your Podcast</h2>
-              <p className="text-gray-600 text-center">
+              <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-neutral-800 mb-4"></div>
+              <h2 className="text-xl font-bold text-neutral-900 mb-2">Generating Your Podcast</h2>
+              <p className="text-neutral-600 text-center">
                 Creating conversation script and synthesizing audio...
                 <br />
                 This may take a few minutes.
@@ -310,22 +310,22 @@ const PodcastPage: React.FC = () => {
                 </svg>
               </div>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-4 text-center">
+            <h2 className="text-2xl font-bold text-neutral-900 mb-4 text-center">
               Podcast Generated Successfully!
             </h2>
-            <div className="bg-gray-50 rounded-lg p-6 mb-6">
+            <div className="bg-neutral-50 rounded-lg p-6 mb-6">
               <div className="mb-4">
-                <p className="text-sm text-gray-600 mb-1">Personas</p>
+                <p className="text-sm text-neutral-600 mb-1">Personas</p>
                 <p className="font-semibold">
                   {selectedPersonas?.person1} & {selectedPersonas?.person2}
                 </p>
               </div>
               <div className="mb-4">
-                <p className="text-sm text-gray-600 mb-1">Scenario</p>
+                <p className="text-sm text-neutral-600 mb-1">Scenario</p>
                 <p className="font-semibold">{selectedScenario}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-600 mb-2">Audio</p>
+                <p className="text-sm text-neutral-600 mb-2">Audio</p>
                 <audio
                   controls
                   className="w-full"
@@ -337,7 +337,7 @@ const PodcastPage: React.FC = () => {
             </div>
             <div className="flex gap-4">
               <button
-                className="flex-1 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="flex-1 px-6 py-2 bg-neutral-900 text-white rounded-lg hover:bg-neutral-800"
                 onClick={resetFlow}
               >
                 Create Another Podcast
@@ -345,7 +345,7 @@ const PodcastPage: React.FC = () => {
               <a
                 href={`http://localhost:8000${audioUrl}`}
                 download
-                className="flex-1 px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 text-center"
+                className="flex-1 px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-neutral-50 text-center"
               >
                 Download Audio
               </a>
