@@ -574,7 +574,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
             )}
           </div>
           {hasData && (
-            <CheckCircle2 className="w-4 h-4 text-green-400" />
+            <CheckCircle2 className="w-4 h-4 text-neutral-300" />
           )}
         </div>
 
@@ -644,7 +644,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
               className={cn(
                 'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-all',
                 activeTab === 'chat'
-                  ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-sm'
+                  ? 'bg-neutral-900 text-white shadow-sm'
                   : 'text-gray-500 hover:text-gray-700'
               )}
             >
@@ -690,7 +690,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                 <ToolCard
                   icon={Network}
                   label="Course Mind Map"
-                  bgColor="bg-indigo-800/80"
+                  bgColor="bg-neutral-900"
                   hasData={!!mindMapData}
                   isLoading={isMindMapLoading}
                   onGenerate={handleGenerateMindMap}
@@ -702,7 +702,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                       onClick={() => setMindMapDialogOpen(true)}
                       className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
                     >
-                      <Network className="w-4 h-4 text-indigo-600 shrink-0" />
+                      <Network className="w-4 h-4 text-neutral-700 shrink-0" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-gray-700 truncate">
                           Course Mind Map
@@ -731,7 +731,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                 <ToolCard
                   icon={FileText}
                   label="Notes"
-                  bgColor="bg-emerald-800/80"
+                  bgColor="bg-neutral-900"
                   hasData={!!content}
                   isLoading={isContentLoading}
                   onGenerate={() => handleGenerateContent(!!content)}
@@ -740,7 +740,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                 <ToolCard
                   icon={ListChecks}
                   label="Quiz"
-                  bgColor="bg-amber-800/80"
+                  bgColor="bg-neutral-800"
                   hasData={!!quiz}
                   isLoading={isQuizLoading}
                   onGenerate={handleGenerateQuiz}
@@ -750,7 +750,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                 <ToolCard
                   icon={Video}
                   label="Video"
-                  bgColor="bg-purple-800/80"
+                  bgColor="bg-neutral-900"
                   hasData={
                     videoTask?.status === 'completed' ||
                     resources.some(r => r.resource_type === 'video')
@@ -766,7 +766,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                 <ToolCard
                   icon={Headphones}
                   label="Podcast"
-                  bgColor="bg-blue-800/80"
+                  bgColor="bg-neutral-900"
                   hasData={
                     !!generatedPodcast ||
                     resources.some(r => r.resource_type === 'audio')
@@ -779,7 +779,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                 <ToolCard
                   icon={Network}
                   label="Mind Map"
-                  bgColor="bg-indigo-800/80"
+                  bgColor="bg-neutral-900"
                   hasData={!!topicMindMapData}
                   isLoading={isTopicMindMapLoading}
                   onGenerate={handleGenerateTopicMindMap}
@@ -789,7 +789,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                 <ToolCard
                   icon={Code2}
                   label="Try Yourself"
-                  bgColor="bg-cyan-800/80"
+                  bgColor="bg-neutral-900"
                   hasData={
                     !!codingProblem ||
                     resources.some((r) => r.resource_type === 'code_exercise')
@@ -810,7 +810,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                 <ToolCard
                   icon={Code2}
                   label="Sample Code"
-                  bgColor="bg-teal-800/80"
+                  bgColor="bg-neutral-900"
                   hasData={resources.some((r) => r.resource_type === 'code_exercise' && r.content_json?.mode === 'sample_code')}
                   isLoading={sampleCodeLoading}
                   onGenerate={handleGenerateSampleCode}
@@ -822,7 +822,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                 <ToolCard
                   icon={Sparkle}
                   label="Dynamic Script"
-                  bgColor="bg-fuchsia-800/80"
+                  bgColor="bg-neutral-900"
                   hasData={!!dynamicScript && dynamicScript.blocks.length > 0}
                   isLoading={isDynamicScriptLoading}
                   onGenerate={handleGenerateDynamicScript}
@@ -861,7 +861,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                               })
                             )
                           }
-                          className="flex items-center gap-1 text-[10px] text-emerald-600 hover:text-emerald-500 transition-colors"
+                          className="flex items-center gap-1 text-[10px] text-neutral-700 hover:text-neutral-900 transition-colors"
                         >
                           <Plus className="w-3 h-3" />
                           New Note
@@ -883,7 +883,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                         }
                         className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
                       >
-                        <FileText className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <FileText className="w-4 h-4 text-neutral-700 shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-gray-700 truncate">
                             {currentTopic?.topic_name} - Notes
@@ -901,11 +901,11 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                     {topicMindMapData && (
                       <button
                         onClick={() => openMindMapDialog(topicMindMapData, `${currentTopic?.topic_name} - Mind Map`)}
-                        className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-800 transition-colors text-left"
+                        className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-neutral-50 transition-colors text-left"
                       >
-                        <Network className="w-4 h-4 text-indigo-400 shrink-0" />
+                        <Network className="w-4 h-4 text-neutral-700 shrink-0" />
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm text-gray-300 truncate">
+                          <p className="text-sm text-gray-700 truncate">
                             {currentTopic?.topic_name} - Mind Map
                           </p>
                           <p className="text-[10px] text-gray-500">
@@ -932,7 +932,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                           }
                           className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
                         >
-                          <FileText className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <FileText className="w-4 h-4 text-neutral-700 shrink-0" />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm text-gray-700 truncate">
                               {resource.title}
@@ -948,7 +948,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
 
                     {quiz && (
                       <div className="w-full flex items-center gap-3 p-2 rounded-lg bg-gray-50 border border-gray-100">
-                        <ListChecks className="w-4 h-4 text-amber-600 shrink-0" />
+                        <ListChecks className="w-4 h-4 text-neutral-700 shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-gray-700 truncate">
                             {currentTopic?.topic_name} - Quiz
@@ -975,7 +975,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                         }
                         className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
                       >
-                        <Sparkle className="w-4 h-4 text-fuchsia-600 shrink-0" />
+                        <Sparkle className="w-4 h-4 text-neutral-700 shrink-0" />
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-gray-700 truncate">
                             {dynamicScript.title}
@@ -1004,7 +1004,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                           }
                           className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
                         >
-                          <Video className="w-4 h-4 text-purple-600 shrink-0" />
+                          <Video className="w-4 h-4 text-neutral-700 shrink-0" />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm text-gray-700 truncate">
                               {resource.title}
@@ -1021,7 +1021,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                     {videoTask?.status === 'completed' &&
                       resources.filter((r) => r.resource_type === 'video').length === 0 && (
                         <div className="w-full flex items-center gap-3 p-2 rounded-lg bg-gray-50 border border-gray-100">
-                          <Video className="w-4 h-4 text-purple-600 shrink-0" />
+                          <Video className="w-4 h-4 text-neutral-700 shrink-0" />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm text-gray-700 truncate">
                               {currentTopic?.topic_name} - Video
@@ -1048,7 +1048,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                           }
                           className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
                         >
-                          <Headphones className="w-4 h-4 text-blue-600 shrink-0" />
+                          <Headphones className="w-4 h-4 text-neutral-700 shrink-0" />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm text-gray-700 truncate">
                               {resource.title}
@@ -1065,7 +1065,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                     {generatedPodcast &&
                       resources.filter((r) => r.resource_type === 'audio').length === 0 && (
                         <div className="w-full flex items-center gap-3 p-2 rounded-lg bg-gray-50 border border-gray-100">
-                          <Headphones className="w-4 h-4 text-blue-600 shrink-0" />
+                          <Headphones className="w-4 h-4 text-neutral-700 shrink-0" />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm text-gray-700 truncate">
                               {currentTopic?.topic_name} - Podcast
@@ -1102,7 +1102,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                           }}
                           className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition-colors text-left"
                         >
-                          <Code2 className="w-4 h-4 text-cyan-600 shrink-0" />
+                          <Code2 className="w-4 h-4 text-neutral-700 shrink-0" />
                           <div className="flex-1 min-w-0">
                             <p className="text-sm text-gray-700 truncate">
                               {resource.title}
@@ -1147,7 +1147,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
         <DialogContent className="!max-w-none !w-screen !h-screen !p-0 overflow-hidden flex flex-col bg-[#E8EAED] border-0 !rounded-none !translate-x-[-50%] !translate-y-[-50%] !top-[50%] !left-[50%]">
           <DialogHeader className="p-6 border-b border-gray-300 bg-white flex-shrink-0">
             <DialogTitle className="text-xl font-bold items-center gap-2 flex text-gray-800">
-              <Network className="w-5 h-5 text-indigo-500" />
+              <Network className="w-5 h-5 text-neutral-700" />
               {activeMindMapTitle}
             </DialogTitle>
           </DialogHeader>
@@ -1162,7 +1162,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Code2 className="w-5 h-5 text-cyan-600" />
+              <Code2 className="w-5 h-5 text-neutral-700" />
               Coding Assessment
             </DialogTitle>
           </DialogHeader>
@@ -1203,7 +1203,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
 
               {eId && codingProblem && (
                 <Button
-                  className="w-full bg-cyan-600 hover:bg-cyan-700"
+                  className="w-full bg-neutral-900 hover:bg-neutral-800"
                   onClick={() => {
                     setCodingDialogOpen(false);
                     navigate(`/course/${eId}/module/${mIdx}/topic/${tIdx}/coding/${codingProblem.id}`);
@@ -1224,7 +1224,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
         <DialogContent className="!max-w-none !w-[95vw] !h-[92vh] !p-0 overflow-hidden flex flex-col bg-white border border-gray-200">
           <DialogHeader className="px-6 py-4 border-b border-gray-200 bg-gray-50">
             <DialogTitle className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <Sparkle className="w-5 h-5 text-fuchsia-600" />
+              <Sparkle className="w-5 h-5 text-neutral-700" />
               {dynamicScript?.title || 'Dynamic Script'}
             </DialogTitle>
             {dynamicScript?.overview && (
@@ -1341,7 +1341,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                     )}
 
                     {block.type === 'code' && (
-                      <div className="rounded-lg border border-cyan-200 bg-cyan-50/40 p-3 space-y-3">
+                      <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 space-y-3">
                         <div className="flex items-center justify-between gap-2">
                           <p className="text-sm font-medium text-gray-900">
                             {block.payload?.title || 'Interactive Coding Block'}
@@ -1351,7 +1351,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                               size="sm"
                               onClick={() => prepareCodeRunner(blockIndex, block.prompt)}
                               disabled={runner.loading}
-                              className="bg-cyan-600 hover:bg-cyan-700"
+                              className="bg-neutral-900 hover:bg-neutral-800"
                             >
                               {runner.loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Initialize Runner'}
                             </Button>
@@ -1360,7 +1360,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                               size="sm"
                               onClick={() => runCodeBlock(blockIndex)}
                               disabled={runner.submitting || !runner.code.trim()}
-                              className="bg-cyan-600 hover:bg-cyan-700 gap-2"
+                              className="bg-neutral-900 hover:bg-neutral-800 gap-2"
                             >
                               {runner.submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
                               Run
@@ -1375,7 +1375,7 @@ export function StudioPanel({ collapsed, onToggle }: StudioPanelProps) {
                         )}
 
                         {runner.problem && (
-                          <div className="h-[420px] rounded-lg overflow-hidden border border-cyan-300 bg-white">
+                          <div className="h-[420px] rounded-lg overflow-hidden border border-neutral-200 bg-white">
                             <ResizablePanelGroup direction="horizontal">
                               <ResizablePanel defaultSize={60} minSize={35}>
                                 <div className="h-full flex flex-col">

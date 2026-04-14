@@ -115,7 +115,7 @@ export function CourseOutlineSidebar({
       {/* Logo - Clickable to Dashboard */}
       <Link to="/dashboard" className="px-4 pt-4 pb-2 border-b border-gray-200 hover:bg-gray-50 transition-colors">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+          <div className="w-8 h-8 bg-neutral-900 rounded-lg flex items-center justify-center">
             <BookOpen className="w-5 h-5 text-white" />
           </div>
           <span className="font-semibold text-lg text-gray-900">LearnPath</span>
@@ -171,9 +171,9 @@ export function CourseOutlineSidebar({
                       {!unlocked ? (
                         <Lock className="w-4 h-4 text-gray-400 shrink-0" />
                       ) : allComplete ? (
-                        <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                        <CheckCircle2 className="w-4 h-4 text-neutral-700 shrink-0" />
                       ) : (
-                        <BookOpen className="w-4 h-4 text-blue-500 shrink-0" />
+                        <BookOpen className="w-4 h-4 text-neutral-700 shrink-0" />
                       )}
                       <span className={cn(
                         'font-medium text-sm truncate',
@@ -217,16 +217,16 @@ export function CourseOutlineSidebar({
                           className={cn(
                             'flex items-start gap-2.5 px-3 py-2.5 rounded-lg transition-colors text-sm group',
                             isActive
-                              ? 'bg-blue-50 border-l-2 border-blue-500'
+                              ? 'bg-neutral-100 border-l-2 border-neutral-700'
                               : 'hover:bg-gray-50 border-l-2 border-transparent'
                           )}
                         >
                           {/* Status Icon */}
                           <div className="mt-0.5 shrink-0">
                             {completed ? (
-                              <CheckCircle2 className="w-4 h-4 text-green-500" />
+                              <CheckCircle2 className="w-4 h-4 text-neutral-700" />
                             ) : isActive || started ? (
-                              <PlayCircle className="w-4 h-4 text-blue-500" />
+                              <PlayCircle className="w-4 h-4 text-neutral-700" />
                             ) : (
                               <Circle className="w-4 h-4 text-gray-300" />
                             )}
@@ -238,7 +238,7 @@ export function CourseOutlineSidebar({
                               className={cn(
                                 'text-sm leading-tight',
                                 isActive
-                                  ? 'text-blue-700 font-medium'
+                                  ? 'text-neutral-900 font-medium'
                                   : completed
                                   ? 'text-gray-500'
                                   : 'text-gray-700'
