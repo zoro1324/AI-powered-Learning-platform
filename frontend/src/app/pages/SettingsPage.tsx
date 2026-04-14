@@ -142,7 +142,7 @@ export default function SettingsPage() {
                       onClick={() => setNotifications({ ...notifications, email: !notifications.email })}
                       aria-label="Toggle email notifications"
                       className={`relative w-12 h-6 rounded-full transition-all ${
-                        notifications.email ? 'bg-blue-500' : 'bg-gray-300'
+                        notifications.email ? 'bg-neutral-900' : 'bg-gray-300'
                       }`}
                     >
                       <div
@@ -162,7 +162,7 @@ export default function SettingsPage() {
                       onClick={() => setNotifications({ ...notifications, push: !notifications.push })}
                       aria-label="Toggle push notifications"
                       className={`relative w-12 h-6 rounded-full transition-all ${
-                        notifications.push ? 'bg-blue-500' : 'bg-gray-300'
+                        notifications.push ? 'bg-neutral-900' : 'bg-gray-300'
                       }`}
                     >
                       <div
@@ -182,7 +182,7 @@ export default function SettingsPage() {
                       onClick={() => setNotifications({ ...notifications, courseUpdates: !notifications.courseUpdates })}
                       aria-label="Toggle course update notifications"
                       className={`relative w-12 h-6 rounded-full transition-all ${
-                        notifications.courseUpdates ? 'bg-blue-500' : 'bg-gray-300'
+                        notifications.courseUpdates ? 'bg-neutral-900' : 'bg-gray-300'
                       }`}
                     >
                       <div
@@ -211,7 +211,7 @@ export default function SettingsPage() {
                       onClick={() => setPodcastPreferences({ ...podcastPreferences, enabled: !podcastPreferences.enabled })}
                       aria-label="Toggle audio podcasts"
                       className={`relative w-12 h-6 rounded-full transition-all ${
-                        podcastPreferences.enabled ? 'bg-blue-500' : 'bg-gray-300'
+                        podcastPreferences.enabled ? 'bg-neutral-900' : 'bg-gray-300'
                       }`}
                     >
                       <div
@@ -232,7 +232,7 @@ export default function SettingsPage() {
                       disabled={!podcastPreferences.enabled}
                       aria-label="Toggle auto-generate podcasts"
                       className={`relative w-12 h-6 rounded-full transition-all ${
-                        podcastPreferences.autoGenerate && podcastPreferences.enabled ? 'bg-blue-500' : 'bg-gray-300'
+                        podcastPreferences.autoGenerate && podcastPreferences.enabled ? 'bg-neutral-900' : 'bg-gray-300'
                       } ${!podcastPreferences.enabled ? 'opacity-50 cursor-not-allowed' : ''}`}
                     >
                       <div
