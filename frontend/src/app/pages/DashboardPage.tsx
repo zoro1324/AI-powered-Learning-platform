@@ -22,9 +22,9 @@ export default function DashboardPage() {
 
   if (loading && !dashboard) {
     return (
-      <div className="flex min-h-screen bg-gray-50">
+      <div className="app-shell">
         <Sidebar />
-        <main className="flex-1 ml-64 flex items-center justify-center">
+        <main className="app-main flex items-center justify-center">
           <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
         </main>
       </div>
@@ -32,11 +32,11 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="app-shell">
       <Sidebar />
 
-      <main className="flex-1 ml-64">
-        <div className="p-8">
+      <main className="app-main">
+        <div className="app-content">
           {/* Header */}
           <div className="mb-8">
             <h1 className="text-4xl font-semibold text-gray-900 mb-2">
