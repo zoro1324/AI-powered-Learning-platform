@@ -61,7 +61,6 @@ docker compose exec server python manage.py shell
 ```
 
 ## Notes
-
 - The backend uses values from `server/.env`, with Docker overrides for DB host/credentials.
 - For Docker Compose, MySQL runs in the `db` service and Django connects using `DB_HOST=db`.
 - If you update Python or Node dependencies, rebuild images:
