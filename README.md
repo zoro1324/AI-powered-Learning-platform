@@ -14,7 +14,6 @@ From the repository root:
 ```bash
 docker compose up --build
 ```
-
 Services started:
 
 - Frontend: `http://localhost:5173`
